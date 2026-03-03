@@ -1,44 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 
-const AIRTABLE_TOKEN = "patIocMMJeO1lbzlm.d9ea1e76994175893ff166925528aed82f3caea1eb9126a096b16cebade88cd5";
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
 const EVAL_TABLE = "tblWeri8TXWPQY9Dc";
 
-const PF = {
-  name: "fldfyrSV2RPcv1jU1",
-  currentBalance: "fldenQrAmWXxAC5Qv",
-  ddLeft: "fldLM0EQzoGJDgnvZ",
-  ddToFloor: "fldkETMCEwIf4ir6y",
-  progress: "fldf76ADXNFihKn8O",
-  tradeLimit: "fld2mleAdDsy4E3Q3",
-  invested: "fldAWWar1WK3I9BVi",
-  numAccounts: "fldiJ3GD2NLLc3YIi",
-  status: "fld7UANxkXuwL90xT",
-  trader: "fldi7WIXgdknUa1rw",
-  tradeDown: "fldUi9sc4S0KlzVDh",
-  tradeDownFloor: "fldXIDdvlZcpqQO2r",
-  ddSafety: "fldR93EIPYMSVdlhT",
-  contractMultiplier: "fld4zROk0IUc3hC0R",
-};
-
-const EF = {
-  name: "fldmzqIB76bjvJF3L",
-  currentBalance: "fldahVnKHFGz3wnnR",
-  ddLeft: "fldBdBEe7WxX5VwQE",
-  progress: "fldiKug0vOztdoJ9h",
-  tradeLimit: "fldOkYBx1xHuqO8Ld",
-  status: "fldWV8bPpsFkWpYux",
-  trader: "fld44diXukpSDXv3Y",
-  numAccounts: "fldXpePekEYHk8YCs",
-  ddSafety: "fld4HXGSfB4ZtRyaL",
-};
-
-async function fetchTable(tableId, fieldIds) {
-  const params = fieldIds.map(f => `fields[]=${f}`).join("&");
-  const res = await fetch(
-    `/.netlify/functions/airtable/${BASE}/${tableId}?${params}&maxRecords=100`
-  );
+async function fetchTable(tableId, fields) {
+  const params = fields.map(f => `fields[]=${encodeURIComponent(f)}`).join("&");
+  const res = await fetch(`/.netlify/functions/airtable/${BASE}/${tableId}?${params}&maxRecords=100`);
   const data = await res.json();
   return data.records || [];
 }
@@ -51,11 +19,6 @@ async function updateRecord(tableId, recordId, fields) {
   });
 }
 
-function toScore(p) {
-  if (!p && p !== 0) return 0;
-  return Math.max(1, Math.min(10, Math.round(p * 10)));
-}
-
 function $$(v) {
   if (v === null || v === undefined || v === "") return "—";
   const n = parseFloat(v);
@@ -63,11 +26,9 @@ function $$(v) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-function getField(fields, key) {
-  const val = fields[key];
-  if (Array.isArray(val)) return val[0]?.name ?? val[0] ?? null;
-  if (val && typeof val === "object" && "name" in val) return val.name;
-  return val ?? null;
+function toScore(p) {
+  if (!p && p !== 0) return 0;
+  return Math.max(1, Math.min(10, Math.round(p * 10)));
 }
 
 function Bar({ prog }) {
@@ -115,13 +76,12 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
   const diff = noChange ? 0 : hasV ? (v - a.bal) * a.n : null;
   const pos = diff > 0;
   const zero = diff === 0;
-  const C = { card: "#111827", border: "#1f2937" };
-  const tradeDownHit = a.tradeDown && hasV && !noChange && diff !== null && diff < 0 && Math.abs(diff) >= (a.ddToFloor || a.ddLeft);
+  const tradeDownHit = a.tradeDown && hasV && !noChange && diff !== null && diff < 0 && Math.abs(diff / a.n) >= (a.ddToFloor || a.ddLeft);
 
   return (
     <div style={{
-      background: C.card,
-      border: `1px solid ${tradeDownHit ? "#dc2626" : noChange ? "#1f4f1f" : hasV ? (pos ? "#166534" : "#7f1d1d") : C.border}`,
+      background: "#111827",
+      border: `1px solid ${tradeDownHit ? "#dc2626" : noChange ? "#1f4f1f" : hasV ? (pos ? "#166534" : "#7f1d1d") : "#1f2937"}`,
       borderRadius: 10, padding: "10px 14px", marginBottom: 5,
       display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
       boxShadow: tradeDownHit ? "0 0 12px rgba(220,38,38,0.4)" : "none",
@@ -177,9 +137,7 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
           <span style={{ fontSize: 16 }}>⚠️</span>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#fca5a5" }}>TRADE DOWN TRIGGERED — Recovery trade required</div>
-            <div style={{ fontSize: 11, color: "#f87171" }}>
-              Target: get back to {$$(a.bal)} or breach. {a.invested > 0 && `Pull ${$$(Math.abs(diff / a.ddLeft) * a.invested)} from this account's investment.`}
-            </div>
+            <div style={{ fontSize: 11, color: "#f87171" }}>Target: get back to {$$(a.bal)} or breach. {a.invested > 0 && `Pull ${$$(Math.abs(diff / a.ddLeft) * a.invested)} from this account's investment.`}</div>
           </div>
         </div>
       )}
@@ -187,14 +145,8 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Today's Ending Balance</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input
-            type="number"
-            placeholder="Enter balance..."
-            value={inputVal}
-            onChange={e => onInput(e.target.value)}
-            disabled={noChange}
-            style={{ background: noChange ? "#1a2a1a" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#6b7280" : "#fff", width: 125, outline: "none" }}
-          />
+          <input type="number" placeholder="Enter balance..." value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange}
+            style={{ background: noChange ? "#1a2a1a" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#6b7280" : "#fff", width: 125, outline: "none" }} />
           <button onClick={onNoChange}
             style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
             {noChange ? "✓ No Change" : "No Change"}
@@ -210,9 +162,53 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
   );
 }
 
+function SectionGroup({ title, accounts, inputs, noChanges, onInput, onNoChange, startIndex }) {
+  if (accounts.length === 0) return null;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #1f2937", marginBottom: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1 }}>{title}</span>
+        <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
+      </div>
+      {accounts.map((a, i) => (
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} />
+      ))}
+    </div>
+  );
+}
+
+function Section({ title, accounts, inputs, noChanges, onInput, onNoChange, color }) {
+  if (accounts.length === 0) return null;
+
+  // Group by data provider
+  const groups = {};
+  accounts.forEach(a => {
+    const dp = a.dataProvider || "Other";
+    if (!groups[dp]) groups[dp] = [];
+    groups[dp].push(a);
+  });
+  const sorted = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+
+  let idx = 0;
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ width: 3, height: 18, background: color, borderRadius: 99 }} />
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{accounts.length}</span>
+      </div>
+      {sorted.map(([dp, accs]) => {
+        const start = idx;
+        idx += accs.length;
+        return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} startIndex={start} />;
+      })}
+    </div>
+  );
+}
+
 export default function App() {
-  const [perfs, setPerfs] = useState([]);
-  const [evals, setEvals] = useState([]);
+  const [perfAccounts, setPerfAccounts] = useState([]);
+  const [evalAccounts, setEvalAccounts] = useState([]);
   const [inputs, setInputs] = useState({});
   const [noChanges, setNoChanges] = useState({});
   const [loading, setLoading] = useState(true);
@@ -227,69 +223,68 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, Object.values(PF)),
-        fetchTable(EVAL_TABLE, Object.values(EF)),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
-      const mappedPerfs = pr
-        .filter(r => {
-          const s = r.fields[PF.status];
-          const statusName = s?.name || s;
-          return activeStatuses.includes(statusName);
-        })
-        .map(r => {
-          const f = r.fields;
-          return {
-            id: r.id, type: "perf",
-            name: getField(f, PF.name) || "?",
-            trader: Array.isArray(f[PF.trader]) ? (f[PF.trader][0]?.name || "") : (f[PF.trader] || ""),
-            status: getField(f, PF.status) || "",
-            bal: f[PF.currentBalance] || 0,
-            ddLeft: f[PF.ddLeft] || 0,
-            ddToFloor: f[PF.ddToFloor] || 0,
-            prog: f[PF.progress] || 0,
-            limit: f[PF.tradeLimit] || 0,
-            invested: f[PF.invested] || 0,
-            n: f[PF.numAccounts] || 1,
-            ddSafety: f[PF.ddSafety] || 0,
-            tradeDown: f[PF.tradeDown] || false,
-            tradeDownFloor: f[PF.tradeDownFloor] || 0,
-            contractMultiplier: f[PF.contractMultiplier] || 1,
-          };
-        })
-        .sort((a, b) => a.prog - b.prog);
+      const mapPerf = r => {
+        const f = r.fields;
+        const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        return {
+          id: r.id, type: "perf",
+          name: f["Name"] || "?",
+          trader: "",
+          status: f["Status"] || "",
+          bal: f["Current Balance"] || 0,
+          ddLeft: f["Current Drawdown Left"] || 0,
+          ddToFloor: f["Drawdown to Floor"] || 0,
+          prog: f["Progress to Stage Target"] || 0,
+          limit: f["Max Trade Size"] || 0,
+          invested: f["Invested Per Account"] || 0,
+          n: f["Number of Accounts"] || 1,
+          ddSafety: f["Drawdown Safety"] || 0,
+          tradeDown: f["Trade Down Account"] || false,
+          tradeDownFloor: f["Trade Down Floor"] || 0,
+          contractMultiplier: f["Contract Multiplier"] || 1,
+          payoutAccount: f["Payout Account"] || false,
+          dataProvider: dp,
+        };
+      };
 
-      const mappedEvals = er
-        .filter(r => activeStatuses.includes(r.fields["Status"]))
-        .map(r => {
-          const f = r.fields;
-          return {
-            id: r.id, type: "perf",
-            name: f["Name"] || "?",
-            trader: "",
-            status: f["Status"] || "",
-            bal: f["Current Balance"] || 0,
-            ddLeft: f["Current Drawdown Left"] || 0,
-            ddToFloor: f["Drawdown to Floor"] || 0,
-            prog: f["Progress to Stage Target"] || 0,
-            limit: f["Max Trade Size"] || 0,
-            invested: f["Invested Per Account"] || 0,
-            n: f["Number of Accounts"] || 1,
-            ddSafety: f["Drawdown Safety"] || 0,
-            tradeDown: f["Trade Down Account"] || false,
-            tradeDownFloor: f["Trade Down Floor"] || 0,
-            contractMultiplier: f["Contract Multiplier"] || 1,
-          };
-        })
-        .sort((a, b) => a.prog - b.prog);
+      const mapEval = r => {
+        const f = r.fields;
+        const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        return {
+          id: r.id, type: "eval",
+          name: f["Name"] || "?",
+          trader: "",
+          status: f["Status"] || "",
+          bal: f["Current Balance"] || 0,
+          ddLeft: f["Current Drawdown Left"] || 0,
+          ddToFloor: 0,
+          prog: f["Progress to Target"] || 0,
+          limit: f["Max Trade Size"] || 0,
+          invested: 0,
+          n: f["Number of Accounts"] || 1,
+          ddSafety: f["Drawdown Safety"] || 0,
+          tradeDown: false,
+          tradeDownFloor: 0,
+          contractMultiplier: 1,
+          payoutAccount: false,
+          dataProvider: dp,
+        };
+      };
 
-      console.log("mapped perfs:", mappedPerfs);
-      setPerfs(mappedPerfs);
-      setEvals(mappedEvals);
+      const perfs = pr.filter(r => activeStatuses.includes(r.fields["Status"])).map(mapPerf).sort((a, b) => a.prog - b.prog);
+      const evals = er.filter(r => r.fields["Status"] === "Active").map(mapEval).sort((a, b) => a.prog - b.prog);
+
+      setPerfAccounts(perfs);
+      setEvalAccounts(evals);
+
       const inp = {};
-      [...mappedPerfs, ...mappedEvals].forEach(a => { inp[a.id] = ""; });
+      [...perfs, ...evals].forEach(a => { inp[a.id] = ""; });
       setInputs(inp);
       setNoChanges({});
     } catch (e) {
@@ -314,11 +309,11 @@ export default function App() {
   async function save() {
     setSaving(true); setErr(null);
     try {
-      const perfUpdates = perfs.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
-      const evalUpdates = evals.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
+      const perfUpdates = perfAccounts.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
+      const evalUpdates = evalAccounts.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
       await Promise.all([
-        ...perfUpdates.map(a => updateRecord(PERF_TABLE, a.id, { [PF.currentBalance]: parseFloat(inputs[a.id]) })),
-        ...evalUpdates.map(a => updateRecord(EVAL_TABLE, a.id, { [EF.currentBalance]: parseFloat(inputs[a.id]) })),
+        ...perfUpdates.map(a => updateRecord(PERF_TABLE, a.id, { "Current Balance": parseFloat(inputs[a.id]) })),
+        ...evalUpdates.map(a => updateRecord(EVAL_TABLE, a.id, { "Current Balance": parseFloat(inputs[a.id]) })),
       ]);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -329,7 +324,11 @@ export default function App() {
     setSaving(false);
   }
 
-  const all = [...evals, ...perfs];
+  // Split performance accounts into 3 groups
+  const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount || a.status === "Waiting on Payout");
+  const standardPerf = perfAccounts.filter(a => !liveOrPayout.includes(a));
+
+  const all = [...evalAccounts, ...perfAccounts];
   const gain = all.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d > 0 ? s + d : s; }, 0);
   const loss = all.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d < 0 ? s + d : s; }, 0);
   const net = gain + loss;
@@ -378,7 +377,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "16px 20px" }}>
+      <div style={{ maxWidth: 1300, margin: "0 auto", padding: "16px 20px" }}>
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>⚠ {err}</div>}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
@@ -401,24 +400,9 @@ export default function App() {
 
         {tab === "gameplan" && (
           <>
-            {evals.length > 0 && (
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>Evaluation Accounts</span>
-                  <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{evals.length}</span>
-                  <span style={{ fontSize: 11, color: "#6b7280" }}>Lowest score first → reset candidates</span>
-                </div>
-                {evals.map((a, i) => <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} />)}
-              </div>
-            )}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>Performance Accounts</span>
-                <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{perfs.length}</span>
-                <span style={{ fontSize: 11, color: "#6b7280" }}>Lowest score first → closest to payout last</span>
-              </div>
-              {perfs.map((a, i) => <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} />)}
-            </div>
+            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} color="#8b5cf6" />
+            <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} color="#3b82f6" />
+            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} color="#f59e0b" />
           </>
         )}
 
