@@ -37,14 +37,14 @@ const EF = {
 async function fetchTable(tableId, fieldIds) {
   const params = fieldIds.map(f => `fields[]=${f}`).join("&");
   const res = await fetch(
-    `/api/${BASE}/${tableId}?${params}&maxRecords=100`
+    `/.netlify/functions/airtable/${BASE}/${tableId}?${params}&maxRecords=100`
   );
   const data = await res.json();
   return data.records || [];
 }
 
 async function updateRecord(tableId, recordId, fields) {
-  await fetch(`/api/${BASE}/${tableId}/${recordId}`, {
+  await fetch(`/.netlify/functions/airtable/${BASE}/${tableId}/${recordId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
