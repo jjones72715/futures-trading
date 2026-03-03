@@ -3,21 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    sourcemap: false,
+  },
   server: {
     host: '0.0.0.0',
-    proxy: {
-      '/airtable': {
-        target: 'https://api.airtable.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/airtable/, ''),
-      },
-    },
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      supported: {
-        'dynamic-import': true,
-      },
-    },
   },
 });
