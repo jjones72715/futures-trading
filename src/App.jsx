@@ -234,7 +234,11 @@ export default function App() {
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
       const mappedPerfs = pr
-        .filter(r => activeStatuses.includes(getField(r.fields, PF.status)))
+        .filter(r => {
+          const s = r.fields[PF.status];
+          const statusName = s?.name || s;
+          return activeStatuses.includes(statusName);
+        })
         .map(r => {
           const f = r.fields;
           return {
