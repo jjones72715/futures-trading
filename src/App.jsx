@@ -70,7 +70,7 @@ function SafetyBar({ safety }) {
   );
 }
 
-function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
+function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone }) {
   const v = parseFloat(inputVal);
   const hasV = inputVal !== "" && !isNaN(v);
   const diff = noChange ? 0 : hasV ? (v - a.bal) * a.n : null;
@@ -80,17 +80,18 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
 
   return (
     <div style={{
-      background: "#111827",
-      border: `1px solid ${tradeDownHit ? "#dc2626" : noChange ? "#1f4f1f" : hasV ? (pos ? "#166534" : "#7f1d1d") : "#1f2937"}`,
+      background: done ? "#0a0f1a" : "#111827",
+      border: `1px solid ${tradeDownHit ? "#dc2626" : done ? "#1a2030" : noChange ? "#1f4f1f" : hasV ? (pos ? "#166534" : "#7f1d1d") : "#1f2937"}`,
       borderRadius: 10, padding: "10px 14px", marginBottom: 5,
       display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      opacity: done ? 0.45 : 1,
       boxShadow: tradeDownHit ? "0 0 12px rgba(220,38,38,0.4)" : "none",
     }}>
       <div style={{ width: 22, height: 22, background: "#1f2937", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#9ca3af", flexShrink: 0 }}>{i + 1}</div>
 
       <div style={{ width: 185, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{a.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : "#fff" }}>{a.name}</span>
           {a.tradeDown && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4 }}>TD</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -109,17 +110,17 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
 
       <div style={{ width: 95, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Balance</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{$$(a.bal)}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : "#fff" }}>{$$(a.bal)}</div>
       </div>
 
       <div style={{ width: 80, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Trade Limit</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#93c5fd" }}>{$$(a.limit)}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : "#93c5fd" }}>{$$(a.limit)}</div>
       </div>
 
       <div style={{ width: 80, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>{a.tradeDown ? "DD to Floor" : "DD Left"}</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: a.tradeDown ? "#f87171" : "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : a.tradeDown ? "#f87171" : "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</div>
       </div>
 
       <div style={{ width: 75, flexShrink: 0 }}>
@@ -129,7 +130,7 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
 
       <div style={{ width: 75, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Invested</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#c4b5fd" }}>{$$(a.invested)}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : "#c4b5fd" }}>{$$(a.invested)}</div>
       </div>
 
       {tradeDownHit && (
@@ -145,24 +146,28 @@ function AccountRow({ a, i, inputVal, noChange, onInput, onNoChange }) {
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Today's Ending Balance</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input type="number" placeholder="Enter balance..." value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange}
-            style={{ background: noChange ? "#1a2a1a" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#6b7280" : "#fff", width: 125, outline: "none" }} />
-          <button onClick={onNoChange}
-            style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
+          <input type="number" placeholder="Enter balance..." value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange || done}
+            style={{ background: (noChange || done) ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: (noChange || done) ? "#4b5563" : "#fff", width: 125, outline: "none" }} />
+          <button onClick={onNoChange} disabled={done}
+            style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: done ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap", opacity: done ? 0.4 : 1 }}>
             {noChange ? "✓ No Change" : "No Change"}
           </button>
-          {diff !== null && (
+          {diff !== null && !done && (
             <span style={{ fontSize: 13, fontWeight: 600, color: zero ? "#6b7280" : pos ? "#4ade80" : "#f87171" }}>
               {zero ? "±$0" : (pos ? "+" : "") + $$(diff)}
             </span>
           )}
+          <button onClick={onDone} title={done ? "Mark as active" : "Done for today"}
+            style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
+            {done ? "✓" : "○"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function SectionGroup({ title, accounts, inputs, noChanges, onInput, onNoChange, startIndex }) {
+function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, startIndex }) {
   if (accounts.length === 0) return null;
   return (
     <div style={{ marginBottom: 10 }}>
@@ -171,18 +176,19 @@ function SectionGroup({ title, accounts, inputs, noChanges, onInput, onNoChange,
         <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
       </div>
       {accounts.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} />
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} />
       ))}
     </div>
   );
 }
 
-function Section({ title, accounts, inputs, noChanges, onInput, onNoChange, color }) {
+function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, color }) {
   if (accounts.length === 0) return null;
+  const active = accounts.filter(a => !dones[a.id]);
+  if (active.length === 0) return null;
 
-  // Group by data provider
   const groups = {};
-  accounts.forEach(a => {
+  active.forEach(a => {
     const dp = a.dataProvider || "Other";
     if (!groups[dp]) groups[dp] = [];
     groups[dp].push(a);
@@ -195,13 +201,30 @@ function Section({ title, accounts, inputs, noChanges, onInput, onNoChange, colo
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <div style={{ width: 3, height: 18, background: color, borderRadius: 99 }} />
         <span style={{ fontSize: 14, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{accounts.length}</span>
+        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{active.length}</span>
       </div>
       {sorted.map(([dp, accs]) => {
         const start = idx;
         idx += accs.length;
-        return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} startIndex={start} />;
+        return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} startIndex={start} />;
       })}
+    </div>
+  );
+}
+
+function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone }) {
+  const done = accounts.filter(a => dones[a.id]);
+  if (done.length === 0) return null;
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
+        <div style={{ width: 3, height: 18, background: "#374151", borderRadius: 99 }} />
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#4b5563" }}>Done for Today</span>
+        <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{done.length}</span>
+      </div>
+      {done.map((a, i) => (
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={true} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} />
+      ))}
     </div>
   );
 }
@@ -211,6 +234,7 @@ export default function App() {
   const [evalAccounts, setEvalAccounts] = useState([]);
   const [inputs, setInputs] = useState({});
   const [noChanges, setNoChanges] = useState({});
+  const [dones, setDones] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -306,6 +330,10 @@ export default function App() {
     });
   }, []);
 
+  const onDone = useCallback((id) => {
+    setDones(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
   async function save() {
     setSaving(true); setErr(null);
     try {
@@ -324,23 +352,22 @@ export default function App() {
     setSaving(false);
   }
 
-  // Split performance accounts into 3 groups
   const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount || a.status === "Waiting on Payout");
   const standardPerf = perfAccounts.filter(a => !liveOrPayout.includes(a));
+  const allAccounts = [...evalAccounts, ...perfAccounts];
 
-  const all = [...evalAccounts, ...perfAccounts];
-  const gain = all.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d > 0 ? s + d : s; }, 0);
-  const loss = all.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d < 0 ? s + d : s; }, 0);
+  const gain = allAccounts.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d > 0 ? s + d : s; }, 0);
+  const loss = allAccounts.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d < 0 ? s + d : s; }, 0);
   const net = gain + loss;
   const filledCount = Object.entries(inputs).filter(([, v]) => v !== "" && !isNaN(parseFloat(v))).length + Object.values(noChanges).filter(Boolean).length;
 
-  const losers = all.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) < a.bal).map(a => {
+  const losers = allAccounts.filter(a => !noChanges[a.id] && !dones[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) < a.bal).map(a => {
     const ddRef = a.tradeDown ? a.ddToFloor : a.ddLeft;
     const pctLost = ddRef > 0 ? Math.abs(parseFloat(inputs[a.id]) - a.bal) / ddRef : 0;
     return { ...a, pctLost, move: pctLost * a.invested };
   }).filter(a => a.move > 0.5);
 
-  const gainers = all.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal);
+  const gainers = allAccounts.filter(a => !noChanges[a.id] && !dones[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal);
   const redists = losers.map(l => {
     const match = [...gainers].sort((a, b) => Math.abs(a.prog - l.prog) - Math.abs(b.prog - l.prog))[0];
     return { from: l.name, to: match?.name || "best gainer", amt: l.move, pct: l.pctLost };
@@ -400,9 +427,10 @@ export default function App() {
 
         {tab === "gameplan" && (
           <>
-            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} color="#8b5cf6" />
-            <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} color="#3b82f6" />
-            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} onInput={onInput} onNoChange={onNoChange} color="#f59e0b" />
+            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} color="#8b5cf6" />
+            <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} color="#3b82f6" />
+            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} color="#f59e0b" />
+            <DoneSection accounts={allAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
           </>
         )}
 
