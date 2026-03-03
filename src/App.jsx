@@ -281,6 +281,7 @@ export default function App() {
         })
         .sort((a, b) => a.prog - b.prog);
 
+      console.log("mapped perfs:", mappedPerfs);
       setPerfs(mappedPerfs);
       setEvals(mappedEvals);
       const inp = {};
