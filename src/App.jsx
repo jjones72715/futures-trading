@@ -262,25 +262,25 @@ export default function App() {
         .sort((a, b) => a.prog - b.prog);
 
       const mappedEvals = er
-        .filter(r => getField(r.fields, EF.status) === "Active")
+        .filter(r => activeStatuses.includes(r.fields["Status"]))
         .map(r => {
           const f = r.fields;
           return {
-            id: r.id, type: "eval",
-            name: getField(f, EF.name) || "?",
-            trader: getField(f, EF.trader) || "",
-            status: getField(f, EF.status) || "",
-            bal: f[EF.currentBalance] || 0,
-            ddLeft: Array.isArray(f[EF.ddLeft]) ? f[EF.ddLeft][0] : f[EF.ddLeft] || 0,
-            ddToFloor: 0,
-            prog: f[EF.progress] || 0,
-            limit: Array.isArray(f[EF.tradeLimit]) ? f[EF.tradeLimit][0] : f[EF.tradeLimit] || 0,
-            n: f[EF.numAccounts] || 1,
-            ddSafety: f[EF.ddSafety] || 0,
-            tradeDown: false,
-            tradeDownFloor: 0,
-            contractMultiplier: 1,
-            invested: 0,
+            id: r.id, type: "perf",
+            name: f["Name"] || "?",
+            trader: "",
+            status: f["Status"] || "",
+            bal: f["Current Balance"] || 0,
+            ddLeft: f["Current Drawdown Left"] || 0,
+            ddToFloor: f["Drawdown to Floor"] || 0,
+            prog: f["Progress to Stage Target"] || 0,
+            limit: f["Max Trade Size"] || 0,
+            invested: f["Invested Per Account"] || 0,
+            n: f["Number of Accounts"] || 1,
+            ddSafety: f["Drawdown Safety"] || 0,
+            tradeDown: f["Trade Down Account"] || false,
+            tradeDownFloor: f["Trade Down Floor"] || 0,
+            contractMultiplier: f["Contract Multiplier"] || 1,
           };
         })
         .sort((a, b) => a.prog - b.prog);
