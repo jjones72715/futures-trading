@@ -240,7 +240,7 @@ export default function App() {
           return {
             id: r.id, type: "perf",
             name: getField(f, PF.name) || "?",
-            trader: getField(f, PF.trader) || "",
+            trader: Array.isArray(f[PF.trader]) ? (f[PF.trader][0]?.name || "") : (f[PF.trader] || ""),
             status: getField(f, PF.status) || "",
             bal: f[PF.currentBalance] || 0,
             ddLeft: f[PF.ddLeft] || 0,
