@@ -5,7 +5,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "script-src 'self' 'unsafe-eval' 'unsafe-inline';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https://api.airtable.com; style-src 'self' 'unsafe-inline';"
 
 [[redirects]]
   from = "/*"
