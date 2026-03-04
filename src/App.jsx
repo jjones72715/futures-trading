@@ -1731,12 +1731,12 @@ export default function App() {
 
       const allEvals = (er.records || []).filter(r => r.fields["Status"] === "Active");
       const allPerfs = (pr.records || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"]));
-
-      setEvalAccounts(allEvals.map(mapEval));
-      setPerfAccounts(allPerfs.map(mapPerf));
-
+      const evals = allEvals.map(mapEval);
+      const perfs = allPerfs.map(mapPerf);
+      setEvalAccounts(evals);
+      setPerfAccounts(perfs);
       const inp = {};
-      [...allPerfs.map(mapPerf), ...allEvals.map(mapEval)].forEach(a => { inp[a.id] = ""; });
+      [...perfs, ...evals].forEach(a => { inp[a.id] = ""; });
       setInputs(inp);
       setNoChanges({});
     } catch (e) {
