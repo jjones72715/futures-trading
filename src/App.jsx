@@ -1015,9 +1015,6 @@ const PAYOUT_STRATEGIES = [
   { id: "reciQv2UV6KCSP23u", name: "YRM 50k Instant Prime - Stage 2", perfTypeId: "recP1UQ1FelJnw5ft", stage: 2, target: 3000, next: "Stage 2" },
 ];
 
-const PERF_TABLE = "tblhM1DWRiWXnhSKb";
-const STRATEGIES_TABLE = "tbljLby6v0o6fydOw";
-
 function AccountManagementTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
