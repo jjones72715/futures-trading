@@ -1042,9 +1042,6 @@ const EVAL_TO_PERF_TYPE = {
   "recx9L2t4eHPFzPAi": "recKSnwwT6dMYrVgG",
 };
 
-const PAYOUT_TABLE = "tblIEpLE5eIV7k6B7";
-const PAYOUT_STATUSES = ["Requested", "Processing", "Approved", "Received"];
-
 function AccountManagementTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
