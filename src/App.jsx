@@ -6,6 +6,7 @@ const EVAL_TABLE = "tblWeri8TXWPQY9Dc";
 const PURCHASE_TABLE = "tblaBys956srO5pca";
 const TRADERS_TABLE = "tbla0lbJ9z1PAhNy7";
 const EVAL_TYPE_TABLE = "tbleHzHF5FgskLxs3";
+const PAYOUT_TABLE = "tblIEpLE5eIV7k6B7";
 
 const TRADERS = [
   { id: "rec0jB7J1Ir1ZspvM", name: "Amanda Seratt" },
@@ -1016,84 +1017,150 @@ const PAYOUT_STRATEGIES = [
 ];
 
 function AccountManagementTab() {
+// Eval type → Perf type map (baked in from Airtable)
+const EVAL_TO_PERF_TYPE = {
+  "rec5O8lSTqB4fXPsP": "recTL4uJ1G8BUZK21",
+  "rec8HfoHBk5m9oscj": "recw2Utx3ln49Wh2M",
+  "rec8lBqRQBKOtFljx": "recnOYUQIGLddgDco",
+  "recCAYjMChppH9u8K": "recq5VXV6SJUsP8Fb",
+  "recCePd3gcQGGiMe6": "recDK9X8GHYJb1P8a",
+  "recD4IfxYzFKOxWGU": "recCipNXVOSRHLqKQ",
+  "recMLV7McrX0yqfd1": "recK8KZqNZD7qlRxc",
+  "recMeH14HcTVOTABK": "rechY3DxrUfj1v60L",
+  "recXHjiUdh5YzWpds": "recsuOqgFYGIJiCDc",
+  "rece3sSv032SWiy8H": "recYUQKZ5R19Snwyk",
+  "recf85p2PhQs3O4Qx": "recO5gj9RRGP2ToTN",
+  "recjSpqACE1VGGL9l": "recT9NCOWvAH8sU13",
+  "reckab8EkDpFCco4e": "recXp5quJOrP2JD1x",
+  "reclSB5U37mNwP5yE": "recyK8fcdcuPkPPVy",
+  "recldNrpc0Uw2iy0Q": "rec7d4W5dlXgAIDeg",
+  "recmK6e815Mus0M4r": "recRkoFdYqIgmBnaz",
+  "recmXkCwRhX8CwdHA": "recQZlpiDSUgEcf17",
+  "recnMxSRnwffHQqGf": "rectnqPEVI7UEgffE",
+  "recpznnL6QT5BGnBL": "rec7xL7pCvC13SDvW",
+  "recrwjjhAEaj98I29": "recD4Q1JfDsoqibVP",
+  "recsMsMF8YosOvAKr": "recAPuxF9wQmpqcns",
+  "recx9L2t4eHPFzPAi": "recKSnwwT6dMYrVgG",
+};
+
+const PAYOUT_TABLE = "tblIEpLE5eIV7k6B7";
+const PAYOUT_STATUSES = ["Requested", "Processing", "Approved", "Received"];
+
+function AccountManagementTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
   const inp = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
-
   const today = new Date().toISOString().split("T")[0];
 
   const [activeTab, setActiveTab] = useState("passed_evals");
   const [traderId, setTraderId] = useState("");
   const [evalAccounts, setEvalAccounts] = useState([]);
   const [perfAccounts, setPerfAccounts] = useState([]);
+  const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Passed Evals state
   const [selectedEvalId, setSelectedEvalId] = useState("");
-  const [selectedPerfId, setSelectedPerfId] = useState("");
-  const [perfTypeId, setPerfTypeId] = useState("");
   const [startingBalance, setStartingBalance] = useState("");
   const [dateActivated, setDateActivated] = useState(today);
   const [numAccounts, setNumAccounts] = useState(1);
   const [investedPerAccount, setInvestedPerAccount] = useState("");
+
+  // Stage Management state
+  const [selectedPerfId, setSelectedPerfId] = useState("");
   const [stageAction, setStageAction] = useState("");
   const [newBalance, setNewBalance] = useState("");
   const [tradingDays, setTradingDays] = useState("");
   const [resetTradingDays, setResetTradingDays] = useState(true);
+
+  // Payout Management state
+  const [selectedPayoutId, setSelectedPayoutId] = useState("");
+  const [payoutAction, setPayoutAction] = useState(""); // "status" or "receive"
+  const [newPayoutStatus, setNewPayoutStatus] = useState("");
+  const [receivedAmount, setReceivedAmount] = useState("");
+  const [receivedDate, setReceivedDate] = useState(today);
+  const [postPayoutBalance, setPostPayoutBalance] = useState("");
+  const [postPayoutStageId, setPostPayoutStageId] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [err, setErr] = useState(null);
 
-  useEffect(() => {
-    if (traderId) loadTraderAccounts(traderId);
-  }, [traderId]);
+  useEffect(() => { if (traderId || activeTab === "payouts") loadData(); }, [traderId, activeTab]);
 
-  async function loadTraderAccounts(tid) {
+  async function loadData() {
     setLoading(true);
     try {
-      const [er, pr] = await Promise.all([
-        fetch(`/.netlify/functions/airtable/${BASE}/${EVAL_TABLE}?maxRecords=100`).then(r => r.json()),
-        fetch(`/.netlify/functions/airtable/${BASE}/${PERF_TABLE}?maxRecords=100`).then(r => r.json()),
+      const [er, pr, payr] = await Promise.all([
+        fetch(`/.netlify/functions/airtable/${BASE}/${EVAL_TABLE}?maxRecords=200`).then(r => r.json()),
+        fetch(`/.netlify/functions/airtable/${BASE}/${PERF_TABLE}?maxRecords=200`).then(r => r.json()),
+        fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=200`).then(r => r.json()),
       ]);
-      const evals = (er.records || []).filter(r => {
-        const t = r.fields["Trader"];
-        return r.fields["Status"] === "Active" && Array.isArray(t) && t.includes(tid);
-      });
-      const perfs = (pr.records || []).filter(r => {
-        const t = r.fields["Trader"];
-        const s = r.fields["Status"];
-        return ["Active", "Live"].includes(s) && Array.isArray(t) && t.includes(tid);
-      });
-      setEvalAccounts(evals);
-      setPerfAccounts(perfs);
+
+      const filterByTrader = (records, field = "Trader") =>
+        !traderId ? records : (records || []).filter(r => {
+          const t = r.fields[field];
+          return Array.isArray(t) && t.includes(traderId);
+        });
+
+      setEvalAccounts(filterByTrader(er.records || []).filter(r => r.fields["Status"] === "Active"));
+      setPerfAccounts(filterByTrader(pr.records || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"])));
+
+      // Payouts: filter by trader if selected, show non-Received by default
+      const allPayouts = payr.records || [];
+      const filteredPayouts = traderId
+        ? allPayouts.filter(r => {
+            const t = r.fields["Trader"];
+            return Array.isArray(t) && t.includes(traderId);
+          })
+        : allPayouts;
+      setPayouts(filteredPayouts.filter(r => r.fields["Status"] !== "Received"));
     } catch (e) {}
     setLoading(false);
   }
 
   function resetForm() {
-    setSelectedEvalId(""); setSelectedPerfId(""); setPerfTypeId("");
-    setStartingBalance(""); setDateActivated(today); setNumAccounts(1);
-    setInvestedPerAccount(""); setStageAction(""); setNewBalance("");
-    setTradingDays(""); setResetTradingDays(true); setErr(null);
+    setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
+    setNumAccounts(1); setInvestedPerAccount("");
+    setSelectedPerfId(""); setStageAction(""); setNewBalance("");
+    setTradingDays(""); setResetTradingDays(true);
+    setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
+    setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
+    setPostPayoutStageId(""); setErr(null);
   }
 
   const selectedEval = evalAccounts.find(r => r.id === selectedEvalId);
   const selectedPerf = perfAccounts.find(r => r.id === selectedPerfId);
-  const selectedPerfType = PERF_TYPES.find(t => t.id === perfTypeId);
+  const selectedPayout = payouts.find(r => r.id === selectedPayoutId);
 
-  // Get current stage of selected perf account
-  const currentStageId = Array.isArray(selectedPerf?.fields["Current Stage"])
-    ? selectedPerf.fields["Current Stage"][0]
+  // Auto-derive perf type from eval type
+  const evalTypeId = selectedEval
+    ? (Array.isArray(selectedEval.fields["Evaluation Account Type"])
+        ? selectedEval.fields["Evaluation Account Type"][0] : null)
+    : null;
+  const perfTypeId = evalTypeId ? EVAL_TO_PERF_TYPE[evalTypeId] : null;
+  const perfType = perfTypeId ? PERF_TYPES.find(t => t.id === perfTypeId) : null;
+
+  // Stage info for selected perf
+  const currentStageId = selectedPerf
+    ? (Array.isArray(selectedPerf.fields["Current Stage"]) ? selectedPerf.fields["Current Stage"][0] : null)
     : null;
   const currentStage = PAYOUT_STRATEGIES.find(s => s.id === currentStageId);
   const perfTypeForStages = selectedPerf
-    ? (Array.isArray(selectedPerf.fields["Performance Account Type"])
-        ? selectedPerf.fields["Performance Account Type"][0]
-        : null)
+    ? (Array.isArray(selectedPerf.fields["Performance Account Type"]) ? selectedPerf.fields["Performance Account Type"][0] : null)
     : null;
-  const availableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === perfTypeForStages)
-    .sort((a, b) => a.stage - b.stage);
-  const nextStage = currentStage
-    ? availableStages.find(s => s.stage === currentStage.stage + 1)
-    : availableStages[0];
+  const availableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === perfTypeForStages).sort((a, b) => a.stage - b.stage);
+  const nextStage = currentStage ? availableStages.find(s => s.stage === currentStage.stage + 1) : availableStages[0];
+
+  // Stage info for post-payout perf account
+  const payoutPerfId = selectedPayout
+    ? (Array.isArray(selectedPayout.fields["Performance Account"]) ? selectedPayout.fields["Performance Account"][0] : null)
+    : null;
+  const payoutPerf = payoutPerfId ? [...perfAccounts].find(r => r.id === payoutPerfId) : null;
+  const payoutPerfTypeId = payoutPerf
+    ? (Array.isArray(payoutPerf.fields["Performance Account Type"]) ? payoutPerf.fields["Performance Account Type"][0] : null)
+    : null;
+  const payoutAvailableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === payoutPerfTypeId).sort((a, b) => a.stage - b.stage);
 
   async function handleConvertEval() {
     if (!selectedEvalId || !perfTypeId || !startingBalance || !dateActivated) return;
@@ -1101,12 +1168,8 @@ function AccountManagementTab() {
     try {
       const trader = TRADERS.find(t => t.id === traderId);
       const pt = PERF_TYPES.find(t => t.id === perfTypeId);
-      const firstStage = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === perfTypeId && s.stage === 1)[0];
-
-      // 1. Mark eval as Passed
+      const firstStage = PAYOUT_STRATEGIES.find(s => s.perfTypeId === perfTypeId && s.stage === 1);
       await updateRecord(EVAL_TABLE, selectedEvalId, { "Status": "Passed" });
-
-      // 2. Create new Performance Account
       const perfFields = {
         "Name": `${trader?.name?.split(" ")[0]} - ${pt?.name}`,
         "Status": "Active",
@@ -1116,22 +1179,17 @@ function AccountManagementTab() {
         "Date Activated": dateActivated,
         "Number of Accounts": parseInt(numAccounts),
         "Trading Days this Cycle": 0,
+        "Performance Account Type": [perfTypeId],
+        "Trader": [traderId],
+        "Evaluation Accounts": [selectedEvalId],
       };
-      if (perfTypeId) perfFields["Performance Account Type"] = [perfTypeId];
-      if (traderId) perfFields["Trader"] = [traderId];
-      if (selectedEvalId) perfFields["Evaluation Accounts"] = [selectedEvalId];
       if (firstStage) perfFields["Current Stage"] = [firstStage.id];
       if (investedPerAccount) perfFields["Invested Per Account"] = parseFloat(investedPerAccount);
-
       await createRecord(PERF_TABLE, perfFields);
-
       setSuccess("✓ Eval passed and Performance Account created!");
       setTimeout(() => setSuccess(""), 4000);
-      resetForm();
-      loadTraderAccounts(traderId);
-    } catch (e) {
-      setErr("Failed: " + e.message);
-    }
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
     setSubmitting(false);
   }
 
@@ -1144,16 +1202,13 @@ function AccountManagementTab() {
         "Current Balance": parseFloat(newBalance),
         "High Water Mark": parseFloat(newBalance),
         "Cycle Start Balance": parseFloat(newBalance),
+        "Trading Days this Cycle": tradingDays ? parseInt(tradingDays) : 0,
       };
-      if (resetTradingDays) fields["Trading Days this Cycle"] = tradingDays ? parseInt(tradingDays) : 0;
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
       setSuccess(`✓ Advanced to Stage ${nextStage.stage}!`);
       setTimeout(() => setSuccess(""), 4000);
-      resetForm();
-      loadTraderAccounts(traderId);
-    } catch (e) {
-      setErr("Failed: " + e.message);
-    }
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
     setSubmitting(false);
   }
 
@@ -1161,14 +1216,68 @@ function AccountManagementTab() {
     if (!selectedPerfId) return;
     setSubmitting(true); setErr(null);
     try {
+      const perf = perfAccounts.find(r => r.id === selectedPerfId);
+      const trader = TRADERS.find(t => t.id === traderId);
+      // Update perf account status
       await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
-      setSuccess("✓ Account marked as Waiting on Payout!");
+      // Create payout record
+      await createRecord(PAYOUT_TABLE, {
+        "Name": `${trader?.name?.split(" ")[0]} - ${perf?.fields["Name"]} - ${today}`,
+        "Performance Account": [selectedPerfId],
+        "Date Requested": today,
+        "Status": "Requested",
+        "Number of Accounts": perf?.fields["Number of Accounts"] || 1,
+        "Trader": [traderId],
+      });
+      setSuccess("✓ Payout requested and logged!");
       setTimeout(() => setSuccess(""), 4000);
-      resetForm();
-      loadTraderAccounts(traderId);
-    } catch (e) {
-      setErr("Failed: " + e.message);
-    }
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSubmitting(false);
+  }
+
+  async function handleUpdatePayoutStatus() {
+    if (!selectedPayoutId || !newPayoutStatus) return;
+    setSubmitting(true); setErr(null);
+    try {
+      await updateRecord(PAYOUT_TABLE, selectedPayoutId, { "Status": newPayoutStatus });
+      setSuccess(`✓ Payout status updated to ${newPayoutStatus}!`);
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSubmitting(false);
+  }
+
+  async function handleReceivePayout() {
+    if (!selectedPayoutId || !receivedAmount || !postPayoutBalance || !postPayoutStageId) return;
+    setSubmitting(true); setErr(null);
+    try {
+      const payout = payouts.find(r => r.id === selectedPayoutId);
+      const numAccts = payout?.fields["Number of Accounts"] || 1;
+      const amtPerAcct = parseFloat(receivedAmount) / numAccts;
+      // Update payout record
+      await updateRecord(PAYOUT_TABLE, selectedPayoutId, {
+        "Status": "Received",
+        "Date Received": receivedDate,
+        "Amount Per Account": amtPerAcct,
+      });
+      // Update perf account: new balance, stage, back to Active
+      if (payoutPerfId) {
+        const stage = PAYOUT_STRATEGIES.find(s => s.id === postPayoutStageId);
+        await updateRecord(PERF_TABLE, payoutPerfId, {
+          "Status": "Active",
+          "Current Balance": parseFloat(postPayoutBalance),
+          "High Water Mark": parseFloat(postPayoutBalance),
+          "Cycle Start Balance": parseFloat(postPayoutBalance),
+          "Current Stage": [postPayoutStageId],
+          "Trading Days this Cycle": 0,
+          "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
+        });
+      }
+      setSuccess("✓ Payout received, account back to Active!");
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
     setSubmitting(false);
   }
 
@@ -1176,66 +1285,76 @@ function AccountManagementTab() {
     <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>{text}</div>
   );
 
-  const TabBtn = ({ id, label: lbl, color }) => (
+  const TabBtn = ({ id, color, children }) => (
     <button onClick={() => { setActiveTab(id); resetForm(); }}
-      style={{ background: "none", border: "none", borderBottom: activeTab === id ? `2px solid ${color}` : "2px solid transparent", color: activeTab === id ? color : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
-      {lbl}
+      style={{ background: "none", border: "none", borderBottom: activeTab === id ? `2px solid ${color}` : "2px solid transparent", color: activeTab === id ? color : "#6b7280", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap" }}>
+      {children}
     </button>
   );
 
+  const statusColor = { "Requested": "#f59e0b", "Processing": "#3b82f6", "Approved": "#8b5cf6", "Received": "#22c55e" };
+
+  // Group payouts by status for display
+  const payoutsByStatus = PAYOUT_STATUSES.slice(0, 3).reduce((acc, s) => {
+    acc[s] = payouts.filter(p => p.fields["Status"] === s);
+    return acc;
+  }, {});
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 20, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "440px 1fr", gap: 20, alignItems: "start" }}>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
 
         {/* Sub tabs */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
-          <TabBtn id="passed_evals" label="📈 Passed Evals" color="#8b5cf6" />
-          <TabBtn id="stage_mgmt" label="🎯 Stage Management" color="#3b82f6" />
+        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 18, gap: 0 }}>
+          <TabBtn id="passed_evals" color="#8b5cf6">📈 Passed Evals</TabBtn>
+          <TabBtn id="stage_mgmt" color="#3b82f6">🎯 Stages</TabBtn>
+          <TabBtn id="payouts" color="#f59e0b">💰 Payouts</TabBtn>
         </div>
 
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
         {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
 
-        {/* Trader selector - shared */}
+        {/* Trader selector */}
         <div style={{ marginBottom: 16 }}>
-          {label("Select Trader")}
+          {label("Trader")}
           <select value={traderId} onChange={e => { setTraderId(e.target.value); resetForm(); }} style={sel}>
-            <option value="">Choose trader...</option>
+            <option value="">All Traders</option>
             {TRADERS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
 
-        {/* ── PASSED EVALS TAB ── */}
-        {activeTab === "passed_evals" && traderId && (
+        {/* ── PASSED EVALS ── */}
+        {activeTab === "passed_evals" && (
           <>
-            <div style={{ marginBottom: 16 }}>
-              {label("Select Passed Eval Account")}
-              {loading ? <div style={{ color: "#6b7280", fontSize: 12 }}>Loading...</div> : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {evalAccounts.length === 0
-                    ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active eval accounts for this trader.</div>
-                    : evalAccounts.map(r => (
-                      <div key={r.id} onClick={() => setSelectedEvalId(r.id)}
-                        style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#1f2937", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                          {r.fields["Evaluation Account Type"]?.[0] || ""} · ×{r.fields["Number of Accounts"]}
+            {label("Select Active Eval Account")}
+            {loading ? <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading...</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {evalAccounts.length === 0
+                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active eval accounts{traderId ? " for this trader" : ""}.</div>
+                  : evalAccounts.map(r => {
+                      const etId = Array.isArray(r.fields["Evaluation Account Type"]) ? r.fields["Evaluation Account Type"][0] : null;
+                      const ptId = etId ? EVAL_TO_PERF_TYPE[etId] : null;
+                      const pt = ptId ? PERF_TYPES.find(t => t.id === ptId) : null;
+                      return (
+                        <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); }}
+                          style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#1f2937", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
+                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                            → {pt?.name || "Unknown perf type"} · ×{r.fields["Number of Accounts"]}
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
-            </div>
+                      );
+                    })
+                }
+              </div>
+            )}
 
-            {selectedEvalId && (
+            {selectedEvalId && perfType && (
               <>
-                <div style={{ marginBottom: 16 }}>
-                  {label("Performance Account Type")}
-                  <select value={perfTypeId} onChange={e => { setPerfTypeId(e.target.value); const pt = PERF_TYPES.find(t => t.id === e.target.value); if (pt) setStartingBalance(pt.accountSize.toString()); }} style={sel}>
-                    <option value="">Choose type...</option>
-                    {PERF_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                <div style={{ background: "#1a1a2e", border: "1px solid #8b5cf6", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 700, marginBottom: 4 }}>Will create:</div>
+                  <div style={{ fontSize: 12, color: "#e5e7eb" }}>{perfType.name}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>Account Size: {$$(perfType.accountSize)}</div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
@@ -1257,54 +1376,42 @@ function AccountManagementTab() {
                   </div>
                 </div>
 
-                {perfTypeId && startingBalance && (
-                  <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>On submit:</div>
-                    <div style={{ fontSize: 12, color: "#a78bfa" }}>• Eval → <strong>Passed</strong></div>
-                    <div style={{ fontSize: 12, color: "#4ade80" }}>• New Performance Account created at Stage 1</div>
-                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Starting balance: <strong>{$$(parseFloat(startingBalance))}</strong></div>
-                  </div>
-                )}
-
-                <button onClick={handleConvertEval} disabled={!perfTypeId || !startingBalance || submitting}
-                  style={{ width: "100%", background: perfTypeId && startingBalance ? "#7c3aed" : "#1f2937", color: perfTypeId && startingBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: perfTypeId && startingBalance ? "pointer" : "not-allowed" }}>
-                  {submitting ? "Converting..." : "Convert to Performance Account"}
+                <button onClick={handleConvertEval} disabled={!startingBalance || submitting}
+                  style={{ width: "100%", background: startingBalance ? "#7c3aed" : "#1f2937", color: startingBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: startingBalance ? "pointer" : "not-allowed" }}>
+                  {submitting ? "Converting..." : "✓ Convert to Performance Account"}
                 </button>
               </>
             )}
           </>
         )}
 
-        {/* ── STAGE MANAGEMENT TAB ── */}
-        {activeTab === "stage_mgmt" && traderId && (
+        {/* ── STAGE MANAGEMENT ── */}
+        {activeTab === "stage_mgmt" && (
           <>
-            <div style={{ marginBottom: 16 }}>
-              {label("Select Performance Account")}
-              {loading ? <div style={{ color: "#6b7280", fontSize: 12 }}>Loading...</div> : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {perfAccounts.length === 0
-                    ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active performance accounts for this trader.</div>
-                    : perfAccounts.map(r => {
-                        const stageId = Array.isArray(r.fields["Current Stage"]) ? r.fields["Current Stage"][0] : null;
-                        const stage = PAYOUT_STRATEGIES.find(s => s.id === stageId);
-                        return (
-                          <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); setNewBalance(""); }}
-                            style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                              {stage ? `Stage ${stage.stage} · Target: ${$$(stage.target)}` : "No stage set"} · Bal: {$$(r.fields["Current Balance"])}
-                            </div>
+            {label("Select Performance Account")}
+            {loading ? <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading...</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {perfAccounts.filter(r => r.fields["Status"] !== "Waiting on Payout").length === 0
+                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active performance accounts{traderId ? " for this trader" : ""}.</div>
+                  : perfAccounts.filter(r => r.fields["Status"] !== "Waiting on Payout").map(r => {
+                      const stageId = Array.isArray(r.fields["Current Stage"]) ? r.fields["Current Stage"][0] : null;
+                      const stage = PAYOUT_STRATEGIES.find(s => s.id === stageId);
+                      return (
+                        <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); }}
+                          style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
+                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                            {stage ? `Stage ${stage.stage} · Target ${$$(stage.target)}` : "No stage"} · {$$(r.fields["Current Balance"])}
                           </div>
-                        );
-                      })
-                  }
-                </div>
-              )}
-            </div>
+                        </div>
+                      );
+                    })
+                }
+              </div>
+            )}
 
             {selectedPerfId && !stageAction && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-                {label("What action?")}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {nextStage && (
                   <div onClick={() => setStageAction("advance")}
                     style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
@@ -1320,7 +1427,7 @@ function AccountManagementTab() {
                   <span style={{ fontSize: 22 }}>💰</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Request Payout</div>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>Mark account as Waiting on Payout</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>Mark as Waiting on Payout + log payout record</div>
                   </div>
                 </div>
               </div>
@@ -1332,27 +1439,19 @@ function AccountManagementTab() {
                   <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#4ade80" }}>Advance to Stage {nextStage.stage}</span>
                 </div>
-
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ gridColumn: "1/-1" }}>
                     {label("New Balance")}
                     <input type="number" placeholder="Enter new balance..." value={newBalance} onChange={e => setNewBalance(e.target.value)} style={inp} />
                   </div>
-                  <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ gridColumn: "1/-1" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                      <input type="checkbox" id="resetDays" checked={resetTradingDays} onChange={e => setResetTradingDays(e.target.checked)}
-                        style={{ width: 16, height: 16, cursor: "pointer" }} />
+                      <input type="checkbox" id="resetDays" checked={resetTradingDays} onChange={e => setResetTradingDays(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
                       <label htmlFor="resetDays" style={{ fontSize: 12, color: "#9ca3af", cursor: "pointer" }}>Reset Trading Days</label>
                     </div>
-                    {!resetTradingDays && (
-                      <input type="number" placeholder="Trading days to carry over..." value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
-                    )}
-                    {resetTradingDays && (
-                      <input type="number" placeholder="Starting trading days (0 if blank)..." value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
-                    )}
+                    <input type="number" placeholder={resetTradingDays ? "Starting days (0 if blank)" : "Days to carry over..."} value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
                   </div>
                 </div>
-
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#16a34a" : "#1f2937", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
@@ -1366,34 +1465,142 @@ function AccountManagementTab() {
                   <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Request Payout</span>
                 </div>
-
                 <div style={{ background: "#2d1f00", border: "1px solid #f59e0b", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 4 }}>This will:</div>
-                  <div style={{ fontSize: 12, color: "#fde68a" }}>• Set <strong>{selectedPerf?.fields["Name"]}</strong> status to "Waiting on Payout"</div>
-                  <div style={{ fontSize: 11, color: "#92400e", marginTop: 6 }}>After receiving the payout, use Stage Management to advance the stage and enter the new balance.</div>
+                  <div style={{ fontSize: 12, color: "#fde68a" }}>• Sets account to "Waiting on Payout"</div>
+                  <div style={{ fontSize: 12, color: "#fde68a" }}>• Creates a Payout record with status "Requested"</div>
+                  <div style={{ fontSize: 11, color: "#92400e", marginTop: 6 }}>When received, go to Payout Management to log the amount and advance the stage.</div>
                 </div>
-
                 <button onClick={handleRequestPayout} disabled={submitting}
                   style={{ width: "100%", background: "#d97706", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                  {submitting ? "Saving..." : "Mark as Waiting on Payout"}
+                  {submitting ? "Saving..." : "Request Payout"}
                 </button>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── PAYOUT MANAGEMENT ── */}
+        {activeTab === "payouts" && (
+          <>
+            {loading ? <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading...</div> : (
+              <>
+                {payouts.length === 0
+                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No pending payouts{traderId ? " for this trader" : ""}.</div>
+                  : Object.entries(payoutsByStatus).map(([status, items]) => items.length === 0 ? null : (
+                    <div key={status} style={{ marginBottom: 20 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor[status] }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: statusColor[status] }}>{status}</span>
+                        <span style={{ fontSize: 10, color: "#4b5563" }}>({items.length})</span>
+                      </div>
+                      {items.map(p => (
+                        <div key={p.id} onClick={() => { setSelectedPayoutId(p.id); setPayoutAction(""); setNewPayoutStatus(""); }}
+                          style={{ background: selectedPayoutId === p.id ? "#1c1c2e" : "#1f2937", border: `1px solid ${selectedPayoutId === p.id ? statusColor[status] : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer", marginBottom: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{p.fields["Name"]}</div>
+                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                            Requested: {p.fields["Date Requested"] || "—"} · Accounts: ×{p.fields["Number of Accounts"] || 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                }
+
+                {selectedPayoutId && !payoutAction && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                    <div onClick={() => setPayoutAction("status")}
+                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 20 }}>🔄</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#93c5fd" }}>Update Status</div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Move between Requested / Processing / Approved</div>
+                      </div>
+                    </div>
+                    <div onClick={() => setPayoutAction("receive")}
+                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 20 }}>✅</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>Mark as Received</div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Log amount, set new balance, advance stage</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPayoutId && payoutAction === "status" && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, marginTop: 8 }}>
+                      <button onClick={() => setPayoutAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#93c5fd" }}>Update Status</span>
+                    </div>
+                    {label("New Status")}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                      {["Requested", "Processing", "Approved"].map(s => (
+                        <button key={s} onClick={() => setNewPayoutStatus(s)}
+                          style={{ background: newPayoutStatus === s ? statusColor[s] : "#1f2937", color: newPayoutStatus === s ? "#fff" : "#9ca3af", border: `1px solid ${newPayoutStatus === s ? statusColor[s] : "#374151"}`, borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={handleUpdatePayoutStatus} disabled={!newPayoutStatus || submitting}
+                      style={{ width: "100%", background: newPayoutStatus ? "#1d4ed8" : "#1f2937", color: newPayoutStatus ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newPayoutStatus ? "pointer" : "not-allowed" }}>
+                      {submitting ? "Saving..." : "Update Status"}
+                    </button>
+                  </>
+                )}
+
+                {selectedPayoutId && payoutAction === "receive" && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, marginTop: 8 }}>
+                      <button onClick={() => setPayoutAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#4ade80" }}>Mark as Received</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                      <div>
+                        {label("Date Received")}
+                        <input type="date" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} style={inp} />
+                      </div>
+                      <div>
+                        {label("Total Amount Received")}
+                        <input type="number" placeholder="e.g. 4500" value={receivedAmount} onChange={e => setReceivedAmount(e.target.value)} style={inp} />
+                      </div>
+                      <div style={{ gridColumn: "1/-1" }}>
+                        {label("New Account Balance After Payout")}
+                        <input type="number" placeholder="e.g. 101200" value={postPayoutBalance} onChange={e => setPostPayoutBalance(e.target.value)} style={inp} />
+                      </div>
+                      <div style={{ gridColumn: "1/-1" }}>
+                        {label("Advance to Stage")}
+                        <select value={postPayoutStageId} onChange={e => setPostPayoutStageId(e.target.value)} style={sel}>
+                          <option value="">Select next stage...</option>
+                          {payoutAvailableStages.map(s => (
+                            <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <button onClick={handleReceivePayout} disabled={!receivedAmount || !postPayoutBalance || !postPayoutStageId || submitting}
+                      style={{ width: "100%", background: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#16a34a" : "#1f2937", color: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      {submitting ? "Saving..." : "✓ Mark Received & Advance Stage"}
+                    </button>
+                  </>
+                )}
               </>
             )}
           </>
         )}
       </div>
 
-      {/* Right panel - account info */}
+      {/* Right info panel */}
       <div>
-        {selectedEvalId && activeTab === "passed_evals" && selectedEval && (
+        {activeTab === "passed_evals" && selectedEval && (
           <div style={{ background: C.card, border: "1px solid #8b5cf6", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Eval Account Details</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Eval Account</div>
             {[
-              ["Account", selectedEval.fields["Name"]],
-              ["Status", selectedEval.fields["Status"]],
+              ["Name", selectedEval.fields["Name"]],
               ["Balance", $$(selectedEval.fields["Current Balance"])],
               ["DD Left", $$(selectedEval.fields["Current Drawdown Left"])],
               ["Accounts", `×${selectedEval.fields["Number of Accounts"]}`],
+              ["→ Perf Type", perfType?.name || "Unknown"],
             ].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
                 <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
@@ -1403,19 +1610,38 @@ function AccountManagementTab() {
           </div>
         )}
 
-        {selectedPerfId && activeTab === "stage_mgmt" && selectedPerf && (
+        {activeTab === "stage_mgmt" && selectedPerf && (
           <div style={{ background: C.card, border: "1px solid #3b82f6", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", marginBottom: 12 }}>Performance Account Details</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", marginBottom: 12 }}>Performance Account</div>
             {[
-              ["Account", selectedPerf.fields["Name"]],
+              ["Name", selectedPerf.fields["Name"]],
               ["Status", selectedPerf.fields["Status"]],
               ["Balance", $$(selectedPerf.fields["Current Balance"])],
               ["DD Left", $$(selectedPerf.fields["Current Drawdown Left"])],
               ["Current Stage", currentStage ? `Stage ${currentStage.stage}` : "—"],
               ["Stage Target", currentStage ? $$(currentStage.target) : "—"],
-              ["Next Stage", nextStage ? `Stage ${nextStage.stage} (${$$(nextStage.target)})` : "Final Stage"],
+              ["Next Stage", nextStage ? `Stage ${nextStage.stage} (${$$(nextStage.target)})` : "Final"],
               ["Trading Days", selectedPerf.fields["Trading Days this Cycle"] || 0],
               ["Accounts", `×${selectedPerf.fields["Number of Accounts"]}`],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === "payouts" && selectedPayout && (
+          <div style={{ background: C.card, border: `1px solid ${statusColor[selectedPayout.fields["Status"]] || "#374151"}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: statusColor[selectedPayout.fields["Status"]] || "#fff", marginBottom: 12 }}>Payout Details</div>
+            {[
+              ["Name", selectedPayout.fields["Name"]],
+              ["Status", selectedPayout.fields["Status"]],
+              ["Date Requested", selectedPayout.fields["Date Requested"] || "—"],
+              ["Accounts", `×${selectedPayout.fields["Number of Accounts"] || 1}`],
+              ["Perf Account", payoutPerf?.fields["Name"] || "—"],
+              ["Current Balance", payoutPerf ? $$(payoutPerf.fields["Current Balance"]) : "—"],
             ].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
                 <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
