@@ -322,6 +322,7 @@ function PurchaseTab() {
   const [err, setErr] = useState(null);
   const [recentPurchases, setRecentPurchases] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  const [traderId, setTraderId] = useState("");
 
   useEffect(() => {
     loadActivePurchases();
@@ -388,6 +389,7 @@ function PurchaseTab() {
     setNotes("");
     setNumAccounts(1);
     setDate(today);
+    setTraderId("");
   }
 
   const selectedPurchase = activePurchases.find(r => r.id === selectedPurchaseId);
@@ -428,10 +430,26 @@ function PurchaseTab() {
         if (traderArr) fields["Trader"] = [traderArr[0]?.id];
         await createRecord(PURCHASE_TABLE, fields);
       } else {
-        const selectedEval = evalAccounts.find(r => r.id === selectedEvalId);
-        const traderArr = selectedEval?.fields["Trader"];
-        const traderId = Array.isArray(traderArr) ? traderArr[0]?.id : null;
-        const purchaseName = `${TRADERS.find(t => t.id === traderId)?.name || "Unknown"} - ${evalType?.name} - ${date}`;
+        const traderObj = TRADERS.find(t => t.id === traderId);
+        const purchaseName = `${traderObj?.name || "Unknown"} - ${evalType?.name} - ${date}`;
+
+        // Create the eval account record first
+        const evalAccountFields = {
+          "Name": `${traderObj?.name?.split(" ")[0]} - ${evalType?.name}`,
+          "Status": "Active",
+          "Current Balance": accountSize,
+          "High Water Mark": accountSize,
+          "Date Purchased": date,
+          "Date Started": date,
+          "Number of Accounts": parseInt(numAccounts),
+        };
+        if (evalTypeId) evalAccountFields["Evaluation Account Type"] = [evalTypeId];
+        if (traderId) evalAccountFields["Trader"] = [traderId];
+
+        const newEvalRecord = await createRecord(EVAL_TABLE, evalAccountFields);
+        const newEvalId = newEvalRecord?.id;
+
+        // Create purchase log linked to new eval account
         const fields = {
           "Name": purchaseName,
           "Date Purchased": date,
@@ -442,7 +460,7 @@ function PurchaseTab() {
           "Notes": notes || undefined,
         };
         if (evalTypeId) fields["Evaluation Account Type"] = [evalTypeId];
-        if (selectedEvalId) fields["Evaluation Account"] = [selectedEvalId];
+        if (newEvalId) fields["Evaluation Account"] = [newEvalId];
         if (traderId) fields["Trader"] = [traderId];
         await createRecord(PURCHASE_TABLE, fields);
       }
@@ -580,9 +598,12 @@ function PurchaseTab() {
         {/* New Account Flow */}
         {mode === "new" && (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>New Account</span>
+            <div style={{ marginBottom: 16 }}>
+              {label("Select Trader")}
+              <select value={traderId} onChange={e => setTraderId(e.target.value)} style={sel}>
+                <option value="">Choose trader...</option>
+                {TRADERS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
             </div>
 
             <div style={{ marginBottom: 16 }}>
