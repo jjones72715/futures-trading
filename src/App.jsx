@@ -1729,8 +1729,8 @@ export default function App() {
         };
       };
 
-      const allEvals = (er.records || []).filter(r => r.fields["Status"] === "Active");
-      const allPerfs = (pr.records || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"]));
+      const allEvals = (er || []).filter(r => r.fields["Status"] === "Active");
+      const allPerfs = (pr || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"]));
       const evals = allEvals.map(mapEval);
       const perfs = allPerfs.map(mapPerf);
       setEvalAccounts(evals);
