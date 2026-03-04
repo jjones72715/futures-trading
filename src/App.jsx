@@ -1736,7 +1736,7 @@ export default function App() {
       setPerfAccounts(allPerfs.map(mapPerf));
 
       const inp = {};
-      [...perfs, ...evals].forEach(a => { inp[a.id] = ""; });
+      [...allPerfs.map(mapPerf), ...allEvals.map(mapEval)].forEach(a => { inp[a.id] = ""; });
       setInputs(inp);
       setNoChanges({});
     } catch (e) {
