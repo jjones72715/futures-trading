@@ -362,7 +362,7 @@ function PurchaseTab() {
     const p = activePurchases.find(r => r.id === purchaseId);
     if (p) {
       const typeArr = p.fields["Evaluation Account Type"];
-      const typeId = Array.isArray(typeArr) ? typeArr[0]?.id : null;
+      const typeId = Array.isArray(typeArr) ? typeArr[0]?.id : typeArr?.id || null;
       if (typeId) {
         setEvalTypeId(typeId);
         const et = EVAL_TYPES.find(t => t.id === typeId);
@@ -397,6 +397,7 @@ function PurchaseTab() {
   const trader = selectedPurchase ? TRADERS.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
   const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "reset" ? selectedPurchaseId : traderId);
+  console.log("canSubmit check:", { mode, evalTypeId, costPer, date, numAccounts, selectedPurchaseId, traderId });
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -598,6 +599,10 @@ function PurchaseTab() {
         {/* New Account Flow */}
         {mode === "new" && (
           <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>New Account</span>
+            </div>
             <div style={{ marginBottom: 16 }}>
               {label("Select Trader")}
               <select value={traderId} onChange={e => setTraderId(e.target.value)} style={sel}>
