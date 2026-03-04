@@ -607,16 +607,6 @@ function PurchaseTab() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              {label("Link to Evaluation Account")}
-              <select value={selectedEvalId} onChange={e => setSelectedEvalId(e.target.value)} style={sel}>
-                <option value="">Choose eval account...</option>
-                {evalAccounts.sort((a, b) => (a.fields["Name"] || "").localeCompare(b.fields["Name"] || "")).map(r => (
-                  <option key={r.id} value={r.id}>{r.fields["Name"]}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
               {label("Evaluation Account Type")}
               <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
                 <option value="">Choose type...</option>
