@@ -1666,7 +1666,7 @@ export default function App() {
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("gameplan");
 
-  useEffect(() => { loadData(); }, [traderId, activeTab]);
+  useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
