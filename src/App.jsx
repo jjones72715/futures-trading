@@ -1666,7 +1666,7 @@ export default function App() {
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("gameplan");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadData(); }, [traderId, activeTab]);
 
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
@@ -1729,11 +1729,11 @@ export default function App() {
         };
       };
 
-      const perfs = pr.filter(r => activeStatuses.includes(r.fields["Status"])).map(mapPerf).sort((a, b) => a.prog - b.prog);
-      const evals = er.filter(r => r.fields["Status"] === "Active").map(mapEval).sort((a, b) => a.prog - b.prog);
+      const allEvals = (er.records || []).filter(r => r.fields["Status"] === "Active");
+      const allPerfs = (pr.records || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"]));
 
-      setPerfAccounts(perfs);
-      setEvalAccounts(evals);
+      setEvalAccounts(traderId ? allEvals.filter(r => Array.isArray(r.fields["Trader"]) && r.fields["Trader"].includes(traderId)) : allEvals);
+      setPerfAccounts(traderId ? allPerfs.filter(r => Array.isArray(r.fields["Trader"]) && r.fields["Trader"].includes(traderId)) : allPerfs);
 
       const inp = {};
       [...perfs, ...evals].forEach(a => { inp[a.id] = ""; });
