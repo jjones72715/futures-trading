@@ -333,8 +333,9 @@ function PurchaseTab() {
   async function loadActivePurchases() {
     setLoadingActive(true);
     try {
-      const records = await fetchTable(PURCHASE_TABLE, ["Name", "Status", "Evaluation Account Type", "Evaluation Account", "Trader", "Number of Accounts", "Cost Per Account", "Date Purchased", "Purchase Type"]);
-      const active = records.filter(r => r.fields["Status"] === "Active");
+      const res = await fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=100`);
+      const data = await res.json();
+      const active = (data.records || []).filter(r => r.fields["Status"] === "Active");
       setActivePurchases(active);
     } catch (e) {}
     setLoadingActive(false);
@@ -361,8 +362,10 @@ function PurchaseTab() {
     setSelectedPurchaseId(purchaseId);
     const p = activePurchases.find(r => r.id === purchaseId);
     if (p) {
+      console.log("selected purchase fields:", JSON.stringify(p.fields));
       const typeArr = p.fields["Evaluation Account Type"];
-      const typeId = Array.isArray(typeArr) ? typeArr[0]?.id : typeArr?.id || null;
+      const typeId = Array.isArray(typeArr) ? typeArr[0]?.id : null;
+      console.log("typeId found:", typeId);
       if (typeId) {
         setEvalTypeId(typeId);
         const et = EVAL_TYPES.find(t => t.id === typeId);
