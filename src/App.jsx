@@ -364,7 +364,7 @@ function PurchaseTab() {
     if (p) {
       console.log("selected purchase fields:", JSON.stringify(p.fields));
       const typeArr = p.fields["Evaluation Account Type"];
-      const typeId = Array.isArray(typeArr) ? typeArr[0]?.id : null;
+      const typeId = Array.isArray(typeArr) ? (typeof typeArr[0] === "string" ? typeArr[0] : typeArr[0]?.id) : null;
       console.log("typeId found:", typeId);
       if (typeId) {
         setEvalTypeId(typeId);
@@ -372,7 +372,7 @@ function PurchaseTab() {
         if (et) setCostPer(et.cost.toString());
       }
       const evalArr = p.fields["Evaluation Account"];
-      if (Array.isArray(evalArr)) setSelectedEvalId(evalArr[0]?.id || "");
+      if (Array.isArray(evalArr)) setSelectedEvalId(typeof evalArr[0] === "string" ? evalArr[0] : evalArr[0]?.id || "");
       setNumAccounts(p.fields["Number of Accounts"] || 1);
     }
   }
