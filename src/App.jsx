@@ -1016,7 +1016,6 @@ const PAYOUT_STRATEGIES = [
   { id: "reciQv2UV6KCSP23u", name: "YRM 50k Instant Prime - Stage 2", perfTypeId: "recP1UQ1FelJnw5ft", stage: 2, target: 3000, next: "Stage 2" },
 ];
 
-function AccountManagementTab() {
 // Eval type → Perf type map (baked in from Airtable)
 const EVAL_TO_PERF_TYPE = {
   "rec5O8lSTqB4fXPsP": "recTL4uJ1G8BUZK21",
@@ -1654,6 +1653,7 @@ function AccountManagementTab() {
     </div>
   );
 }
+  
 // ── Main App ──────────────────────────────────────────────────────────────────
 
 export default function App() {
