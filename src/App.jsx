@@ -1732,8 +1732,8 @@ export default function App() {
       const allEvals = (er.records || []).filter(r => r.fields["Status"] === "Active");
       const allPerfs = (pr.records || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"]));
 
-      setEvalAccounts(traderId ? allEvals.filter(r => Array.isArray(r.fields["Trader"]) && r.fields["Trader"].includes(traderId)) : allEvals);
-      setPerfAccounts(traderId ? allPerfs.filter(r => Array.isArray(r.fields["Trader"]) && r.fields["Trader"].includes(traderId)) : allPerfs);
+      setEvalAccounts(allEvals.map(mapEval));
+      setPerfAccounts(allPerfs.map(mapPerf));
 
       const inp = {};
       [...perfs, ...evals].forEach(a => { inp[a.id] = ""; });
