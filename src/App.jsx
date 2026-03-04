@@ -7,6 +7,7 @@ const PURCHASE_TABLE = "tblaBys956srO5pca";
 const TRADERS_TABLE = "tbla0lbJ9z1PAhNy7";
 const EVAL_TYPE_TABLE = "tbleHzHF5FgskLxs3";
 const PAYOUT_TABLE = "tblIEpLE5eIV7k6B7";
+const PAYOUT_STATUSES = ["Requested", "Processing", "Approved", "Received"];
 
 const TRADERS = [
   { id: "rec0jB7J1Ir1ZspvM", name: "Amanda Seratt" },
