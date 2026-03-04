@@ -402,12 +402,8 @@ function PurchaseTab() {
     try {
       const evalType = EVAL_TYPES.find(t => t.id === evalTypeId);
       const accountSize = evalType ? evalType.accountSize : 0;
-
       if (mode === "reset") {
-        // 1. Mark old purchase log as Failed
         await updateRecord(PURCHASE_TABLE, selectedPurchaseId, { "Status": "Failed" });
-
-        // 2. Reset eval account balance and HWM to account size
         if (selectedEvalId) {
           await updateRecord(EVAL_TABLE, selectedEvalId, {
             "Current Balance": accountSize,
@@ -415,8 +411,7 @@ function PurchaseTab() {
             "Date Started": date,
             "Date Purchased": date,
           });
-
-        // 3. Create new Reset purchase log
+        }
         const purchaseName = `${selectedPurchase?.fields["Name"]?.split(" - ")[0]} - ${evalType?.name} - ${date}`;
         const fields = {
           "Name": purchaseName,
@@ -432,9 +427,7 @@ function PurchaseTab() {
         const traderArr = selectedPurchase?.fields["Trader"];
         if (traderArr) fields["Trader"] = [traderArr[0]?.id];
         await createRecord(PURCHASE_TABLE, fields);
-
       } else {
-        // New account
         const selectedEval = evalAccounts.find(r => r.id === selectedEvalId);
         const traderArr = selectedEval?.fields["Trader"];
         const traderId = Array.isArray(traderArr) ? traderArr[0]?.id : null;
@@ -453,7 +446,6 @@ function PurchaseTab() {
         if (traderId) fields["Trader"] = [traderId];
         await createRecord(PURCHASE_TABLE, fields);
       }
-
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
       resetForm();
