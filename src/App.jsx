@@ -16,28 +16,28 @@ const TRADERS = [
 ];
 
 const EVAL_TYPES = [
-  { id: "rec5O8lSTqB4fXPsP", name: "Day Traders 150K Static", cost: 1750 },
-  { id: "rec8HfoHBk5m9oscj", name: "Top Step 150K", cost: 4500 },
-  { id: "rec8lBqRQBKOtFljx", name: "Tradeify 150K Select", cost: 4500 },
-  { id: "recCAYjMChppH9u8K", name: "Tradeify 100K Select", cost: 3000 },
-  { id: "recCePd3gcQGGiMe6", name: "Bulenox 50K EOD", cost: 2500 },
-  { id: "recD4IfxYzFKOxWGU", name: "TPT 150K", cost: 4500 },
-  { id: "recMLV7McrX0yqfd1", name: "FFN 100K Standard", cost: 3600 },
-  { id: "recMeH14HcTVOTABK", name: "Phidias Fundamental 100K", cost: 3000 },
-  { id: "recXHjiUdh5YzWpds", name: "FFN 150K Standard", cost: 5000 },
-  { id: "rece3sSv032SWiy8H", name: "TPT 100K", cost: 3000 },
-  { id: "recf85p2PhQs3O4Qx", name: "Funded Next 50K Legacy", cost: 2000 },
-  { id: "recjSpqACE1VGGL9l", name: "LucidFlex 100K", cost: 3000 },
-  { id: "reckab8EkDpFCco4e", name: "Day Traders 100K Static", cost: 1500 },
-  { id: "reclSB5U37mNwP5yE", name: "Funded Next 100K Legacy", cost: 3000 },
-  { id: "recldNrpc0Uw2iy0Q", name: "Trade Day 100K", cost: 3000 },
-  { id: "recmK6e815Mus0M4r", name: "TOF 50k Elite", cost: 2000 },
-  { id: "recmXkCwRhX8CwdHA", name: "BluSky 300k Blu+", cost: 5000 },
-  { id: "recnMxSRnwffHQqGf", name: "MFFU 50K Flex", cost: 2000 },
-  { id: "recpznnL6QT5BGnBL", name: "LucidFlex 150K", cost: 4500 },
-  { id: "recrwjjhAEaj98I29", name: "Phidias Static", cost: 500 },
-  { id: "recsMsMF8YosOvAKr", name: "Legends Elite 150K", cost: 4500 },
-  { id: "recx9L2t4eHPFzPAi", name: "Legends Elite 100K", cost: 3000 },
+  { id: "rec5O8lSTqB4fXPsP", name: "Day Traders 150K Static", cost: 1750, accountSize: 150000 },
+  { id: "rec8HfoHBk5m9oscj", name: "Top Step 150K", cost: 4500, accountSize: 150000 },
+  { id: "rec8lBqRQBKOtFljx", name: "Tradeify 150K Select", cost: 4500, accountSize: 150000 },
+  { id: "recCAYjMChppH9u8K", name: "Tradeify 100K Select", cost: 3000, accountSize: 100000 },
+  { id: "recCePd3gcQGGiMe6", name: "Bulenox 50K EOD", cost: 2500, accountSize: 50000 },
+  { id: "recD4IfxYzFKOxWGU", name: "TPT 150K", cost: 4500, accountSize: 150000 },
+  { id: "recMLV7McrX0yqfd1", name: "FFN 100K Standard", cost: 3600, accountSize: 100000 },
+  { id: "recMeH14HcTVOTABK", name: "Phidias Fundamental 100K", cost: 3000, accountSize: 100000 },
+  { id: "recXHjiUdh5YzWpds", name: "FFN 150K Standard", cost: 5000, accountSize: 150000 },
+  { id: "rece3sSv032SWiy8H", name: "TPT 100K", cost: 3000, accountSize: 100000 },
+  { id: "recf85p2PhQs3O4Qx", name: "Funded Next 50K Legacy", cost: 2000, accountSize: 50000 },
+  { id: "recjSpqACE1VGGL9l", name: "LucidFlex 100K", cost: 3000, accountSize: 100000 },
+  { id: "reckab8EkDpFCco4e", name: "Day Traders 100K Static", cost: 1500, accountSize: 100000 },
+  { id: "reclSB5U37mNwP5yE", name: "Funded Next 100K Legacy", cost: 3000, accountSize: 100000 },
+  { id: "recldNrpc0Uw2iy0Q", name: "Trade Day 100K", cost: 3000, accountSize: 100000 },
+  { id: "recmK6e815Mus0M4r", name: "TOF 50k Elite", cost: 2000, accountSize: 50000 },
+  { id: "recmXkCwRhX8CwdHA", name: "BluSky 300k Blu+", cost: 5000, accountSize: 300000 },
+  { id: "recnMxSRnwffHQqGf", name: "MFFU 50K Flex", cost: 2000, accountSize: 50000 },
+  { id: "recpznnL6QT5BGnBL", name: "LucidFlex 150K", cost: 4500, accountSize: 150000 },
+  { id: "recrwjjhAEaj98I29", name: "Phidias Static", cost: 500, accountSize: 25000 },
+  { id: "recsMsMF8YosOvAKr", name: "Legends Elite 150K", cost: 4500, accountSize: 150000 },
+  { id: "recx9L2t4eHPFzPAi", name: "Legends Elite 100K", cost: 3000, accountSize: 100000 },
 ];
 
 // Baked-in eval accounts by trader
@@ -306,11 +306,13 @@ function PurchaseTab() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const [traderId, setTraderId] = useState("");
-  const [mode, setMode] = useState(""); // "reset" | "new"
+  const [mode, setMode] = useState("");
+  const [activePurchases, setActivePurchases] = useState([]);
+  const [loadingActive, setLoadingActive] = useState(true);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState("");
+  const [evalAccounts, setEvalAccounts] = useState([]);
   const [selectedEvalId, setSelectedEvalId] = useState("");
   const [evalTypeId, setEvalTypeId] = useState("");
-  const [purchaseType, setPurchaseType] = useState("New");
   const [date, setDate] = useState(today);
   const [numAccounts, setNumAccounts] = useState(1);
   const [costPer, setCostPer] = useState("");
@@ -321,7 +323,28 @@ function PurchaseTab() {
   const [recentPurchases, setRecentPurchases] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
 
-  useEffect(() => { loadRecent(); }, []);
+  useEffect(() => {
+    loadActivePurchases();
+    loadEvalAccounts();
+    loadRecent();
+  }, []);
+
+  async function loadActivePurchases() {
+    setLoadingActive(true);
+    try {
+      const records = await fetchTable(PURCHASE_TABLE, ["Name", "Status", "Evaluation Account Type", "Evaluation Account", "Trader", "Number of Accounts", "Cost Per Account", "Date Purchased", "Purchase Type"]);
+      const active = records.filter(r => r.fields["Status"] === "Active");
+      setActivePurchases(active);
+    } catch (e) {}
+    setLoadingActive(false);
+  }
+
+  async function loadEvalAccounts() {
+    try {
+      const records = await fetchTable(EVAL_TABLE, ["Name", "Status", "Evaluation Account Type", "Number of Accounts"]);
+      setEvalAccounts(records.filter(r => r.fields["Status"] === "Active"));
+    } catch (e) {}
+  }
 
   async function loadRecent() {
     setLoadingRecent(true);
@@ -329,37 +352,24 @@ function PurchaseTab() {
       const records = await fetchTable(PURCHASE_TABLE, ["Name", "Date Purchased", "Number of Accounts", "Cost Per Account", "Total Cost", "Purchase Type", "Status"]);
       const sorted = records.sort((a, b) => new Date(b.fields["Date Purchased"] || 0) - new Date(a.fields["Date Purchased"] || 0)).slice(0, 20);
       setRecentPurchases(sorted);
-    } catch (e) { }
+    } catch (e) {}
     setLoadingRecent(false);
   }
 
-  const traderEvals = traderId ? (EVAL_ACCOUNTS_BY_TRADER[traderId] || []) : [];
-
-  function handleTraderChange(id) {
-    setTraderId(id);
-    setMode("");
-    setSelectedEvalId("");
-    setEvalTypeId("");
-    setCostPer("");
-  }
-
-  function handleSelectEval(evalId) {
-    if (evalId === "new") {
-      setMode("new");
-      setSelectedEvalId("");
-      setEvalTypeId("");
-      setCostPer("");
-      setPurchaseType("New");
-    } else {
-      setMode("reset");
-      setSelectedEvalId(evalId);
-      const ea = traderEvals.find(e => e.id === evalId);
-      if (ea) {
-        setEvalTypeId(ea.typeId);
-        const et = EVAL_TYPES.find(t => t.id === ea.typeId);
+  function handleSelectPurchase(purchaseId) {
+    setSelectedPurchaseId(purchaseId);
+    const p = activePurchases.find(r => r.id === purchaseId);
+    if (p) {
+      const typeArr = p.fields["Evaluation Account Type"];
+      const typeId = Array.isArray(typeArr) ? typeArr[0]?.id : null;
+      if (typeId) {
+        setEvalTypeId(typeId);
+        const et = EVAL_TYPES.find(t => t.id === typeId);
         if (et) setCostPer(et.cost.toString());
       }
-      setPurchaseType("Reset");
+      const evalArr = p.fields["Evaluation Account"];
+      if (Array.isArray(evalArr)) setSelectedEvalId(evalArr[0]?.id || "");
+      setNumAccounts(p.fields["Number of Accounts"] || 1);
     }
   }
 
@@ -369,57 +379,85 @@ function PurchaseTab() {
     if (et) setCostPer(et.cost.toString());
   }
 
-  const selectedEval = traderEvals.find(e => e.id === selectedEvalId);
+  function resetForm() {
+    setMode("");
+    setSelectedPurchaseId("");
+    setSelectedEvalId("");
+    setEvalTypeId("");
+    setCostPer("");
+    setNotes("");
+    setNumAccounts(1);
+    setDate(today);
+  }
+
+  const selectedPurchase = activePurchases.find(r => r.id === selectedPurchaseId);
   const selectedEvalType = EVAL_TYPES.find(t => t.id === evalTypeId);
-  const trader = TRADERS.find(t => t.id === traderId);
+  const trader = selectedPurchase ? TRADERS.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
-  const canSubmit = traderId && mode && evalTypeId && costPer && date && numAccounts > 0;
+  const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "new" ? selectedEvalId : selectedPurchaseId);
 
   async function handleSubmit() {
     if (!canSubmit) return;
     setSubmitting(true); setErr(null);
     try {
-      const purchaseName = `${trader?.name} - ${selectedEvalType?.name} - ${date}`;
+      const evalType = EVAL_TYPES.find(t => t.id === evalTypeId);
+      const accountSize = evalType ? evalType.accountSize : 0;
 
-      // Build purchase log fields
-      const purchaseFields = {
-        "Name": purchaseName,
-        "Date Purchased": date,
-        "Number of Accounts": parseInt(numAccounts),
-        "Cost Per Account": parseFloat(costPer),
-        "Purchase Type": purchaseType,
-        "Notes": notes || undefined,
-      };
+      if (mode === "reset") {
+        // 1. Mark old purchase log as Failed
+        await updateRecord(PURCHASE_TABLE, selectedPurchaseId, { "Status": "Failed" });
 
-      if (traderId) purchaseFields["Trader"] = [traderId];
+        // 2. Reset eval account balance and HWM to account size
+        if (selectedEvalId) {
+          await updateRecord(EVAL_TABLE, selectedEvalId, {
+            "Current Balance": accountSize,
+            "High Water Mark": accountSize,
+            "Date Started": date,
+            "Date Purchased": date,
+          });
 
-      if (mode === "reset" && selectedEvalId) {
-        purchaseFields["Evaluation Account"] = [selectedEvalId];
-        // Reset the eval account high water mark and balance
-        const evalType = EVAL_TYPES.find(t => t.id === evalTypeId);
-        const startingBal = evalType ? 0 : 0;
-        await updateRecord(EVAL_TABLE, selectedEvalId, {
-          "High Water Mark": startingBal,
-          "Current Balance": startingBal,
-          "Date Started": date,
+        // 3. Create new Reset purchase log
+        const purchaseName = `${selectedPurchase?.fields["Name"]?.split(" - ")[0]} - ${evalType?.name} - ${date}`;
+        const fields = {
+          "Name": purchaseName,
+          "Date Purchased": date,
+          "Number of Accounts": parseInt(numAccounts),
+          "Cost Per Account": parseFloat(costPer),
+          "Purchase Type": "Reset",
           "Status": "Active",
-        });
+          "Notes": notes || undefined,
+        };
+        if (evalTypeId) fields["Evaluation Account Type"] = [evalTypeId];
+        if (selectedEvalId) fields["Evaluation Account"] = [selectedEvalId];
+        const traderArr = selectedPurchase?.fields["Trader"];
+        if (traderArr) fields["Trader"] = [traderArr[0]?.id];
+        await createRecord(PURCHASE_TABLE, fields);
+
+      } else {
+        // New account
+        const selectedEval = evalAccounts.find(r => r.id === selectedEvalId);
+        const traderArr = selectedEval?.fields["Trader"];
+        const traderId = Array.isArray(traderArr) ? traderArr[0]?.id : null;
+        const purchaseName = `${TRADERS.find(t => t.id === traderId)?.name || "Unknown"} - ${evalType?.name} - ${date}`;
+        const fields = {
+          "Name": purchaseName,
+          "Date Purchased": date,
+          "Number of Accounts": parseInt(numAccounts),
+          "Cost Per Account": parseFloat(costPer),
+          "Purchase Type": "New",
+          "Status": "Active",
+          "Notes": notes || undefined,
+        };
+        if (evalTypeId) fields["Evaluation Account Type"] = [evalTypeId];
+        if (selectedEvalId) fields["Evaluation Account"] = [selectedEvalId];
+        if (traderId) fields["Trader"] = [traderId];
+        await createRecord(PURCHASE_TABLE, fields);
       }
-
-      if (evalTypeId) purchaseFields["Evaluation Account Type"] = [evalTypeId];
-
-      await createRecord(PURCHASE_TABLE, purchaseFields);
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
-      // Reset form
-      setMode("");
-      setSelectedEvalId("");
-      setEvalTypeId("");
-      setCostPer("");
-      setNotes("");
-      setNumAccounts(1);
-      setPurchaseType("New");
+      resetForm();
+      loadActivePurchases();
       loadRecent();
     } catch (e) {
       setErr("Failed to save: " + e.message);
@@ -439,72 +477,143 @@ function PurchaseTab() {
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
         {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>✓ Purchase logged successfully!</div>}
 
-        {/* Step 1 - Trader */}
-        <div style={{ marginBottom: 16 }}>
-          {label("Step 1 — Select Trader")}
-          <select value={traderId} onChange={e => handleTraderChange(e.target.value)} style={sel}>
-            <option value="">Choose trader...</option>
-            {TRADERS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
-
-        {/* Step 2 - Account Selection */}
-        {traderId && (
-          <div style={{ marginBottom: 16 }}>
-            {label("Step 2 — Select Account")}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {traderEvals.map(ea => (
-                <div key={ea.id} onClick={() => handleSelectEval(ea.id)}
-                  style={{ background: selectedEvalId === ea.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedEvalId === ea.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{ea.name}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>{EVAL_TYPES.find(t => t.id === ea.typeId)?.name} · ×{ea.n}</div>
-                  </div>
-                  <span style={{ fontSize: 10, background: "#134e4a", color: "#2dd4bf", padding: "2px 7px", borderRadius: 99, fontWeight: 600 }}>RESET</span>
-                </div>
-              ))}
-              <div onClick={() => handleSelectEval("new")}
-                style={{ background: mode === "new" ? "#1a2f1a" : "#1f2937", border: `2px dashed ${mode === "new" ? "#22c55e" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 20, color: "#22c55e" }}>+</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>New Account</div>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>Create a brand new eval account</div>
-                </div>
+        {/* Step 1 - Mode */}
+        {!mode && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {label("What type of purchase?")}
+            <div onClick={() => setMode("reset")}
+              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 24 }}>🔄</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Reset an Account</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>An existing account breached — reset it</div>
+              </div>
+            </div>
+            <div onClick={() => setMode("new")}
+              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 24 }}>➕</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e" }}>New Account</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Purchase a brand new eval account</div>
+              </div>
+            </div>
+            <div onClick={() => setMode("monthly")}
+              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 24 }}>📅</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>Monthly Billing</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Log a recurring monthly charge</div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 3 - Details */}
-        {mode && (
+        {/* Reset Flow */}
+        {mode === "reset" && (
           <>
-            {mode === "new" && (
-              <div style={{ marginBottom: 16 }}>
-                {label("Evaluation Account Type")}
-                <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
-                  <option value="">Choose type...</option>
-                  {EVAL_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Reset an Account</span>
+            </div>
+
+            {label("Select the breached account")}
+            {loadingActive ? (
+              <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading active accounts...</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {activePurchases.map(p => {
+                  const f = p.fields;
+                  const isSelected = selectedPurchaseId === p.id;
+                  return (
+                    <div key={p.id} onClick={() => handleSelectPurchase(p.id)}
+                      style={{ background: isSelected ? "#2d1f00" : "#1f2937", border: `1px solid ${isSelected ? "#f59e0b" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{f["Name"]}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                        {f["Evaluation Account Type"]?.[0]?.name} · ×{f["Number of Accounts"]} · {f["Date Purchased"]}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {mode === "reset" && selectedEvalType && (
-              <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>Resetting</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{selectedEval?.name}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>{selectedEvalType.name}</div>
-              </div>
+            {selectedPurchaseId && (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div>
+                    {label("Date")}
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("# of Accounts")}
+                    <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Cost Per Account")}
+                    <input type="number" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  {label("Notes (optional)")}
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes..." rows={2}
+                    style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
+                </div>
+
+                {selectedEvalType && (
+                  <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>On submit:</div>
+                    <div style={{ fontSize: 12, color: "#fca5a5" }}>• Old purchase → <strong>Failed</strong></div>
+                    <div style={{ fontSize: 12, color: "#4ade80" }}>• New Reset purchase → <strong>Active</strong></div>
+                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Eval account balance & HWM reset to <strong>{$$(selectedEvalType.accountSize)}</strong></div>
+                  </div>
+                )}
+
+                {totalCost > 0 && (
+                  <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>{$$(totalCost)}</span>
+                  </div>
+                )}
+
+                <button onClick={handleSubmit} disabled={!canSubmit || submitting}
+                  style={{ width: "100%", background: canSubmit ? "#d97706" : "#1f2937", color: canSubmit ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed" }}>
+                  {submitting ? "Saving..." : `Reset Account — ${$$(totalCost)}`}
+                </button>
+              </>
             )}
+          </>
+        )}
+
+        {/* New Account Flow */}
+        {mode === "new" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>New Account</span>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              {label("Link to Evaluation Account")}
+              <select value={selectedEvalId} onChange={e => setSelectedEvalId(e.target.value)} style={sel}>
+                <option value="">Choose eval account...</option>
+                {evalAccounts.sort((a, b) => (a.fields["Name"] || "").localeCompare(b.fields["Name"] || "")).map(r => (
+                  <option key={r.id} value={r.id}>{r.fields["Name"]}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              {label("Evaluation Account Type")}
+              <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
+                <option value="">Choose type...</option>
+                {EVAL_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-              <div>
-                {label("Purchase Type")}
-                <select value={purchaseType} onChange={e => setPurchaseType(e.target.value)} style={sel}>
-                  <option>New</option>
-                  <option>Reset</option>
-                  <option>Monthly Billing</option>
-                </select>
-              </div>
               <div>
                 {label("Date")}
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
@@ -526,7 +635,7 @@ function PurchaseTab() {
             </div>
 
             {totalCost > 0 && (
-              <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
                 <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>{$$(totalCost)}</span>
               </div>
@@ -535,6 +644,69 @@ function PurchaseTab() {
             <button onClick={handleSubmit} disabled={!canSubmit || submitting}
               style={{ width: "100%", background: canSubmit ? "#2563eb" : "#1f2937", color: canSubmit ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed" }}>
               {submitting ? "Saving..." : `Log Purchase — ${$$(totalCost)}`}
+            </button>
+          </>
+        )}
+
+        {/* Monthly Billing Flow */}
+        {mode === "monthly" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#60a5fa" }}>Monthly Billing</span>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              {label("Link to Evaluation Account")}
+              <select value={selectedEvalId} onChange={e => setSelectedEvalId(e.target.value)} style={sel}>
+                <option value="">Choose eval account...</option>
+                {evalAccounts.sort((a, b) => (a.fields["Name"] || "").localeCompare(b.fields["Name"] || "")).map(r => (
+                  <option key={r.id} value={r.id}>{r.fields["Name"]}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              {label("Evaluation Account Type")}
+              <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
+                <option value="">Choose type...</option>
+                {EVAL_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div>
+                {label("Date")}
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("# of Accounts")}
+                <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("Cost Per Account")}
+                <input type="number" placeholder="0.00" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              {label("Notes (optional)")}
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes..." rows={2}
+                style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
+            </div>
+
+            {totalCost > 0 && (
+              <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>{$$(totalCost)}</span>
+              </div>
+            )}
+
+            <button onClick={handleSubmit} disabled={!canSubmit || submitting}
+              style={{ width: "100%", background: canSubmit ? "#1d4ed8" : "#1f2937", color: canSubmit ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed" }}>
+              {submitting ? "Saving..." : `Log Billing — ${$$(totalCost)}`}
             </button>
           </>
         )}
@@ -551,16 +723,21 @@ function PurchaseTab() {
           recentPurchases.map(r => {
             const f = r.fields;
             const pt = f["Purchase Type"];
+            const st = f["Status"];
             const ptColor = pt === "New" ? "#22c55e" : pt === "Reset" ? "#f59e0b" : "#60a5fa";
+            const stColor = st === "Active" ? "#22c55e" : st === "Failed" ? "#ef4444" : "#f59e0b";
             return (
               <div key={r.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{f["Name"]}</div>
                   <div style={{ fontSize: 11, color: "#6b7280" }}>{f["Date Purchased"]} · ×{f["Number of Accounts"]} accounts</div>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 700, background: `${ptColor}20`, color: ptColor, padding: "2px 8px", borderRadius: 99 }}>{pt}</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: `${ptColor}20`, color: ptColor, padding: "2px 8px", borderRadius: 99 }}>{pt}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: `${stColor}20`, color: stColor, padding: "2px 8px", borderRadius: 99 }}>{st}</span>
+                </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171" }}>{$$( f["Total Cost"])}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171" }}>{$$(f["Total Cost"])}</div>
                   <div style={{ fontSize: 10, color: "#6b7280" }}>{$$(f["Cost Per Account"])} each</div>
                 </div>
               </div>
