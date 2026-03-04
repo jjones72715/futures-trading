@@ -433,7 +433,9 @@ function PurchaseTab() {
         if (evalTypeId) fields["Evaluation Account Type"] = [evalTypeId];
         if (selectedEvalId) fields["Evaluation Account"] = [selectedEvalId];
         const traderArr = selectedPurchase?.fields["Trader"];
-        if (traderArr) fields["Trader"] = [traderArr[0]?.id];
+        if (traderArr && traderArr.length > 0) {
+          fields["Trader"] = [typeof traderArr[0] === "string" ? traderArr[0] : traderArr[0]?.id];
+        }
         await createRecord(PURCHASE_TABLE, fields);
       } else {
         const traderObj = TRADERS.find(t => t.id === traderId);
