@@ -396,7 +396,7 @@ function PurchaseTab() {
   const selectedEvalType = EVAL_TYPES.find(t => t.id === evalTypeId);
   const trader = selectedPurchase ? TRADERS.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
-  const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "new" ? selectedEvalId : selectedPurchaseId);
+  const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "reset" ? selectedPurchaseId : traderId);
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -751,6 +751,134 @@ function PurchaseTab() {
     </div>
   );
 }
+function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
+  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+  const [traderFilter, setTraderFilter] = useState("all");
+  const [feedFilter, setFeedFilter] = useState("all");
+
+  const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount || a.status === "Waiting on Payout");
+  const standardPerf = perfAccounts.filter(a => !liveOrPayout.includes(a));
+
+  const allFeeds = [...new Set([...evalAccounts, ...perfAccounts].map(a => a.dataProvider).filter(Boolean))].sort();
+
+  function filterAccounts(accounts) {
+    return accounts
+      .filter(a => !dones[a.id])
+      .filter(a => traderFilter === "all" || a.trader === traderFilter || a.traderId === traderFilter)
+      .filter(a => feedFilter === "all" || a.dataProvider === feedFilter);
+  }
+
+  const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, padding: "6px 10px", fontSize: 12, color: "#fff", outline: "none" };
+
+  function MiniRow({ a, i }) {
+    const score = toScore(a.prog);
+    const scoreColor = score <= 3 ? "#ef4444" : score <= 6 ? "#f59e0b" : score <= 8 ? "#3b82f6" : "#22c55e";
+    const multiplierLabel = a.type === "eval" ? (a.accountWeight ? `${a.accountWeight}w` : "—") : (a.contractMultiplier > 1 ? `${a.contractMultiplier}x` : "1x");
+    const multiplierBg = a.type === "eval" ? "#2d1b69" : "#1e3a5f";
+    const multiplierColor = a.type === "eval" ? "#a78bfa" : "#93c5fd";
+
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "7px 12px", borderBottom: `1px solid ${C.border}`,
+        background: i % 2 === 0 ? "#0d1117" : "#111827",
+      }}>
+        <div style={{ width: 18, fontSize: 10, color: "#4b5563", fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#e5e7eb", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+          <div style={{ fontSize: 10, color: "#6b7280" }}>{a.dataProvider} {a.n > 1 ? `· ×${a.n}` : ""}</div>
+        </div>
+        <div style={{ width: 28, flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, background: multiplierBg, color: multiplierColor, padding: "1px 5px", borderRadius: 4 }}>{multiplierLabel}</span>
+        </div>
+        <div style={{ width: 70, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 40, background: "#374151", borderRadius: 99, height: 4 }}>
+              <div style={{ height: 4, borderRadius: 99, width: `${Math.min(100, (a.prog || 0) * 100)}%`, background: scoreColor }} />
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: scoreColor }}>{score}</span>
+          </div>
+        </div>
+        <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#60a5fa" }}>{$$(a.dailyTarget)}</div>
+          <div style={{ fontSize: 9, color: "#4b5563" }}>target</div>
+        </div>
+        <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#fde68a" }}>{$$(a.ddLeft)}</div>
+          <div style={{ fontSize: 9, color: "#4b5563" }}>dd left</div>
+        </div>
+      </div>
+    );
+  }
+
+  function MiniSection({ title, accounts, color }) {
+    const filtered = filterAccounts(accounts);
+    if (filtered.length === 0) return null;
+
+    const groups = {};
+    filtered.forEach(a => {
+      const dp = a.dataProvider || "Other";
+      if (!groups[dp]) groups[dp] = [];
+      groups[dp].push(a);
+    });
+
+    let globalIdx = 0;
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <div style={{ width: 3, height: 14, background: color, borderRadius: 99 }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{filtered.length}</span>
+        </div>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 12px", background: "#0d1117", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ width: 18 }} />
+            <div style={{ flex: 1, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.5 }}>Account</div>
+            <div style={{ width: 28, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase" }}>Mult</div>
+            <div style={{ width: 70, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase" }}>Progress</div>
+            <div style={{ width: 70, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", textAlign: "right" }}>Target</div>
+            <div style={{ width: 70, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", textAlign: "right" }}>DD Left</div>
+          </div>
+          {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([dp, accs]) => (
+            <div key={dp}>
+              <div style={{ padding: "4px 12px", background: "#0a0f1a", borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>{dp}</span>
+              </div>
+              {accs.map((a) => {
+                const idx = globalIdx++;
+                return <MiniRow key={a.id} a={a} i={idx} />;
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const totalActive = filterAccounts([...evalAccounts, ...perfAccounts]).length;
+
+  return (
+    <div>
+      {/* Filters */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>Filter by:</span>
+        <select value={traderFilter} onChange={e => setTraderFilter(e.target.value)} style={sel}>
+          <option value="all">All Traders</option>
+          {TRADERS.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+        </select>
+        <select value={feedFilter} onChange={e => setFeedFilter(e.target.value)} style={sel}>
+          <option value="all">All Data Feeds</option>
+          {allFeeds.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <span style={{ fontSize: 12, color: "#4b5563", marginLeft: "auto" }}>{totalActive} accounts shown</span>
+      </div>
+
+      <MiniSection title="Evaluation Accounts" accounts={evalAccounts} color="#8b5cf6" />
+      <MiniSection title="Performance Accounts" accounts={standardPerf} color="#3b82f6" />
+      <MiniSection title="Live & Payout Accounts" accounts={liveOrPayout} color="#f59e0b" />
+    </div>
+  );
+}
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 
@@ -772,8 +900,8 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
@@ -823,6 +951,9 @@ export default function App() {
           contractMultiplier: 1,
           payoutAccount: false,
           dataProvider: dp,
+          dailyTarget: f["Daily Target"] || 0,
+          accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
+          dailyTarget: f["Daily Target"] || 0,
         };
       };
 
@@ -946,11 +1077,12 @@ export default function App() {
         )}
 
         <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
-          {[
-            ["gameplan", "📊 Daily Gameplan"],
-            ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
-            ["purchases", "🛒 Purchases"],
-          ].map(([key, label]) => (
+            {[
+              ["gameplan", "📊 Daily Gameplan"],
+              ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
+              ["purchases", "🛒 Purchases"],
+              ["accounts", "📋 All Accounts"],
+            ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ background: "none", border: "none", borderBottom: tab === key ? "2px solid #3b82f6" : "2px solid transparent", color: tab === key ? "#60a5fa" : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
               {label}
@@ -999,6 +1131,7 @@ export default function App() {
         )}
 
         {tab === "purchases" && <PurchaseTab />}
+        {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
       </div>
     </div>
   );
