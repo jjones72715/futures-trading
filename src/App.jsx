@@ -887,7 +887,550 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     </div>
   );
 }
+const PERF_TYPES = [
+  { id: "rec7d4W5dlXgAIDeg", name: "Trade Day 100K Perf", accountSize: 100000 },
+  { id: "rec7xL7pCvC13SDvW", name: "LucidFlex 150K Perf", accountSize: 150000 },
+  { id: "recAPuxF9wQmpqcns", name: "Legends Elite 150K Perf", accountSize: 150000 },
+  { id: "recCipNXVOSRHLqKQ", name: "TPT 150K Perf", accountSize: 150000 },
+  { id: "recDGkltGuqhdmcUC", name: "Savius 300k Perf", accountSize: 300000 },
+  { id: "recDK9X8GHYJb1P8a", name: "Bulenox 50K EOD Perf", accountSize: 50000 },
+  { id: "recFWL0IRGxPfZAt0", name: "TFD - 100K Perf", accountSize: 100000 },
+  { id: "recIMu5FNdytf70y1", name: "Legends - Live", accountSize: 5500 },
+  { id: "recK8KZqNZD7qlRxc", name: "FFN 100K Standard Perf", accountSize: 100000 },
+  { id: "recKSnwwT6dMYrVgG", name: "Legends Elite 100K Perf", accountSize: 100000 },
+  { id: "recO5gj9RRGP2ToTN", name: "Funded Next 50K Legacy Perf", accountSize: 50000 },
+  { id: "recP1UQ1FelJnw5ft", name: "YRM 50k Instant Prime", accountSize: 50000 },
+  { id: "recQZlpiDSUgEcf17", name: "BluSky 300k Blu+ Perf", accountSize: 300000 },
+  { id: "recRkoFdYqIgmBnaz", name: "TOF 50k Elite Perf", accountSize: 50000 },
+  { id: "recSoGeDruvqUQPQ0", name: "Savius 100k Perf", accountSize: 100000 },
+  { id: "recT9NCOWvAH8sU13", name: "LucidFlex 100K Perf", accountSize: 100000 },
+  { id: "recTL4uJ1G8BUZK21", name: "Day Traders 150K Static Perf", accountSize: 150000 },
+  { id: "recWqBIPXHYBR7NwW", name: "YRM 100k Instant Prime", accountSize: 100000 },
+  { id: "recXp5quJOrP2JD1x", name: "Day Traders 100K Static Perf", accountSize: 100000 },
+  { id: "recYUQKZ5R19Snwyk", name: "TPT 100K Perf", accountSize: 100000 },
+  { id: "rechY3DxrUfj1v60L", name: "Phidias Fundamental 100K Perf", accountSize: 100000 },
+  { id: "recjaLPJKlnks4qV4", name: "YRM 150k Instant Prime", accountSize: 150000 },
+  { id: "recnOYUQIGLddgDco", name: "Tradeify 150K Select Perf", accountSize: 150000 },
+  { id: "recnYzi1GE4j3hy1q", name: "Tradeify - 100k - Live", accountSize: 0 },
+  { id: "recq5VXV6SJUsP8Fb", name: "Tradeify 100K Select Perf", accountSize: 100000 },
+  { id: "recsuOqgFYGIJiCDc", name: "FFN 150K Standard Perf", accountSize: 150000 },
+  { id: "rectnqPEVI7UEgffE", name: "MFFU 50K Flex Perf", accountSize: 0 },
+  { id: "recvzxGesKyxmKXbk", name: "TFD - Live", accountSize: 3250 },
+  { id: "recw2Utx3ln49Wh2M", name: "Top Step 150K Perf", accountSize: 0 },
+  { id: "recwug1Q5nN8D3wAN", name: "Savius 150k Perf", accountSize: 150000 },
+  { id: "recyK8fcdcuPkPPVy", name: "Funded Next 100K Legacy Perf", accountSize: 100000 },
+  { id: "rec9ZOHsi52US5d4P", name: "Purdia - Live", accountSize: 3000 },
+  { id: "recD4Q1JfDsoqibVP", name: "Phidias Static Perf", accountSize: 25000 },
+];
 
+// Payout Strategies baked in, grouped by perf type ID
+const PAYOUT_STRATEGIES = [
+  { id: "recD7r0vpYgh2nM9Z", name: "Top Step 150K Perf - Stage 1", perfTypeId: "recw2Utx3ln49Wh2M", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "rec9PKDHP0M3g7kSg", name: "Top Step 150K Perf - Stage 2", perfTypeId: "recw2Utx3ln49Wh2M", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "rech8KSemQ9e1rnuS", name: "Top Step 150K Perf - Stage 3", perfTypeId: "recw2Utx3ln49Wh2M", stage: 3, target: 7250, next: "Stage 4" },
+  { id: "recjEGACKPVzLHeRd", name: "Top Step 150K Perf - Stage 4", perfTypeId: "recw2Utx3ln49Wh2M", stage: 4, target: 8500, next: "Stage 5" },
+  { id: "rectT9yByjG2c0RiJ", name: "Top Step 150K Perf - Stage 5", perfTypeId: "recw2Utx3ln49Wh2M", stage: 5, target: 10000, next: "Stage 5" },
+  { id: "recRZFFc0t4O0buZ8", name: "Tradeify 150K Select Perf - Stage 1", perfTypeId: "recnOYUQIGLddgDco", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recIDn2XMdUHiLUFu", name: "Tradeify 150K Select Perf - Stage 2", perfTypeId: "recnOYUQIGLddgDco", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recPhwIfdMPJXOAfZ", name: "Tradeify 150K Select Perf - Stage 3", perfTypeId: "recnOYUQIGLddgDco", stage: 3, target: 7250, next: "Stage 4" },
+  { id: "reckHmSu5AimCRm4R", name: "Tradeify 150K Select Perf - Stage 4", perfTypeId: "recnOYUQIGLddgDco", stage: 4, target: 8500, next: "Stage 5" },
+  { id: "reclO0Dq8mHH7rB0X", name: "Tradeify 150K Select Perf - Stage 5", perfTypeId: "recnOYUQIGLddgDco", stage: 5, target: 10000, next: "Stage 5" },
+  { id: "recP5m0AXWwPC9UIj", name: "Tradeify 100K Select Perf - Stage 1", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "recOtClnmFZqr2nYy", name: "Tradeify 100K Select Perf - Stage 2", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recmKme5aziu8Wbfn", name: "Tradeify 100K Select Perf - Stage 3", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 3, target: 7000, next: "Stage 4" },
+  { id: "recpgFOxmZ9p4vRxV", name: "Tradeify 100K Select Perf - Stage 4", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 4, target: 8000, next: "Stage 4" },
+  { id: "recOpcjZ0SSYR7iTp", name: "Phidias Fundamental 100K Perf - Stage 1", perfTypeId: "rechY3DxrUfj1v60L", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "rec1D8Ri0nSlLjERR", name: "Phidias Fundamental 100K Perf - Stage 2", perfTypeId: "rechY3DxrUfj1v60L", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recDmiXqq7XJN2bOA", name: "Phidias Fundamental 100K Perf - Stage 3", perfTypeId: "rechY3DxrUfj1v60L", stage: 3, target: 5000, next: "Stage 3" },
+  { id: "recI9o7mw8zKtz4On", name: "Bulenox 50K EOD Perf - Stage 1", perfTypeId: "recDK9X8GHYJb1P8a", stage: 1, target: 4100, next: "Stage 2" },
+  { id: "recvhV5OdyCbgtOVf", name: "Bulenox 50K EOD Perf - Stage 2", perfTypeId: "recDK9X8GHYJb1P8a", stage: 2, target: 4100, next: "Stage 2" },
+  { id: "recDvHemEQ7Y7Nnqp", name: "Legends Elite 100K Perf - Stage 1", perfTypeId: "recKSnwwT6dMYrVgG", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "recOSyjvLkdLAZsHY", name: "Legends Elite 100K Perf - Stage 2", perfTypeId: "recKSnwwT6dMYrVgG", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recZ6pKQvnGv87PWA", name: "Legends Elite 100K Perf - Stage 3", perfTypeId: "recKSnwwT6dMYrVgG", stage: 3, target: 4000, next: "Stage 3" },
+  { id: "recPRosIMqNFcAcNy", name: "Legends Elite 150K Perf - Stage 1", perfTypeId: "recAPuxF9wQmpqcns", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recsvNgIREUZUpnjQ", name: "Legends Elite 150K Perf - Stage 2", perfTypeId: "recAPuxF9wQmpqcns", stage: 2, target: 7000, next: "Stage 3" },
+  { id: "recKwHHARudU5dX27", name: "Legends Elite 150K Perf - Stage 3", perfTypeId: "recAPuxF9wQmpqcns", stage: 3, target: 4500, next: "Stage 3" },
+  { id: "receyRAkF2faFKi4a", name: "TPT 100K Perf - Stage 1", perfTypeId: "recYUQKZ5R19Snwyk", stage: 1, target: 3000, next: "Stage 2" },
+  { id: "recJUJI0Q0Eoa5Kq3", name: "TPT 100K Perf - Stage 2", perfTypeId: "recYUQKZ5R19Snwyk", stage: 2, target: 5000, next: "Stage 3" },
+  { id: "reche2Pz8nnzvF46G", name: "TPT 100K Perf - Stage 3", perfTypeId: "recYUQKZ5R19Snwyk", stage: 3, target: 6000, next: "Stage 3" },
+  { id: "rec4K9uXXUgTGtjZ7", name: "TPT 150K Perf - Stage 1", perfTypeId: "recCipNXVOSRHLqKQ", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "recfP5fQwJWVqTcnI", name: "TPT 150K Perf - Stage 2", perfTypeId: "recCipNXVOSRHLqKQ", stage: 2, target: 6500, next: "Stage 3" },
+  { id: "rec2SMczeds8jhkhj", name: "TPT 150K Perf - Stage 3", perfTypeId: "recCipNXVOSRHLqKQ", stage: 3, target: 7500, next: "Stage 3" },
+  { id: "recuviYwkqyLwdIoz", name: "Day Traders 150K Static Perf - Stage 1", perfTypeId: "recTL4uJ1G8BUZK21", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recqYJjYPDPHjAa3E", name: "Day Traders 150K Static Perf - Stage 2", perfTypeId: "recTL4uJ1G8BUZK21", stage: 2, target: 7000, next: "Stage 3" },
+  { id: "recighzEcblaNmfrd", name: "Day Traders 150K Static Perf - Stage 3", perfTypeId: "recTL4uJ1G8BUZK21", stage: 3, target: 5500, next: "Stage 3" },
+  { id: "recz6SFULnonIwekq", name: "Day Traders 100K Static Perf - Stage 1", perfTypeId: "recXp5quJOrP2JD1x", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "recYuo5CQ28zmnNry", name: "Day Traders 100K Static Perf - Stage 2", perfTypeId: "recXp5quJOrP2JD1x", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recNJasT559yfPpr5", name: "Day Traders 100K Static Perf - Stage 3", perfTypeId: "recXp5quJOrP2JD1x", stage: 3, target: 5000, next: "Stage 3" },
+  { id: "recUc21nJMFd5tMYs", name: "FFN 100K Standard Perf - Stage 1", perfTypeId: "recK8KZqNZD7qlRxc", stage: 1, target: 3600, next: "Stage 2" },
+  { id: "recYsveCxaJO2MUq9", name: "FFN 100K Standard Perf - Stage 2", perfTypeId: "recK8KZqNZD7qlRxc", stage: 2, target: 6100, next: "Stage 2" },
+  { id: "recl5tLEZAN0WIWIk", name: "FFN 150K Standard Perf - Stage 1", perfTypeId: "recsuOqgFYGIJiCDc", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "rec5pQGppBxD8TgVY", name: "FFN 150K Standard Perf - Stage 2", perfTypeId: "recsuOqgFYGIJiCDc", stage: 2, target: 7500, next: "Stage 2" },
+  { id: "reca7XG21oF468YLE", name: "Funded Next 100K Legacy Perf - Stage 1", perfTypeId: "recyK8fcdcuPkPPVy", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "recEEYTvwJrWslH3G", name: "Funded Next 100K Legacy Perf - Stage 2", perfTypeId: "recyK8fcdcuPkPPVy", stage: 2, target: 6000, next: "Stage 2" },
+  { id: "reczxROMH9n06y00e", name: "Funded Next 50K Legacy Perf - Stage 1", perfTypeId: "recO5gj9RRGP2ToTN", stage: 1, target: 4000, next: "Stage 2" },
+  { id: "rec7wj5WyPkl04oW3", name: "Funded Next 50K Legacy Perf - Stage 2", perfTypeId: "recO5gj9RRGP2ToTN", stage: 2, target: 6000, next: "Stage 2" },
+  { id: "recAdAd5eitPvjxPGTd", name: "MFFU 50K Flex Perf - Stage 1", perfTypeId: "rectnqPEVI7UEgffE", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "recqiSXFb5U2ol8IR", name: "MFFU 50K Flex Perf - Stage 2", perfTypeId: "rectnqPEVI7UEgffE", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recWtZZuk6d6ONOBe", name: "MFFU 50K Flex Perf - Stage 3", perfTypeId: "rectnqPEVI7UEgffE", stage: 3, target: 7250, next: "Stage 4" },
+  { id: "recGiVXiz94MqXf0E", name: "MFFU 50K Flex Perf - Stage 4", perfTypeId: "rectnqPEVI7UEgffE", stage: 4, target: 8500, next: "Stage 5" },
+  { id: "reczGNnCwgQUkHF1B", name: "MFFU 50K Flex Perf - Stage 5", perfTypeId: "rectnqPEVI7UEgffE", stage: 5, target: 10000, next: "Stage 5" },
+  { id: "recZh1dPJY83EvFVf", name: "YRM 100k Instant Prime - Stage 1", perfTypeId: "recWqBIPXHYBR7NwW", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recSHBvgxkaTe22f4", name: "YRM 100k Instant Prime - Stage 2", perfTypeId: "recWqBIPXHYBR7NwW", stage: 2, target: 6000, next: "Stage 3" },
+  { id: "recCEbkPjacMMNTo5", name: "YRM 100k Instant Prime - Stage 3", perfTypeId: "recWqBIPXHYBR7NwW", stage: 3, target: 7000, next: "Stage 4" },
+  { id: "recV4j9QkskbywTHU", name: "YRM 100k Instant Prime - Stage 4", perfTypeId: "recWqBIPXHYBR7NwW", stage: 4, target: 8000, next: "Stage 4" },
+  { id: "recaVNpZy4yrdS8UP", name: "YRM 150k Instant Prime - Stage 1", perfTypeId: "recjaLPJKlnks4qV4", stage: 1, target: 8000, next: "Stage 2" },
+  { id: "recg67je3c9g0Xysd", name: "YRM 150k Instant Prime - Stage 2", perfTypeId: "recjaLPJKlnks4qV4", stage: 2, target: 10000, next: "Stage 3" },
+  { id: "recdqFw0rElJRiDIy", name: "YRM 150k Instant Prime - Stage 3", perfTypeId: "recjaLPJKlnks4qV4", stage: 3, target: 12000, next: "Stage 4" },
+  { id: "recw90SPSPNVJ0XLG", name: "YRM 150k Instant Prime - Stage 4", perfTypeId: "recjaLPJKlnks4qV4", stage: 4, target: 14000, next: "Stage 4" },
+  { id: "recI316Gc26YqE9tU", name: "BluSky 300k Blu+ Perf - Stage 1", perfTypeId: "recQZlpiDSUgEcf17", stage: 1, target: 3500, next: "Stage 2" },
+  { id: "reckqsGWkxd02gGHP", name: "BluSky 300k Blu+ Perf - Stage 2", perfTypeId: "recQZlpiDSUgEcf17", stage: 2, target: 5500, next: "Stage 3" },
+  { id: "recNw4UWcm0TJtJ7e", name: "BluSky 300k Blu+ Perf - Stage 3", perfTypeId: "recQZlpiDSUgEcf17", stage: 3, target: 6500, next: "Stage 3" },
+  { id: "recovu0efQGWsqnhX", name: "Trade Day 100K Perf - Stage 1", perfTypeId: "rec7d4W5dlXgAIDeg", stage: 1, target: 4000, next: "Stage 2" },
+  { id: "recyzD07wTlx3LibV", name: "Trade Day 100K Perf - Stage 2", perfTypeId: "rec7d4W5dlXgAIDeg", stage: 2, target: 5000, next: "Stage 3" },
+  { id: "recpoE7nyS5LE5sMw", name: "Trade Day 100K Perf - Stage 3", perfTypeId: "rec7d4W5dlXgAIDeg", stage: 3, target: 6000, next: "Stage 3" },
+  { id: "recut8uRm3oxG0Apk", name: "TOF 50k Elite Perf - Stage 1", perfTypeId: "recRkoFdYqIgmBnaz", stage: 1, target: 4100, next: "Stage 2" },
+  { id: "recLGd12PCxyHnZHP", name: "TOF 50k Elite Perf - Stage 2", perfTypeId: "recRkoFdYqIgmBnaz", stage: 2, target: 4100, next: "Stage 2" },
+  { id: "recRfn6Gyn8SDP6Lh", name: "Savius 100k Perf - Stage 1", perfTypeId: "recSoGeDruvqUQPQ0", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recQa30ZBPFcPzIbB", name: "Savius 100k Perf - Stage 2", perfTypeId: "recSoGeDruvqUQPQ0", stage: 2, target: 5000, next: "Stage 2" },
+  { id: "recZWirPZvScMrFlo", name: "Savius 150k Perf - Stage 1", perfTypeId: "recwug1Q5nN8D3wAN", stage: 1, target: 7500, next: "Stage 2" },
+  { id: "recQxdZoDPPAZrgRM", name: "Savius 150k Perf - Stage 2", perfTypeId: "recwug1Q5nN8D3wAN", stage: 2, target: 7500, next: "Stage 2" },
+  { id: "recUHRRb0T0q8SLbp", name: "Savius 300k Perf - Stage 1", perfTypeId: "recDGkltGuqhdmcUC", stage: 1, target: 15000, next: "Stage 2" },
+  { id: "rec4IVV8mfPmaEpUf", name: "Savius 300k Perf - Stage 2", perfTypeId: "recDGkltGuqhdmcUC", stage: 2, target: 15000, next: "Stage 2" },
+  { id: "receZQOw8cUwIWlJ2", name: "LucidFlex 150K Perf - Stage 1", perfTypeId: "rec7xL7pCvC13SDvW", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recv6yJFkTzUnByxq", name: "LucidFlex 150K Perf - Stage 2", perfTypeId: "rec7xL7pCvC13SDvW", stage: 2, target: 6000, next: "Stage 2" },
+  { id: "rec7IcXyAVmyIAmMI", name: "LucidFlex 100K Perf - Stage 1", perfTypeId: "recT9NCOWvAH8sU13", stage: 1, target: 4500, next: "Stage 2" },
+  { id: "reccbesPPOKZ8bamt", name: "LucidFlex 100K Perf - Stage 2", perfTypeId: "recT9NCOWvAH8sU13", stage: 2, target: 5000, next: "Stage 2" },
+  { id: "recEmrtJAsQlYWdAa", name: "TFD - 100K Perf - Stage 1", perfTypeId: "recFWL0IRGxPfZAt0", stage: 1, target: 3000, next: "Live" },
+  { id: "recnr6WrMzmFf013p", name: "TFD - Live - Stage 1", perfTypeId: "recvzxGesKyxmKXbk", stage: 1, target: 5000, next: "Stage 2" },
+  { id: "recUvS1hrRYAM2beW", name: "TFD - Live - Stage 2", perfTypeId: "recvzxGesKyxmKXbk", stage: 2, target: 8000, next: "Stage 2" },
+  { id: "rec3fnr4KThLY7BS3", name: "Legends - Live - Stage 1", perfTypeId: "recIMu5FNdytf70y1", stage: 1, target: 10000, next: "Stage 2" },
+  { id: "recqUEg4i3D1WQK9v", name: "Legends - Live - Stage 2", perfTypeId: "recIMu5FNdytf70y1", stage: 2, target: 12500, next: "Stage 2" },
+  { id: "rec2PJiH0akm0Rzqb", name: "Tradeify - 100k - Live - Stage 1", perfTypeId: "recnYzi1GE4j3hy1q", stage: 1, target: 3000, next: "Stage 2" },
+  { id: "reclCiN25iUBLtUgI", name: "Tradeify - 100k - Live - Stage 2", perfTypeId: "recnYzi1GE4j3hy1q", stage: 2, target: 6000, next: "Stage 2" },
+  { id: "recmvcdI7DC49aniN", name: "Purdia - Live - Stage 1", perfTypeId: "rec9ZOHsi52US5d4P", stage: 1, target: 8000, next: "Stage 2" },
+  { id: "recEOg5lO4eyagw0V", name: "Purdia - Live - Stage 2", perfTypeId: "rec9ZOHsi52US5d4P", stage: 2, target: 10000, next: "Stage 2" },
+  { id: "reccOsSoA6kiuyqXK", name: "Phidias Static Perf - Stage 1", perfTypeId: "recD4Q1JfDsoqibVP", stage: 1, target: 1500, next: "Live" },
+  { id: "recy2k5FURS3dKciB", name: "YRM 50k Instant Prime - Stage 1", perfTypeId: "recP1UQ1FelJnw5ft", stage: 1, target: 3000, next: "Stage 2" },
+  { id: "reciQv2UV6KCSP23u", name: "YRM 50k Instant Prime - Stage 2", perfTypeId: "recP1UQ1FelJnw5ft", stage: 2, target: 3000, next: "Stage 2" },
+];
+
+const PERF_TABLE = "tblhM1DWRiWXnhSKb";
+const STRATEGIES_TABLE = "tbljLby6v0o6fydOw";
+
+function AccountManagementTab() {
+  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+  const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
+  const inp = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const [activeTab, setActiveTab] = useState("passed_evals");
+  const [traderId, setTraderId] = useState("");
+  const [evalAccounts, setEvalAccounts] = useState([]);
+  const [perfAccounts, setPerfAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedEvalId, setSelectedEvalId] = useState("");
+  const [selectedPerfId, setSelectedPerfId] = useState("");
+  const [perfTypeId, setPerfTypeId] = useState("");
+  const [startingBalance, setStartingBalance] = useState("");
+  const [dateActivated, setDateActivated] = useState(today);
+  const [numAccounts, setNumAccounts] = useState(1);
+  const [investedPerAccount, setInvestedPerAccount] = useState("");
+  const [stageAction, setStageAction] = useState("");
+  const [newBalance, setNewBalance] = useState("");
+  const [tradingDays, setTradingDays] = useState("");
+  const [resetTradingDays, setResetTradingDays] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (traderId) loadTraderAccounts(traderId);
+  }, [traderId]);
+
+  async function loadTraderAccounts(tid) {
+    setLoading(true);
+    try {
+      const [er, pr] = await Promise.all([
+        fetch(`/.netlify/functions/airtable/${BASE}/${EVAL_TABLE}?maxRecords=100`).then(r => r.json()),
+        fetch(`/.netlify/functions/airtable/${BASE}/${PERF_TABLE}?maxRecords=100`).then(r => r.json()),
+      ]);
+      const evals = (er.records || []).filter(r => {
+        const t = r.fields["Trader"];
+        return r.fields["Status"] === "Active" && Array.isArray(t) && t.includes(tid);
+      });
+      const perfs = (pr.records || []).filter(r => {
+        const t = r.fields["Trader"];
+        const s = r.fields["Status"];
+        return ["Active", "Live"].includes(s) && Array.isArray(t) && t.includes(tid);
+      });
+      setEvalAccounts(evals);
+      setPerfAccounts(perfs);
+    } catch (e) {}
+    setLoading(false);
+  }
+
+  function resetForm() {
+    setSelectedEvalId(""); setSelectedPerfId(""); setPerfTypeId("");
+    setStartingBalance(""); setDateActivated(today); setNumAccounts(1);
+    setInvestedPerAccount(""); setStageAction(""); setNewBalance("");
+    setTradingDays(""); setResetTradingDays(true); setErr(null);
+  }
+
+  const selectedEval = evalAccounts.find(r => r.id === selectedEvalId);
+  const selectedPerf = perfAccounts.find(r => r.id === selectedPerfId);
+  const selectedPerfType = PERF_TYPES.find(t => t.id === perfTypeId);
+
+  // Get current stage of selected perf account
+  const currentStageId = Array.isArray(selectedPerf?.fields["Current Stage"])
+    ? selectedPerf.fields["Current Stage"][0]
+    : null;
+  const currentStage = PAYOUT_STRATEGIES.find(s => s.id === currentStageId);
+  const perfTypeForStages = selectedPerf
+    ? (Array.isArray(selectedPerf.fields["Performance Account Type"])
+        ? selectedPerf.fields["Performance Account Type"][0]
+        : null)
+    : null;
+  const availableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === perfTypeForStages)
+    .sort((a, b) => a.stage - b.stage);
+  const nextStage = currentStage
+    ? availableStages.find(s => s.stage === currentStage.stage + 1)
+    : availableStages[0];
+
+  async function handleConvertEval() {
+    if (!selectedEvalId || !perfTypeId || !startingBalance || !dateActivated) return;
+    setSubmitting(true); setErr(null);
+    try {
+      const trader = TRADERS.find(t => t.id === traderId);
+      const pt = PERF_TYPES.find(t => t.id === perfTypeId);
+      const firstStage = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === perfTypeId && s.stage === 1)[0];
+
+      // 1. Mark eval as Passed
+      await updateRecord(EVAL_TABLE, selectedEvalId, { "Status": "Passed" });
+
+      // 2. Create new Performance Account
+      const perfFields = {
+        "Name": `${trader?.name?.split(" ")[0]} - ${pt?.name}`,
+        "Status": "Active",
+        "Current Balance": parseFloat(startingBalance),
+        "High Water Mark": parseFloat(startingBalance),
+        "Cycle Start Balance": parseFloat(startingBalance),
+        "Date Activated": dateActivated,
+        "Number of Accounts": parseInt(numAccounts),
+        "Trading Days this Cycle": 0,
+      };
+      if (perfTypeId) perfFields["Performance Account Type"] = [perfTypeId];
+      if (traderId) perfFields["Trader"] = [traderId];
+      if (selectedEvalId) perfFields["Evaluation Accounts"] = [selectedEvalId];
+      if (firstStage) perfFields["Current Stage"] = [firstStage.id];
+      if (investedPerAccount) perfFields["Invested Per Account"] = parseFloat(investedPerAccount);
+
+      await createRecord(PERF_TABLE, perfFields);
+
+      setSuccess("✓ Eval passed and Performance Account created!");
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm();
+      loadTraderAccounts(traderId);
+    } catch (e) {
+      setErr("Failed: " + e.message);
+    }
+    setSubmitting(false);
+  }
+
+  async function handleStageAdvance() {
+    if (!selectedPerfId || !nextStage || !newBalance) return;
+    setSubmitting(true); setErr(null);
+    try {
+      const fields = {
+        "Current Stage": [nextStage.id],
+        "Current Balance": parseFloat(newBalance),
+        "High Water Mark": parseFloat(newBalance),
+        "Cycle Start Balance": parseFloat(newBalance),
+      };
+      if (resetTradingDays) fields["Trading Days this Cycle"] = tradingDays ? parseInt(tradingDays) : 0;
+      await updateRecord(PERF_TABLE, selectedPerfId, fields);
+      setSuccess(`✓ Advanced to Stage ${nextStage.stage}!`);
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm();
+      loadTraderAccounts(traderId);
+    } catch (e) {
+      setErr("Failed: " + e.message);
+    }
+    setSubmitting(false);
+  }
+
+  async function handleRequestPayout() {
+    if (!selectedPerfId) return;
+    setSubmitting(true); setErr(null);
+    try {
+      await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
+      setSuccess("✓ Account marked as Waiting on Payout!");
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm();
+      loadTraderAccounts(traderId);
+    } catch (e) {
+      setErr("Failed: " + e.message);
+    }
+    setSubmitting(false);
+  }
+
+  const label = (text) => (
+    <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>{text}</div>
+  );
+
+  const TabBtn = ({ id, label: lbl, color }) => (
+    <button onClick={() => { setActiveTab(id); resetForm(); }}
+      style={{ background: "none", border: "none", borderBottom: activeTab === id ? `2px solid ${color}` : "2px solid transparent", color: activeTab === id ? color : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
+      {lbl}
+    </button>
+  );
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 20, alignItems: "start" }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+
+        {/* Sub tabs */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 18 }}>
+          <TabBtn id="passed_evals" label="📈 Passed Evals" color="#8b5cf6" />
+          <TabBtn id="stage_mgmt" label="🎯 Stage Management" color="#3b82f6" />
+        </div>
+
+        {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
+        {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
+
+        {/* Trader selector - shared */}
+        <div style={{ marginBottom: 16 }}>
+          {label("Select Trader")}
+          <select value={traderId} onChange={e => { setTraderId(e.target.value); resetForm(); }} style={sel}>
+            <option value="">Choose trader...</option>
+            {TRADERS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+
+        {/* ── PASSED EVALS TAB ── */}
+        {activeTab === "passed_evals" && traderId && (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              {label("Select Passed Eval Account")}
+              {loading ? <div style={{ color: "#6b7280", fontSize: 12 }}>Loading...</div> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {evalAccounts.length === 0
+                    ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active eval accounts for this trader.</div>
+                    : evalAccounts.map(r => (
+                      <div key={r.id} onClick={() => setSelectedEvalId(r.id)}
+                        style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#1f2937", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          {r.fields["Evaluation Account Type"]?.[0] || ""} · ×{r.fields["Number of Accounts"]}
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+
+            {selectedEvalId && (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  {label("Performance Account Type")}
+                  <select value={perfTypeId} onChange={e => { setPerfTypeId(e.target.value); const pt = PERF_TYPES.find(t => t.id === e.target.value); if (pt) setStartingBalance(pt.accountSize.toString()); }} style={sel}>
+                    <option value="">Choose type...</option>
+                    {PERF_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div>
+                    {label("Date Activated")}
+                    <input type="date" value={dateActivated} onChange={e => setDateActivated(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("# of Accounts")}
+                    <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Starting Balance")}
+                    <input type="number" value={startingBalance} onChange={e => setStartingBalance(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Invested Per Account")}
+                    <input type="number" placeholder="Optional" value={investedPerAccount} onChange={e => setInvestedPerAccount(e.target.value)} style={inp} />
+                  </div>
+                </div>
+
+                {perfTypeId && startingBalance && (
+                  <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>On submit:</div>
+                    <div style={{ fontSize: 12, color: "#a78bfa" }}>• Eval → <strong>Passed</strong></div>
+                    <div style={{ fontSize: 12, color: "#4ade80" }}>• New Performance Account created at Stage 1</div>
+                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Starting balance: <strong>{$$(parseFloat(startingBalance))}</strong></div>
+                  </div>
+                )}
+
+                <button onClick={handleConvertEval} disabled={!perfTypeId || !startingBalance || submitting}
+                  style={{ width: "100%", background: perfTypeId && startingBalance ? "#7c3aed" : "#1f2937", color: perfTypeId && startingBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: perfTypeId && startingBalance ? "pointer" : "not-allowed" }}>
+                  {submitting ? "Converting..." : "Convert to Performance Account"}
+                </button>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── STAGE MANAGEMENT TAB ── */}
+        {activeTab === "stage_mgmt" && traderId && (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              {label("Select Performance Account")}
+              {loading ? <div style={{ color: "#6b7280", fontSize: 12 }}>Loading...</div> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {perfAccounts.length === 0
+                    ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active performance accounts for this trader.</div>
+                    : perfAccounts.map(r => {
+                        const stageId = Array.isArray(r.fields["Current Stage"]) ? r.fields["Current Stage"][0] : null;
+                        const stage = PAYOUT_STRATEGIES.find(s => s.id === stageId);
+                        return (
+                          <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); setNewBalance(""); }}
+                            style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                              {stage ? `Stage ${stage.stage} · Target: ${$$(stage.target)}` : "No stage set"} · Bal: {$$(r.fields["Current Balance"])}
+                            </div>
+                          </div>
+                        );
+                      })
+                  }
+                </div>
+              )}
+            </div>
+
+            {selectedPerfId && !stageAction && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                {label("What action?")}
+                {nextStage && (
+                  <div onClick={() => setStageAction("advance")}
+                    style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 22 }}>⬆️</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>Advance to Stage {nextStage.stage}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>Target: {$$(nextStage.target)}</div>
+                    </div>
+                  </div>
+                )}
+                <div onClick={() => setStageAction("payout")}
+                  style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 22 }}>💰</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Request Payout</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>Mark account as Waiting on Payout</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedPerfId && stageAction === "advance" && nextStage && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#4ade80" }}>Advance to Stage {nextStage.stage}</span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    {label("New Balance")}
+                    <input type="number" placeholder="Enter new balance..." value={newBalance} onChange={e => setNewBalance(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <input type="checkbox" id="resetDays" checked={resetTradingDays} onChange={e => setResetTradingDays(e.target.checked)}
+                        style={{ width: 16, height: 16, cursor: "pointer" }} />
+                      <label htmlFor="resetDays" style={{ fontSize: 12, color: "#9ca3af", cursor: "pointer" }}>Reset Trading Days</label>
+                    </div>
+                    {!resetTradingDays && (
+                      <input type="number" placeholder="Trading days to carry over..." value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
+                    )}
+                    {resetTradingDays && (
+                      <input type="number" placeholder="Starting trading days (0 if blank)..." value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
+                    )}
+                  </div>
+                </div>
+
+                <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
+                  style={{ width: "100%", background: newBalance ? "#16a34a" : "#1f2937", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
+                  {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
+                </button>
+              </>
+            )}
+
+            {selectedPerfId && stageAction === "payout" && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Request Payout</span>
+                </div>
+
+                <div style={{ background: "#2d1f00", border: "1px solid #f59e0b", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600, marginBottom: 4 }}>This will:</div>
+                  <div style={{ fontSize: 12, color: "#fde68a" }}>• Set <strong>{selectedPerf?.fields["Name"]}</strong> status to "Waiting on Payout"</div>
+                  <div style={{ fontSize: 11, color: "#92400e", marginTop: 6 }}>After receiving the payout, use Stage Management to advance the stage and enter the new balance.</div>
+                </div>
+
+                <button onClick={handleRequestPayout} disabled={submitting}
+                  style={{ width: "100%", background: "#d97706", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                  {submitting ? "Saving..." : "Mark as Waiting on Payout"}
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Right panel - account info */}
+      <div>
+        {selectedEvalId && activeTab === "passed_evals" && selectedEval && (
+          <div style={{ background: C.card, border: "1px solid #8b5cf6", borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Eval Account Details</div>
+            {[
+              ["Account", selectedEval.fields["Name"]],
+              ["Status", selectedEval.fields["Status"]],
+              ["Balance", $$(selectedEval.fields["Current Balance"])],
+              ["DD Left", $$(selectedEval.fields["Current Drawdown Left"])],
+              ["Accounts", `×${selectedEval.fields["Number of Accounts"]}`],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedPerfId && activeTab === "stage_mgmt" && selectedPerf && (
+          <div style={{ background: C.card, border: "1px solid #3b82f6", borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", marginBottom: 12 }}>Performance Account Details</div>
+            {[
+              ["Account", selectedPerf.fields["Name"]],
+              ["Status", selectedPerf.fields["Status"]],
+              ["Balance", $$(selectedPerf.fields["Current Balance"])],
+              ["DD Left", $$(selectedPerf.fields["Current Drawdown Left"])],
+              ["Current Stage", currentStage ? `Stage ${currentStage.stage}` : "—"],
+              ["Stage Target", currentStage ? $$(currentStage.target) : "—"],
+              ["Next Stage", nextStage ? `Stage ${nextStage.stage} (${$$(nextStage.target)})` : "Final Stage"],
+              ["Trading Days", selectedPerf.fields["Trading Days this Cycle"] || 0],
+              ["Accounts", `×${selectedPerf.fields["Number of Accounts"]}`],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 // ── Main App ──────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -1085,12 +1628,13 @@ export default function App() {
         )}
 
         <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
-            {[
-              ["gameplan", "📊 Daily Gameplan"],
-              ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
-              ["purchases", "🛒 Purchases"],
-              ["accounts", "📋 All Accounts"],
-            ].map(([key, label]) => (
+              {[
+                ["gameplan", "📊 Daily Gameplan"],
+                ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
+                ["purchases", "🛒 Purchases"],
+                ["accounts", "📋 All Accounts"],
+                ["mgmt", "🔄 Account Management"],
+              ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ background: "none", border: "none", borderBottom: tab === key ? "2px solid #3b82f6" : "2px solid transparent", color: tab === key ? "#60a5fa" : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
               {label}
@@ -1139,6 +1683,7 @@ export default function App() {
         )}
 
         {tab === "purchases" && <PurchaseTab />}
+        {tab === "mgmt" && <AccountManagementTab />}
         {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
       </div>
     </div>
