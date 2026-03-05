@@ -140,7 +140,125 @@ function SafetyBar({ safety }) {
   );
 }
 
-function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone }) {
+function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
+  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+  const [selected, setSelected] = useState([]);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const MAX_DEST = 4;
+
+  function toggleSelect(a) {
+    if (selected.find(s => s.id === a.id)) {
+      setSelected(selected.filter(s => s.id !== a.id));
+    } else if (selected.length < MAX_DEST) {
+      setSelected([...selected, a]);
+    }
+  }
+
+  const sharePerDest = selected.length > 0 ? totalToMove / selected.length : 0;
+  const destinations = selected.map(a => ({
+    ...a,
+    share: sharePerDest,
+    pct: selected.length > 0 ? 100 / selected.length : 0,
+    newBal: a.bal + sharePerDest,
+  }));
+
+  async function handleConfirm() {
+    setConfirming(true);
+    await onConfirm(destinations);
+    setConfirmed(true);
+    setSelected([]);
+    setConfirming(false);
+    setTimeout(() => setConfirmed(false), 3000);
+  }
+
+  if (losers.length === 0) return (
+    <div style={{ textAlign: "center", padding: "50px 0", color: "#6b7280" }}>
+      <p style={{ fontSize: 15, marginBottom: 6 }}>No redistributions needed</p>
+      <p style={{ fontSize: 13 }}>Enter today's balances on the Gameplan tab to see losses</p>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+      {/* Left - Losers */}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 12 }}>
+          📉 Accounts with Losses — {$$(totalToMove)} available
+        </div>
+        {losers.map(l => (
+          <div key={l.id} style={{ background: C.card, border: "1px solid #7f1d1d", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{l.name}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 11, color: "#6b7280" }}>{(l.pctLost * 100).toFixed(1)}% of DD lost</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#f87171" }}>−{$$(l.move)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Right - Gainers + selection */}
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80", marginBottom: 12 }}>
+          📈 Select Destinations (up to {MAX_DEST})
+        </div>
+        {gainers.length === 0
+          ? <div style={{ color: "#6b7280", fontSize: 12 }}>No profitable accounts today.</div>
+          : gainers.map(a => {
+              const isSel = !!selected.find(s => s.id === a.id);
+              const selIdx = selected.findIndex(s => s.id === a.id);
+              return (
+                <div key={a.id} onClick={() => toggleSelect(a)}
+                  style={{ background: isSel ? "#052e16" : C.card, border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8, cursor: selected.length >= MAX_DEST && !isSel ? "not-allowed" : "pointer", opacity: selected.length >= MAX_DEST && !isSel ? 0.5 : 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{a.name}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Current: {$$(a.bal)}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {isSel && (
+                        <>
+                          <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 700 }}>+{(100 / selected.length).toFixed(0)}%</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>+{$$(sharePerDest)}</div>
+                          <div style={{ fontSize: 10, color: "#6b7280" }}>→ {$$(a.bal + sharePerDest)}</div>
+                        </>
+                      )}
+                      {!isSel && <div style={{ fontSize: 11, color: "#6b7280" }}>tap to select</div>}
+                    </div>
+                    {isSel && <div style={{ width: 22, height: 22, background: "#22c55e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginLeft: 8 }}>{selIdx + 1}</div>}
+                  </div>
+                </div>
+              );
+            })
+        }
+
+        {selected.length > 0 && (
+          <div style={{ background: "#0d1f0d", border: "1px solid #166534", borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700, marginBottom: 8 }}>Summary</div>
+            {destinations.map(d => (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#d1fae5", marginBottom: 4 }}>
+                <span>{d.name}</span>
+                <span>+{$$(d.share)} → {$$(d.newBal)}</span>
+              </div>
+            ))}
+            <div style={{ borderTop: "1px solid #166534", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "#6b7280" }}>Total moved</span>
+              <span style={{ color: "#4ade80", fontWeight: 700 }}>{$$(totalToMove)}</span>
+            </div>
+            {confirmed && <div style={{ color: "#4ade80", fontSize: 12, fontWeight: 700, marginTop: 8 }}>✓ Balances updated!</div>}
+            <button onClick={handleConfirm} disabled={confirming}
+              style={{ width: "100%", background: "#16a34a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer", marginTop: 10 }}>
+              {confirming ? "Updating..." : "Confirm Redistribution"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
   const v = parseFloat(inputVal);
   const hasV = inputVal !== "" && !isNaN(v);
   const diff = noChange ? 0 : hasV ? (v - a.bal) * a.n : null;
@@ -231,6 +349,10 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             {done ? "✓" : "○"}
           </button>
+          <button onClick={onBreach} title="Log a breach"
+            style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
+            💥
+          </button>
         </div>
       </div>
     </div>
@@ -246,7 +368,7 @@ function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNo
         <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
       </div>
       {accounts.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} />
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => { setBreachAccount(a); setBreachCount(""); }}/>
       ))}
     </div>
   );
@@ -293,7 +415,7 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
         <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{done.length}</span>
       </div>
       {done.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={true} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} />
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={true} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => { setBreachAccount(a); setBreachCount(""); }}/>
       ))}
     </div>
   );
@@ -1664,6 +1786,9 @@ export default function App() {
   const [dones, setDones] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [breachAccount, setBreachAccount] = useState(null);
+  const [breachCount, setBreachCount] = useState("");
+  const [breachSubmitting, setBreachSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("gameplan");
@@ -1764,6 +1889,24 @@ export default function App() {
     setDones(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
+  async function handleBreach(a) {
+    const count = parseInt(breachCount);
+    if (!count || count < 1 || count > a.n) return;
+    setBreachSubmitting(true);
+    try {
+      const remaining = a.n - count;
+      const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+      if (remaining === 0) {
+        await updateRecord(tableId, a.id, { "Number of Accounts": 0, "Status": "Failed" });
+      } else {
+        await updateRecord(tableId, a.id, { "Number of Accounts": remaining });
+      }
+      setBreachAccount(null);
+      setBreachCount("");
+      await load();
+    } catch (e) {}
+    setBreachSubmitting(false);
+  }
   async function save() {
     setSaving(true); setErr(null);
     try {
@@ -1791,22 +1934,52 @@ export default function App() {
   const net = gain + loss;
   const filledCount = Object.entries(inputs).filter(([, v]) => v !== "" && !isNaN(parseFloat(v))).length + Object.values(noChanges).filter(Boolean).length;
 
-  const losers = allAccounts.filter(a => !noChanges[a.id] && !dones[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) < a.bal).map(a => {
-    const ddRef = a.tradeDown ? a.ddToFloor : a.ddLeft;
-    const pctLost = ddRef > 0 ? Math.abs(parseFloat(inputs[a.id]) - a.bal) / ddRef : 0;
-    return { ...a, pctLost, move: pctLost * a.invested };
-  }).filter(a => a.move > 0.5);
-
-  const gainers = allAccounts.filter(a => !noChanges[a.id] && !dones[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal);
-  const redists = losers.map(l => {
-    const match = [...gainers].sort((a, b) => Math.abs(a.prog - l.prog) - Math.abs(b.prog - l.prog))[0];
-    return { from: l.name, to: match?.name || "best gainer", amt: l.move, pct: l.pctLost };
-  });
+    const losers = allAccounts.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) < a.bal).map(a => {
+      const ddRef = a.tradeDown ? a.ddToFloor : a.ddLeft;
+      const pctLost = ddRef > 0 ? Math.abs(parseFloat(inputs[a.id]) - a.bal) / ddRef : 0;
+      return { ...a, newBal: parseFloat(inputs[a.id]), pctLost, move: pctLost * a.invested };
+    }).filter(a => a.move > 0.5);
+    const gainers = allAccounts.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal)
+      .map(a => ({ ...a, newBal: parseFloat(inputs[a.id]) }));
+    const totalToMove = losers.reduce((sum, l) => sum + l.move, 0);
+    const redists = losers;
 
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui,sans-serif" }}>
+      {breachAccount && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 340 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 6 }}>💥 Log Breach</div>
+            <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 16 }}>{breachAccount.name} · {breachAccount.n} account{breachAccount.n > 1 ? "s" : ""}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 6, textTransform: "uppercase" }}>How many accounts breached?</div>
+            <input type="number" min="1" max={breachAccount.n} value={breachCount} onChange={e => setBreachCount(e.target.value)}
+              placeholder={`1 - ${breachAccount.n}`}
+              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
+            {breachCount && parseInt(breachCount) === breachAccount.n && (
+              <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#fca5a5", marginBottom: 12 }}>
+                All accounts breached — status will be set to <strong>Failed</strong>
+              </div>
+            )}
+            {breachCount && parseInt(breachCount) < breachAccount.n && parseInt(breachCount) > 0 && (
+              <div style={{ background: "#1c1f2e", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#93c5fd", marginBottom: 12 }}>
+                {breachAccount.n - parseInt(breachCount)} account{breachAccount.n - parseInt(breachCount) > 1 ? "s" : ""} remaining after breach
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setBreachAccount(null); setBreachCount(""); }}
+                style={{ flex: 1, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "9px", fontSize: 13, color: "#9ca3af", cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={() => handleBreach(breachAccount)} disabled={!breachCount || parseInt(breachCount) < 1 || parseInt(breachCount) > breachAccount.n || breachSubmitting}
+                style={{ flex: 1, background: breachCount && parseInt(breachCount) >= 1 ? "#dc2626" : "#1f2937", border: "none", borderRadius: 8, padding: "9px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" }}>
+                {breachSubmitting ? "Saving..." : "Confirm Breach"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ textAlign: "center", color: "#9ca3af" }}>
         <div style={{ width: 36, height: 36, border: "3px solid #3b82f6", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
@@ -1874,41 +2047,19 @@ export default function App() {
           </>
         )}
 
-        {tab === "redist" && (
-          <div>
-            {redists.length === 0
-              ? <div style={{ textAlign: "center", padding: "50px 0", color: "#6b7280" }}>
-                  <p style={{ fontSize: 15, marginBottom: 6 }}>No redistributions yet</p>
-                  <p style={{ fontSize: 13 }}>Enter today's balances on the Gameplan tab to see suggestions</p>
-                </div>
-              : <>
-                  <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 14 }}>Based on today's drawdown losses, suggested investment moves:</p>
-                  {redists.map((r, i) => (
-                    <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "13px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                      <div style={{ width: 26, height: 26, background: "#431407", border: "1px solid #9a3412", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fb923c", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>{i + 1}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                          <span style={{ color: "#f87171", fontWeight: 600 }}>{r.from}</span>
-                          <span style={{ color: "#6b7280" }}>→</span>
-                          <span style={{ color: "#4ade80", fontWeight: 600 }}>{r.to}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{(r.pct * 100).toFixed(0)}% of drawdown lost</div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{$$(r.amt)}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>to move</div>
-                      </div>
-                    </div>
-                  ))}
-                </>
-            }
-          </div>
-        )}
-
-        {tab === "purchases" && <PurchaseTab />}
-        {tab === "mgmt" && <AccountManagementTab />}
-        {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
-      </div>
-    </div>
-  );
-}
+{tab === "redist" && (
+  <RedistTab
+    losers={losers}
+    gainers={gainers}
+    totalToMove={totalToMove}
+    onConfirm={async (destinations) => {
+      try {
+        await Promise.all([
+          ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
+          ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
+        ]);
+        await load();
+      } catch (e) {}
+    }}
+  />
+)}
