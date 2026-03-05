@@ -2064,6 +2064,5 @@ export default function App() {
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
             </div>
             </div>
-          </div>
         );
       }     
