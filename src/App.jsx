@@ -2040,7 +2040,7 @@ export default function App() {
 
         {tab === "gameplan" && (
           <>
-            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
+            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { console.log("setBreachAccount called", a); setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
             <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#3b82f6" />
             <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onDone} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#f59e0b" />
             <DoneSection accounts={allAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
