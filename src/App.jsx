@@ -2040,26 +2040,27 @@ export default function App() {
           </>
         )}
 
-      {tab === "redist" && (
-        <RedistTab
-          losers={losers}
-          gainers={gainers}
-          totalToMove={totalToMove}
-          onConfirm={async (destinations) => {
-            try {
-              await Promise.all([
-                ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
-                ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
-              ]);
-              await load();
-            } catch (e) {}
-          }}
-        />
-      )}
-      {tab === "purchases" && <PurchaseTab />}
-      {tab === "mgmt" && <AccountManagementTab />}
-      {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
-      </div>
-      </div>
-      );
-      }
+       {tab === "redist" && (
+                <RedistTab
+                  losers={losers}
+                  gainers={gainers}
+                  totalToMove={totalToMove}
+                  onConfirm={async (destinations) => {
+                    try {
+                      await Promise.all([
+                        ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
+                        ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
+                      ]);
+                      await load();
+                    } catch (e) {}
+                  }}
+                />
+              )}
+              {tab === "purchases" && <PurchaseTab />}
+              {tab === "mgmt" && <AccountManagementTab />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
+            </div>
+            </div>
+          </div>
+        );
+      }     
