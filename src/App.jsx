@@ -2055,11 +2055,11 @@ export default function App() {
       } catch (e) {}
       }}
       />
-      )}
+)}
       {tab === "purchases" && <PurchaseTab />}
       {tab === "mgmt" && <AccountManagementTab />}
       {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
-      </div>
-      </div>
-      );
-      }
+    </div>
+  </div>
+  );
+}
