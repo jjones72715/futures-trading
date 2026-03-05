@@ -2057,12 +2057,13 @@ export default function App() {
         await Promise.all([
           ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
           ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
-      ]);
-              await load();
-            } catch (e) {}
-          }}
-        />
-      )}
-          </div>
-        );
-      }
+        ]);
+                await load();
+              } catch (e) {}
+            }}
+          />
+        )}
+        </div>
+        </div>
+          );
+        }
