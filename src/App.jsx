@@ -359,7 +359,7 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
   );
 }
 
-function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, startIndex }) {
+function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, startIndex }) {
   if (accounts.length === 0) return null;
   return (
     <div style={{ marginBottom: 10 }}>
@@ -368,13 +368,13 @@ function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNo
         <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
       </div>
       {accounts.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => { setBreachAccount(a); setBreachCount(""); }}/>
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)}/>
       ))}
     </div>
   );
 }
 
-function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, color }) {
+function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, color }) {
   if (accounts.length === 0) return null;
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
@@ -398,7 +398,7 @@ function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChang
       {sorted.map(([dp, accs]) => {
         const start = idx;
         idx += accs.length;
-        return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} startIndex={start} />;
+      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} startIndex={start} />;
       })}
     </div>
   );
@@ -2040,9 +2040,9 @@ export default function App() {
 
         {tab === "gameplan" && (
           <>
-            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} color="#8b5cf6" />
-            <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} color="#3b82f6" />
-            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onDone} onDone={onDone} color="#f59e0b" />
+            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
+            <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#3b82f6" />
+            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onDone} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#f59e0b" />
             <DoneSection accounts={allAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
           </>
         )}
