@@ -1948,6 +1948,10 @@ export default function App() {
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui,sans-serif" }}>
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, color: "#f3f4f6", fontFamily: "system-ui,sans-serif" }}>
+      <style>{`input[type=number]::-webkit-inner-spin-button{opacity:1} input[type=number]{-moz-appearance:textfield}`}</style>
       {breachAccount && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 340 }}>
@@ -1980,17 +1984,6 @@ export default function App() {
           </div>
         </div>
       )}
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ textAlign: "center", color: "#9ca3af" }}>
-        <div style={{ width: 36, height: 36, border: "3px solid #3b82f6", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-        <p>Loading your accounts...</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: "#f3f4f6", fontFamily: "system-ui,sans-serif" }}>
-      <style>{`input[type=number]::-webkit-inner-spin-button{opacity:1} input[type=number]{-moz-appearance:textfield}`}</style>
 
       <div style={{ background: C.card, borderBottom: `1px solid ${C.border}`, padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
