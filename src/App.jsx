@@ -349,7 +349,7 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             {done ? "✓" : "○"}
           </button>
-          <button onClick={onBreach} title="Log a breach"
+          <button onClick={e => { e.stopPropagation(); onBreach(); }} title="Log a breach"
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             💥
           </button>
