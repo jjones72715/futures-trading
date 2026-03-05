@@ -2063,6 +2063,9 @@ export default function App() {
             }}
           />
         )}
+        {tab === "purchases" && <PurchaseTab />}
+        {tab === "mgmt" && <AccountManagementTab />}
+        {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
         </div>
         </div>
           );
