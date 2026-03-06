@@ -1186,6 +1186,7 @@ function AccountManagementTab() {
   const [dateActivated, setDateActivated] = useState(today);
   const [numAccounts, setNumAccounts] = useState(1);
   const [investedPerAccount, setInvestedPerAccount] = useState("");
+  const [contractMultiplier, setContractMultiplier] = useState(1);
 
   // Stage Management state
   const [selectedPerfId, setSelectedPerfId] = useState("");
@@ -1242,7 +1243,7 @@ function AccountManagementTab() {
 
   function resetForm() {
     setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
-    setNumAccounts(1); setInvestedPerAccount("");
+    setNumAccounts(1); setInvestedPerAccount(""); setContractMultiplier(1);
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
@@ -1306,6 +1307,7 @@ function AccountManagementTab() {
       };
       if (firstStage) perfFields["Current Stage"] = [firstStage.id];
       if (investedPerAccount) perfFields["Invested Per Account"] = parseFloat(investedPerAccount);
+      if (contractMultiplier) perfFields["Contract Multiplier"] = parseFloat(contractMultiplier);
       await createRecord(PERF_TABLE, perfFields);
       setSuccess("✓ Eval passed and Performance Account created!");
       setTimeout(() => setSuccess(""), 4000);
@@ -1325,6 +1327,7 @@ function AccountManagementTab() {
         "Cycle Start Balance": parseFloat(newBalance),
         "Trading Days this Cycle": tradingDays ? parseInt(tradingDays) : 0,
       };
+      if (contractMultiplier) fields["Contract Multiplier"] = parseFloat(contractMultiplier);
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
       setSuccess(`✓ Advanced to Stage ${nextStage.stage}!`);
       setTimeout(() => setSuccess(""), 4000);
@@ -1457,7 +1460,7 @@ function AccountManagementTab() {
                       const ptId = etId ? EVAL_TO_PERF_TYPE[etId] : null;
                       const pt = ptId ? PERF_TYPES.find(t => t.id === ptId) : null;
                       return (
-                        <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); }}
+                        <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
                           style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#1f2937", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
                           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
@@ -1495,6 +1498,10 @@ function AccountManagementTab() {
                     {label("Invested Per Account")}
                     <input type="number" placeholder="Optional" value={investedPerAccount} onChange={e => setInvestedPerAccount(e.target.value)} style={inp} />
                   </div>
+                  <div>
+                    {label("Contract Multiplier")}
+                    <input type="number" min="1" placeholder="1" value={contractMultiplier} onChange={e => setContractMultiplier(e.target.value)} style={inp} />
+                  </div>
                 </div>
 
                 <button onClick={handleConvertEval} disabled={!startingBalance || submitting}
@@ -1518,7 +1525,7 @@ function AccountManagementTab() {
                       const stageId = Array.isArray(r.fields["Current Stage"]) ? r.fields["Current Stage"][0] : null;
                       const stage = PAYOUT_STRATEGIES.find(s => s.id === stageId);
                       return (
-                        <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); }}
+                        <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
                           style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
                           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
@@ -1561,9 +1568,13 @@ function AccountManagementTab() {
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#4ade80" }}>Advance to Stage {nextStage.stage}</span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <div style={{ gridColumn: "1/-1" }}>
+                  <div>
                     {label("New Balance")}
                     <input type="number" placeholder="Enter new balance..." value={newBalance} onChange={e => setNewBalance(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Contract Multiplier")}
+                    <input type="number" min="1" placeholder="1" value={contractMultiplier} onChange={e => setContractMultiplier(e.target.value)} style={inp} />
                   </div>
                   <div style={{ gridColumn: "1/-1" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
