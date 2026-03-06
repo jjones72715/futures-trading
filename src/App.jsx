@@ -887,104 +887,75 @@ function PurchaseTab() {
 }
 function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-
-  const evalByDP = {};
-  evalAccounts.forEach(a => {
-    const dp = a.dataProvider || "Other";
-    if (!evalByDP[dp]) evalByDP[dp] = [];
-    evalByDP[dp].push(a);
-  });
-
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Live");
   const livePerf = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
-
-  const perfByDP = {};
-  standardPerf.forEach(a => {
-    const dp = a.dataProvider || "Other";
-    if (!perfByDP[dp]) perfByDP[dp] = [];
-    perfByDP[dp].push(a);
-  });
-
-  const payoutByDP = {};
-  livePerf.forEach(a => {
-    const dp = a.dataProvider || "Other";
-    if (!payoutByDP[dp]) payoutByDP[dp] = [];
-    payoutByDP[dp].push(a);
-  });
-
+  function getFeeds(accounts) {
+    const feeds = {};
+    accounts.forEach(a => {
+      const dp = a.dataProvider || "Other";
+      if (!feeds[dp]) feeds[dp] = [];
+      feeds[dp].push(a);
+    });
+    return feeds;
+  }
   function AccountMiniCard({ a }) {
     return (
-      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "8px 12px", opacity: dones[a.id] ? 0.5 : 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{a.name}</span>
-          <StatusPill status={a.status} />
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Balance</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{$$(a.bal)}</div>
+      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "7px 10px", marginBottom: 6, opacity: dones[a.id] ? 0.5 : 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, color: "#6b7280" }}>Balance</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#fff" }}>{$$(a.bal)}</span>
           </div>
-          <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>DD Left</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#fde68a" }}>{$$(a.ddLeft)}</div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, color: "#6b7280" }}>DD Left</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span>
           </div>
-          <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Limit</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#93c5fd" }}>{$$(a.limit)}</div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, color: "#6b7280" }}>Progress</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span>
           </div>
-          <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Progress</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 10, color: "#6b7280" }}>Daily Target</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#4ade80" }}>{$$(a.dailyTarget)}</span>
           </div>
-          {a.n > 1 && <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Accts</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>{a.n}</div>
-          </div>}
-          {a.type === "eval" && a.accountWeight && <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Weight</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>{a.accountWeight}</div>
-          </div>}
-          {a.type === "perf" && a.invested > 0 && <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Invested</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#c4b5fd" }}>{$$(a.invested)}</div>
-          </div>}
-          {a.contractMultiplier > 1 && <div>
-            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Multiplier</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#93c5fd" }}>{a.contractMultiplier}x</div>
-          </div>}
+          {a.type === "eval" && a.accountWeight && (
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#6b7280" }}>Weight</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af" }}>{a.accountWeight}</span>
+            </div>
+          )}
         </div>
       </div>
     );
   }
-
-  function DPGroup({ title, accountsByDP, color }) {
-    if (Object.keys(accountsByDP).length === 0) return null;
+  function FeedGrid({ accounts, color, title }) {
+    if (accounts.length === 0) return null;
+    const feeds = getFeeds(accounts);
+    const feedNames = Object.keys(feeds).sort();
     return (
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ width: 3, height: 18, background: color, borderRadius: 99 }} />
           <span style={{ fontSize: 14, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>
-            {Object.values(accountsByDP).flat().length}
-          </span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{accounts.length}</span>
         </div>
-        {Object.entries(accountsByDP).sort(([a], [b]) => a.localeCompare(b)).map(([dp, accs]) => (
-          <div key={dp} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{dp}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-              {accs.map(a => <AccountMiniCard key={a.id} a={a} />)}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${feedNames.length}, 1fr)`, gap: 10 }}>
+          {feedNames.map(feed => (
+            <div key={feed}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, borderBottom: "1px solid #1f2937", paddingBottom: 4 }}>{feed}</div>
+              {feeds[feed].map(a => <AccountMiniCard key={a.id} a={a} />)}
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
-
   return (
     <div>
-      <DPGroup title="Evaluation Accounts" accountsByDP={evalByDP} color="#8b5cf6" />
-      <DPGroup title="Performance Accounts" accountsByDP={perfByDP} color="#3b82f6" />
-      <DPGroup title="Live & Payout Accounts" accountsByDP={payoutByDP} color="#f59e0b" />
+      <FeedGrid accounts={evalAccounts} color="#8b5cf6" title="Evaluation Accounts" />
+      <FeedGrid accounts={standardPerf} color="#3b82f6" title="Performance Accounts" />
+      <FeedGrid accounts={livePerf} color="#f59e0b" title="Live & Payout Accounts" />
     </div>
   );
 }
