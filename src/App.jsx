@@ -887,129 +887,104 @@ function PurchaseTab() {
 }
 function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const [traderFilter, setTraderFilter] = useState("all");
-  const [feedFilter, setFeedFilter] = useState("all");
 
-  const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount || a.status === "Waiting on Payout");
-  const standardPerf = perfAccounts.filter(a => !liveOrPayout.includes(a));
+  const evalByDP = {};
+  evalAccounts.forEach(a => {
+    const dp = a.dataProvider || "Other";
+    if (!evalByDP[dp]) evalByDP[dp] = [];
+    evalByDP[dp].push(a);
+  });
 
-  const allFeeds = [...new Set([...evalAccounts, ...perfAccounts].map(a => a.dataProvider).filter(Boolean))].sort();
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Live");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
 
-  function filterAccounts(accounts) {
-    return accounts
-      .filter(a => !dones[a.id])
-      .filter(a => traderFilter === "all" || a.trader === traderFilter || a.traderId === traderFilter)
-      .filter(a => feedFilter === "all" || a.dataProvider === feedFilter);
-  }
+  const perfByDP = {};
+  standardPerf.forEach(a => {
+    const dp = a.dataProvider || "Other";
+    if (!perfByDP[dp]) perfByDP[dp] = [];
+    perfByDP[dp].push(a);
+  });
 
-  const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 7, padding: "6px 10px", fontSize: 12, color: "#fff", outline: "none" };
+  const payoutByDP = {};
+  livePerf.forEach(a => {
+    const dp = a.dataProvider || "Other";
+    if (!payoutByDP[dp]) payoutByDP[dp] = [];
+    payoutByDP[dp].push(a);
+  });
 
-  function MiniRow({ a, i }) {
-    const score = toScore(a.prog);
-    const scoreColor = score <= 3 ? "#ef4444" : score <= 6 ? "#f59e0b" : score <= 8 ? "#3b82f6" : "#22c55e";
-    const multiplierLabel = a.type === "eval" ? (a.accountWeight ? `${a.accountWeight}w` : "—") : (a.contractMultiplier > 1 ? `${a.contractMultiplier}x` : "1x");
-    const multiplierBg = a.type === "eval" ? "#2d1b69" : "#1e3a5f";
-    const multiplierColor = a.type === "eval" ? "#a78bfa" : "#93c5fd";
-
+  function AccountMiniCard({ a }) {
     return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        padding: "7px 12px", borderBottom: `1px solid ${C.border}`,
-        background: i % 2 === 0 ? "#0d1117" : "#111827",
-      }}>
-        <div style={{ width: 18, fontSize: 10, color: "#4b5563", fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#e5e7eb", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
-          <div style={{ fontSize: 10, color: "#6b7280" }}>{a.dataProvider} {a.n > 1 ? `· ×${a.n}` : ""}</div>
+      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "8px 12px", opacity: dones[a.id] ? 0.5 : 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{a.name}</span>
+          <StatusPill status={a.status} />
         </div>
-        <div style={{ width: 28, flexShrink: 0 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, background: multiplierBg, color: multiplierColor, padding: "1px 5px", borderRadius: 4 }}>{multiplierLabel}</span>
-        </div>
-        <div style={{ width: 70, flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <div style={{ width: 40, background: "#374151", borderRadius: 99, height: 4 }}>
-              <div style={{ height: 4, borderRadius: 99, width: `${Math.min(100, (a.prog || 0) * 100)}%`, background: scoreColor }} />
-            </div>
-            <span style={{ fontSize: 10, fontWeight: 700, color: scoreColor }}>{score}</span>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Balance</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{$$(a.bal)}</div>
           </div>
-        </div>
-        <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#60a5fa" }}>{$$(a.dailyTarget)}</div>
-          <div style={{ fontSize: 9, color: "#4b5563" }}>target</div>
-        </div>
-        <div style={{ width: 70, flexShrink: 0, textAlign: "right" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#fde68a" }}>{$$(a.ddLeft)}</div>
-          <div style={{ fontSize: 9, color: "#4b5563" }}>dd left</div>
+          <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>DD Left</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#fde68a" }}>{$$(a.ddLeft)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Limit</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#93c5fd" }}>{$$(a.limit)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Progress</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</div>
+          </div>
+          {a.n > 1 && <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Accts</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>{a.n}</div>
+          </div>}
+          {a.type === "eval" && a.accountWeight && <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Weight</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>{a.accountWeight}</div>
+          </div>}
+          {a.type === "perf" && a.invested > 0 && <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Invested</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#c4b5fd" }}>{$$(a.invested)}</div>
+          </div>}
+          {a.contractMultiplier > 1 && <div>
+            <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 1 }}>Multiplier</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#93c5fd" }}>{a.contractMultiplier}x</div>
+          </div>}
         </div>
       </div>
     );
   }
 
-  function MiniSection({ title, accounts, color }) {
-    const filtered = filterAccounts(accounts);
-    if (filtered.length === 0) return null;
-
-    const groups = {};
-    filtered.forEach(a => {
-      const dp = a.dataProvider || "Other";
-      if (!groups[dp]) groups[dp] = [];
-      groups[dp].push(a);
-    });
-
-    let globalIdx = 0;
+  function DPGroup({ title, accountsByDP, color }) {
+    if (Object.keys(accountsByDP).length === 0) return null;
     return (
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <div style={{ width: 3, height: 14, background: color, borderRadius: 99 }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{filtered.length}</span>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ width: 3, height: 18, background: color, borderRadius: 99 }} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>
+            {Object.values(accountsByDP).flat().length}
+          </span>
         </div>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 12px", background: "#0d1117", borderBottom: `1px solid ${C.border}` }}>
-            <div style={{ width: 18 }} />
-            <div style={{ flex: 1, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.5 }}>Account</div>
-            <div style={{ width: 28, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase" }}>Mult</div>
-            <div style={{ width: 70, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase" }}>Progress</div>
-            <div style={{ width: 70, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", textAlign: "right" }}>Target</div>
-            <div style={{ width: 70, fontSize: 9, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", textAlign: "right" }}>DD Left</div>
-          </div>
-          {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([dp, accs]) => (
-            <div key={dp}>
-              <div style={{ padding: "4px 12px", background: "#0a0f1a", borderBottom: `1px solid ${C.border}` }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>{dp}</span>
-              </div>
-              {accs.map((a) => {
-                const idx = globalIdx++;
-                return <MiniRow key={a.id} a={a} i={idx} />;
-              })}
+        {Object.entries(accountsByDP).sort(([a], [b]) => a.localeCompare(b)).map(([dp, accs]) => (
+          <div key={dp} style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{dp}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+              {accs.map(a => <AccountMiniCard key={a.id} a={a} />)}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     );
   }
-
-  const totalActive = filterAccounts([...evalAccounts, ...perfAccounts]).length;
 
   return (
     <div>
-      {/* Filters */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, color: "#6b7280" }}>Filter by:</span>
-        <select value={traderFilter} onChange={e => setTraderFilter(e.target.value)} style={sel}>
-          <option value="all">All Traders</option>
-          {TRADERS.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-        </select>
-        <select value={feedFilter} onChange={e => setFeedFilter(e.target.value)} style={sel}>
-          <option value="all">All Data Feeds</option>
-          {allFeeds.map(f => <option key={f} value={f}>{f}</option>)}
-        </select>
-        <span style={{ fontSize: 12, color: "#4b5563", marginLeft: "auto" }}>{totalActive} accounts shown</span>
-      </div>
-
-      <MiniSection title="Evaluation Accounts" accounts={evalAccounts} color="#8b5cf6" />
-      <MiniSection title="Performance Accounts" accounts={standardPerf} color="#3b82f6" />
-      <MiniSection title="Live & Payout Accounts" accounts={liveOrPayout} color="#f59e0b" />
+      <DPGroup title="Evaluation Accounts" accountsByDP={evalByDP} color="#8b5cf6" />
+      <DPGroup title="Performance Accounts" accountsByDP={perfByDP} color="#3b82f6" />
+      <DPGroup title="Live & Payout Accounts" accountsByDP={payoutByDP} color="#f59e0b" />
     </div>
   );
 }
