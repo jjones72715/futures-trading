@@ -1513,6 +1513,10 @@ function AccountManagementTab() {
                     <input type="number" placeholder="Optional" value={investedPerAccount} onChange={e => setInvestedPerAccount(e.target.value)} style={inp} />
                   </div>
                   <div>
+                    {label("Activation Fee Per Account")}
+                    <input type="number" placeholder="0.00" value={activationFee} onChange={e => setActivationFee(e.target.value)} style={inp} />
+                  </div>
+                  <div>
                     {label("Contract Multiplier")}
                     <input type="number" min="1" placeholder="1" value={contractMultiplier} onChange={e => setContractMultiplier(e.target.value)} style={inp} />
                   </div>
