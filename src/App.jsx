@@ -891,7 +891,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   const livePerf = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
   function getFeeds(accounts) {
     const feeds = {};
-    accounts.forEach(a => {
+    accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
       feeds[dp].push(a);
@@ -900,31 +900,14 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   }
   function AccountMiniCard({ a }) {
     return (
-      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "7px 10px", marginBottom: 6, opacity: dones[a.id] ? 0.5 : 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10, color: "#6b7280" }}>Balance</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: "#fff" }}>{$$(a.bal)}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10, color: "#6b7280" }}>DD Left</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10, color: "#6b7280" }}>Progress</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 10, color: "#6b7280" }}>Daily Target</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: "#4ade80" }}>{$$(a.dailyTarget)}</span>
-          </div>
-          {a.type === "eval" && a.accountWeight && (
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, color: "#6b7280" }}>Weight</span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af" }}>{a.accountWeight}</span>
-            </div>
-          )}
+      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 7, padding: "5px 8px", marginBottom: 4, opacity: dones[a.id] ? 0.5 : 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
+          <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
+          <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>
+          <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
+          {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
         </div>
       </div>
     );
@@ -934,16 +917,16 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     const feeds = getFeeds(accounts);
     const feedNames = Object.keys(feeds).sort();
     return (
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <div style={{ width: 3, height: 18, background: color, borderRadius: 99 }} />
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{accounts.length}</span>
+          <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${feedNames.length}, 1fr)`, gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 8 }}>
           {feedNames.map(feed => (
             <div key={feed}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, borderBottom: "1px solid #1f2937", paddingBottom: 4 }}>{feed}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, paddingBottom: 3, borderBottom: "1px solid #1f2937" }}>{feed}</div>
               {feeds[feed].map(a => <AccountMiniCard key={a.id} a={a} />)}
             </div>
           ))}
