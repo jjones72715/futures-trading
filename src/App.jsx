@@ -1186,6 +1186,7 @@ function AccountManagementTab() {
   const [dateActivated, setDateActivated] = useState(today);
   const [numAccounts, setNumAccounts] = useState(1);
   const [investedPerAccount, setInvestedPerAccount] = useState("");
+  const [activationFee, setActivationFee] = useState("");
   const [contractMultiplier, setContractMultiplier] = useState(1);
 
   // Stage Management state
@@ -1243,7 +1244,7 @@ function AccountManagementTab() {
 
   function resetForm() {
     setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
-    setNumAccounts(1); setInvestedPerAccount(""); setContractMultiplier(1);
+    setNumAccounts(1); setInvestedPerAccount(""); setActivationFee(""); setContractMultiplier(1);
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
@@ -1308,7 +1309,20 @@ function AccountManagementTab() {
       if (firstStage) perfFields["Current Stage"] = [firstStage.id];
       if (investedPerAccount) perfFields["Invested Per Account"] = parseFloat(investedPerAccount);
       if (contractMultiplier) perfFields["Contract Multiplier"] = parseFloat(contractMultiplier);
-      await createRecord(PERF_TABLE, perfFields);
+      const newPerfRecord = await createRecord(PERF_TABLE, perfFields);
+      const newPerfId = newPerfRecord?.id;
+      await createRecord(PURCHASE_TABLE, {
+        "Name": `${trader?.name?.split(" ")[0]} - ${pt?.name} - Activation - ${dateActivated}`,
+        "Date Purchased": dateActivated,
+        "Number of Accounts": parseInt(numAccounts),
+        "Cost Per Account": parseFloat(activationFee) || 0,
+        "Purchase Type": "Activation Fee",
+        "Status": "Active",
+        "Trader": [traderId],
+        "Evaluation Account": [selectedEvalId],
+        "Performance Account Type": [perfTypeId],
+        ...(newPerfId && { "Performance Account": [newPerfId] }),
+      });
       setSuccess("✓ Eval passed and Performance Account created!");
       setTimeout(() => setSuccess(""), 4000);
       resetForm(); loadData();
@@ -1909,6 +1923,15 @@ export default function App() {
       const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
       if (remaining === 0) {
         await updateRecord(tableId, a.id, { "Number of Accounts": 0, "Status": "Failed" });
+        if (a.type === "perf") {
+          const purchaseRes = await fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=100`);
+          const purchaseData = await purchaseRes.json();
+          const related = (purchaseData.records || []).filter(r => {
+            const pa = r.fields["Performance Account"];
+            return Array.isArray(pa) && pa.includes(a.id) && r.fields["Status"] === "Active";
+          });
+          await Promise.all(related.map(r => updateRecord(PURCHASE_TABLE, r.id, { "Status": "Failed" })));
+        }
       } else {
         await updateRecord(tableId, a.id, { "Number of Accounts": remaining });
       }
