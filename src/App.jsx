@@ -155,6 +155,10 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   });
 
   async function handleConfirm() {
+    console.log("destinations:", destinations);
+    console.log("selected:", selected);
+    console.log("percentages:", percentages);
+    console.log("totalToMove:", totalToMove);
     setConfirming(true);
     await onConfirm(destinations);
     setConfirmed(true);
@@ -2239,7 +2243,14 @@ export default function App() {
   const net = gain + loss;
   const filledCount = Object.entries(inputs).filter(([, v]) => v !== "" && !isNaN(parseFloat(v))).length + Object.values(noChanges).filter(Boolean).length;
 
-    const losers = allAccounts.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) < a.bal).map(a => {
+    const losers = allAccounts.filter(a => {
+      if (noChanges[a.id]) return false;
+      if (a.status === "Failed" && a.invested > 0) return true;
+      return inputs[a.id] && parseFloat(inputs[a.id]) < a.bal;
+    }).map(a => {
+      if (a.status === "Failed" && a.invested > 0) {
+        return { ...a, newBal: 0, pctLost: 1, move: a.invested * a.n };
+      }
       const ddRef = a.tradeDown ? a.ddToFloor : a.ddLeft;
       const pctLost = ddRef > 0 ? Math.abs(parseFloat(inputs[a.id]) - a.bal) / ddRef : 0;
       return { ...a, newBal: parseFloat(inputs[a.id]), pctLost, move: pctLost * a.invested };
