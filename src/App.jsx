@@ -2081,8 +2081,8 @@ export default function App() {
     try {
       const dynamicMap = await loadEvalToPerfMap();
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
@@ -2109,6 +2109,7 @@ export default function App() {
           payoutAccount: f["Payout Account"] || false,
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
+          hwm: f["High Water Mark"] || 0,
         };
       };
 
@@ -2128,6 +2129,7 @@ export default function App() {
           invested: 0,
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
+          hwm: f["High Water Mark"] || 0,
           tradeDown: false,
           tradeDownFloor: 0,
           contractMultiplier: 1,
@@ -2216,8 +2218,18 @@ export default function App() {
       const perfUpdates = perfAccounts.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
       const evalUpdates = evalAccounts.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
       await Promise.all([
-        ...perfUpdates.map(a => updateRecord(PERF_TABLE, a.id, { "Current Balance": parseFloat(inputs[a.id]) })),
-        ...evalUpdates.map(a => updateRecord(EVAL_TABLE, a.id, { "Current Balance": parseFloat(inputs[a.id]) })),
+        ...perfUpdates.map(a => {
+          const newBal = parseFloat(inputs[a.id]);
+          const fields = { "Current Balance": newBal };
+          if (newBal > a.bal && newBal > (a.hwm || 0)) fields["High Water Mark"] = newBal;
+          return updateRecord(PERF_TABLE, a.id, fields);
+        }),
+        ...evalUpdates.map(a => {
+          const newBal = parseFloat(inputs[a.id]);
+          const fields = { "Current Balance": newBal };
+          if (newBal > a.bal && newBal > (a.hwm || 0)) fields["High Water Mark"] = newBal;
+          return updateRecord(EVAL_TABLE, a.id, fields);
+        }),
       ]);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
