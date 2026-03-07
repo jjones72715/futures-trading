@@ -258,6 +258,81 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   );
 }
 
+function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
+  const allAccounts = [
+    ...evalAccounts,
+    ...perfAccounts.filter(a => a.status !== "Waiting on Payout"),
+  ];
+  const waitingPayout = perfAccounts.filter(a => a.status === "Waiting on Payout" && !a.payoutAccount);
+
+  const feeds = {};
+  allAccounts.forEach(a => {
+    const dp = a.dataProvider || "Other";
+    if (!feeds[dp]) feeds[dp] = [];
+    feeds[dp].push(a);
+  });
+  Object.keys(feeds).forEach(dp => {
+    feeds[dp].sort((a, b) => a.prog - b.prog);
+  });
+  const feedNames = Object.keys(feeds).sort();
+
+  const activeCounts = feedNames.map(f => feeds[f].filter(a => !dones[a.id]).length);
+  const anyActive = activeCounts.some(c => c > 0);
+
+  return (
+    <div>
+      {anyActive && (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 12, marginBottom: 24 }}>
+          {feedNames.map(feed => {
+            const active = feeds[feed].filter(a => !dones[a.id]);
+            if (active.length === 0) return null;
+            return (
+              <div key={feed}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid #1f2937" }}>
+                  {feed} <span style={{ color: "#374151" }}>({active.length})</span>
+                </div>
+                {active.map((a, i) => (
+                  <AccountRow key={a.id} a={a} i={i}
+                    inputVal={inputs[a.id] || ""}
+                    noChange={!!noChanges[a.id]}
+                    done={!!dones[a.id]}
+                    onInput={val => onInput(a.id, val)}
+                    onNoChange={() => onNoChange(a.id)}
+                    onDone={() => onDone(a.id)}
+                    onBreach={() => onBreach(a)}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {waitingPayout.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ width: 3, height: 16, background: "#6b7280", borderRadius: 99 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>Waiting on Payout</span>
+            <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{waitingPayout.length}</span>
+          </div>
+          {waitingPayout.filter(a => !dones[a.id]).map((a, i) => (
+            <AccountRow key={a.id} a={a} i={i}
+              inputVal={inputs[a.id] || ""}
+              noChange={!!noChanges[a.id]}
+              done={!!dones[a.id]}
+              onInput={val => onInput(a.id, val)}
+              onNoChange={() => onNoChange(a.id)}
+              onDone={() => onDone(a.id)}
+              onBreach={() => onBreach(a)}
+            />
+          ))}
+        </div>
+      )}
+
+      <DoneSection accounts={[...allAccounts, ...waitingPayout]} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
+    </div>
+  );
+}
 function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
@@ -305,8 +380,6 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
           {a.contractMultiplier > 1 && <span style={{ fontSize: 10, background: "#1e3a5f", color: "#93c5fd", padding: "1px 5px", borderRadius: 4 }}>{a.contractMultiplier}x</span>}
         </div>
       </div>
-
-      {a.status === "Live" && <div style={{ width: 80, flexShrink: 0 }}><StatusPill status={a.status} /></div>}
 
       <div style={{ width: 105, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Progress</div>
@@ -362,13 +435,13 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
               {zero ? "±$0" : (pos ? "+" : "") + $$(diff)}
             </span>
           )}
-          <button onClick={e => { e.stopPropagation(); onDone(); }} title={done ? "Mark as active" : "Done for today"}
-            style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
-            {done ? "✓" : "☐"}
-          </button>
           <button onClick={e => { e.stopPropagation(); onBreach(); }} title="Log a breach"
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             💥
+          </button>
+          <button onClick={e => { e.stopPropagation(); onDone(); }} title={done ? "Mark as active" : "Done for today"}
+            style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
+            {done ? "✓" : "☐"}
           </button>
           {a.status === "Live" && (
             <span style={{ fontSize: 10, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "3px 8px", borderRadius: 6 }}>LIVE</span>
@@ -2184,13 +2257,17 @@ export default function App() {
         </div>
 
         {tab === "gameplan" && (
-          <>
-            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
-            <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#3b82f6" />
-            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#f59e0b" />
-            <WaitingSection accounts={waitingPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} />
-            <DoneSection accounts={allAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
-          </>
+          <ReconciliationTab
+            evalAccounts={evalAccounts}
+            perfAccounts={perfAccounts}
+            inputs={inputs}
+            noChanges={noChanges}
+            dones={dones}
+            onInput={onInput}
+            onNoChange={onNoChange}
+            onDone={onDone}
+            onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }}
+          />
         )}
 
        {tab === "redist" && (
