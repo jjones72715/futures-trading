@@ -258,6 +258,23 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   );
 }
 
+function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
+  const active = accounts.filter(a => !dones[a.id]);
+  if (active.length === 0) return null;
+  const sorted = active.slice().sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ width: 3, height: 18, background: "#6b7280", borderRadius: 99 }} />
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#e5e7eb" }}>Waiting on Payout</span>
+        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{sorted.length}</span>
+      </div>
+      {sorted.map((a, i) => (
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} />
+      ))}
+    </div>
+  );
+}
 function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
   const v = parseFloat(inputVal);
   const hasV = inputVal !== "" && !isNaN(v);
@@ -333,26 +350,29 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
 
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Today's Ending Balance</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input type="number" placeholder={$$(a.bal)} value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange}
-            style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", appearance: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <button onClick={onNoChange} disabled={done}
             style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: done ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap", opacity: done ? 0.4 : 1 }}>
             {noChange ? "✓ No Change" : "No Change"}
           </button>
+          <input type="number" placeholder={String(a.bal)} value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange}
+            style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
           {diff !== null && !done && (
             <span style={{ fontSize: 13, fontWeight: 600, color: zero ? "#6b7280" : pos ? "#4ade80" : "#f87171" }}>
               {zero ? "±$0" : (pos ? "+" : "") + $$(diff)}
             </span>
           )}
-          <button onClick={onDone} title={done ? "Mark as active" : "Done for today"}
+          <button onClick={e => { e.stopPropagation(); onDone(); }} title={done ? "Mark as active" : "Done for today"}
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             {done ? "✓" : "☐"}
           </button>
-          <button onClick={e => { e.stopPropagation(); console.log("breach clicked", a.name); onBreach(); }} title="Log a breach"
+          <button onClick={e => { e.stopPropagation(); onBreach(); }} title="Log a breach"
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             💥
           </button>
+          {a.status === "Live" && (
+            <span style={{ fontSize: 10, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "3px 8px", borderRadius: 6 }}>LIVE</span>
+          )}
         </div>
       </div>
     </div>
@@ -2082,7 +2102,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: "#f3f4f6", fontFamily: "system-ui,sans-serif" }}>
-      <style>{`input[type=number]::-webkit-inner-spin-button{opacity:1} input[type=number]{-moz-appearance:textfield}`}</style>
+      <style>{`input[type=number]::-webkit-inner-spin-button{display:none} input[type=number]::-webkit-outer-spin-button{display:none} input[type=number]{-moz-appearance:textfield}`}</style>
       {breachAccount && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 340 }}>
@@ -2149,12 +2169,12 @@ export default function App() {
 
         <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
               {[
-                ["gameplan", "📊 Daily Gameplan"],
-                ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
-                ["purchases", "🛒 Purchases"],
                 ["accounts", "📋 All Accounts"],
-                ["pl", "📈 P&L"],
+                ["purchases", "🛒 Purchases"],
                 ["mgmt", "🔄 Account Management"],
+                ["gameplan", "📊 Reconciliation"],
+                ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
+                ["pl", "📈 P&L"],
               ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ background: "none", border: "none", borderBottom: tab === key ? "2px solid #3b82f6" : "2px solid transparent", color: tab === key ? "#60a5fa" : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
@@ -2165,10 +2185,10 @@ export default function App() {
 
         {tab === "gameplan" && (
           <>
-            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { console.log("setBreachAccount called", a); setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
+            <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
             <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#3b82f6" />
-            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onDone} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#f59e0b" />
-            <Section title="Waiting on Payout" accounts={waitingPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#6b7280" />
+            <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#f59e0b" />
+            <WaitingSection accounts={waitingPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} />
             <DoneSection accounts={allAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
           </>
         )}
