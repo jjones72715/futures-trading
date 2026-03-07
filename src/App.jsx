@@ -2374,12 +2374,14 @@ export default function App() {
                     console.log("redist confirm - losers:", losers);
                     console.log("redist confirm - destinations:", destinations);
                     try {
+                      console.log("updating losers:", losers.map(l => ({ id: l.id, table: l.type === "perf" ? PERF_TABLE : EVAL_TABLE, newBal: l.newBal })));
+                      console.log("updating destinations:", destinations.map(d => ({ id: d.id, table: d.type === "perf" ? PERF_TABLE : EVAL_TABLE, newBal: d.newBal })));
                       await Promise.all([
                         ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
                         ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
                       ]);
                       await load();
-                    } catch (e) { console.error("redist confirm error:", e); }
+                    } catch (e) { console.error("redist update error:", e); }
                   }}
                 />
               )}
