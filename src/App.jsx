@@ -259,63 +259,83 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
 }
 
 function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
-  const allAccounts = [
-    ...evalAccounts,
-    ...perfAccounts.filter(a => a.status !== "Waiting on Payout"),
-  ];
-  const waitingPayout = perfAccounts.filter(a => a.status === "Waiting on Payout" && !a.payoutAccount);
+  const activeEvals = evalAccounts.filter(a => !dones[a.id]);
+  const activePerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Waiting on Payout" && a.status !== "Live" && !dones[a.id]);
+  const livePerf = perfAccounts.filter(a => a.status === "Live" && !dones[a.id]);
+  const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status !== "Waiting on Payout" && !dones[a.id]);
+  const waitingPayout = perfAccounts.filter(a => a.status === "Waiting on Payout" && !dones[a.id]);
+  const allAccounts = [...evalAccounts, ...perfAccounts];
+  const doneAccounts = allAccounts.filter(a => dones[a.id]);
 
-  const feeds = {};
-  allAccounts.forEach(a => {
-    const dp = a.dataProvider || "Other";
-    if (!feeds[dp]) feeds[dp] = [];
-    feeds[dp].push(a);
-  });
-  Object.keys(feeds).forEach(dp => {
-    feeds[dp].sort((a, b) => a.prog - b.prog);
-  });
-  const feedNames = Object.keys(feeds).sort();
+  function getFeedColumns(accounts) {
+    const feeds = {};
+    accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
+      const dp = a.dataProvider || "Other";
+      if (!feeds[dp]) feeds[dp] = [];
+      feeds[dp].push(a);
+    });
+    return feeds;
+  }
 
-  const activeCounts = feedNames.map(f => feeds[f].filter(a => !dones[a.id]).length);
-  const anyActive = activeCounts.some(c => c > 0);
+  function FeedColumns({ accounts }) {
+    if (accounts.length === 0) return null;
+    const feeds = getFeedColumns(accounts);
+    const feedNames = Object.keys(feeds).sort();
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 12 }}>
+        {feedNames.map(feed => (
+          <div key={feed}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid #1f2937" }}>
+              {feed} <span style={{ color: "#374151" }}>({feeds[feed].length})</span>
+            </div>
+            {feeds[feed].map((a, i) => (
+              <AccountRow key={a.id} a={a} i={i}
+                inputVal={inputs[a.id] || ""}
+                noChange={!!noChanges[a.id]}
+                done={!!dones[a.id]}
+                onInput={val => onInput(a.id, val)}
+                onNoChange={() => onNoChange(a.id)}
+                onDone={() => onDone(a.id)}
+                onBreach={() => onBreach(a)}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function SectionHeader({ title, color, count }) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 0 10px" }}>
+        <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{count}</span>
+      </div>
+    );
+  }
 
   return (
     <div>
-      {anyActive && (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 12, marginBottom: 24 }}>
-          {feedNames.map(feed => {
-            const active = feeds[feed].filter(a => !dones[a.id]);
-            if (active.length === 0) return null;
-            return (
-              <div key={feed}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid #1f2937" }}>
-                  {feed} <span style={{ color: "#374151" }}>({active.length})</span>
-                </div>
-                {active.map((a, i) => (
-                  <AccountRow key={a.id} a={a} i={i}
-                    inputVal={inputs[a.id] || ""}
-                    noChange={!!noChanges[a.id]}
-                    done={!!dones[a.id]}
-                    onInput={val => onInput(a.id, val)}
-                    onNoChange={() => onNoChange(a.id)}
-                    onDone={() => onDone(a.id)}
-                    onBreach={() => onBreach(a)}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {activeEvals.length > 0 && <>
+        <SectionHeader title="Evaluation Accounts" color="#8b5cf6" count={activeEvals.length} />
+        <FeedColumns accounts={activeEvals} />
+      </>}
 
-      {waitingPayout.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 3, height: 16, background: "#6b7280", borderRadius: 99 }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>Waiting on Payout</span>
-            <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{waitingPayout.length}</span>
-          </div>
-          {waitingPayout.filter(a => !dones[a.id]).map((a, i) => (
+      {(activePerf.length > 0 || livePerf.length > 0) && <>
+        <SectionHeader title="Performance Accounts" color="#3b82f6" count={activePerf.length + livePerf.length} />
+        <FeedColumns accounts={[...activePerf, ...livePerf]} />
+      </>}
+
+      {payoutAccounts.length > 0 && <>
+        <SectionHeader title="Payout Accounts" color="#f59e0b" count={payoutAccounts.length} />
+        <FeedColumns accounts={payoutAccounts} />
+      </>}
+
+      {waitingPayout.length > 0 && <>
+        <SectionHeader title="Waiting on Payout" color="#6b7280" count={waitingPayout.length} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {waitingPayout.map((a, i) => (
             <AccountRow key={a.id} a={a} i={i}
               inputVal={inputs[a.id] || ""}
               noChange={!!noChanges[a.id]}
@@ -327,9 +347,24 @@ function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, done
             />
           ))}
         </div>
-      )}
+      </>}
 
-      <DoneSection accounts={[...allAccounts, ...waitingPayout]} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
+      {doneAccounts.length > 0 && <>
+        <SectionHeader title="Done for Today" color="#166534" count={doneAccounts.length} />
+        <div style={{ opacity: 0.5 }}>
+          {doneAccounts.map((a, i) => (
+            <AccountRow key={a.id} a={a} i={i}
+              inputVal={inputs[a.id] || ""}
+              noChange={!!noChanges[a.id]}
+              done={!!dones[a.id]}
+              onInput={val => onInput(a.id, val)}
+              onNoChange={() => onNoChange(a.id)}
+              onDone={() => onDone(a.id)}
+              onBreach={() => onBreach(a)}
+            />
+          ))}
+        </div>
+      </>}
     </div>
   );
 }
@@ -445,6 +480,9 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
           </button>
           {a.status === "Live" && (
             <span style={{ fontSize: 10, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "3px 8px", borderRadius: 6 }}>LIVE</span>
+          )}
+          {a.status === "Waiting on Payout" && (
+            <span style={{ fontSize: 10, fontWeight: 700, background: "#1c3a1c", color: "#4ade80", padding: "3px 8px", borderRadius: 6 }}>WAITING</span>
           )}
         </div>
       </div>
