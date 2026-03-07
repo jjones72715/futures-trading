@@ -399,7 +399,7 @@ const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, 
       </>}
     </div>
   );
-}
+});
 function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
@@ -416,7 +416,7 @@ function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChang
       ))}
     </div>
   );
-});
+}
 const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
   const v = parseFloat(inputVal);
   const hasV = inputVal !== "" && !isNaN(v);
