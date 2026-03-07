@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
@@ -107,157 +107,38 @@ function SafetyBar({ safety }) {
   );
 }
 
-const RedistTab = React.memo(function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
+const RedistTab = React.memo(function RedistTab({ history }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const [selected, setSelected] = useState([]);
-  const [percentages, setPercentages] = useState({});
-  const [confirming, setConfirming] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
-  const MAX_DEST = 4;
-
-  function toggleSelect(a) {
-    if (selected.find(s => s.id === a.id)) {
-      const newSelected = selected.filter(s => s.id !== a.id);
-      setSelected(newSelected);
-      const newPcts = { ...percentages };
-      delete newPcts[a.id];
-      redistributeEvenly(newSelected, newPcts);
-    } else if (selected.length < MAX_DEST) {
-      const newSelected = [...selected, a];
-      setSelected(newSelected);
-      redistributeEvenly(newSelected, {});
-    }
-  }
-
-  function redistributeEvenly(accts, existing) {
-    if (accts.length === 0) { setPercentages({}); return; }
-    const even = Math.floor(100 / accts.length);
-    const remainder = 100 - even * accts.length;
-    const newPcts = {};
-    accts.forEach((a, i) => {
-      newPcts[a.id] = even + (i === 0 ? remainder : 0);
-    });
-    setPercentages(newPcts);
-  }
-
-  function updatePct(id, val) {
-    const num = Math.min(100, Math.max(0, parseInt(val) || 0));
-    setPercentages(prev => ({ ...prev, [id]: num }));
-  }
-
-  const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
-  const pctValid = totalPct === 100;
-
-  const destinations = selected.map(a => {
-    const pct = percentages[a.id] || 0;
-    const share = Math.ceil(totalToMove * pct / 100);
-    return { ...a, pct, share, newBal: a.bal + share };
-  });
-
-  async function handleConfirm() {
-    setConfirming(true);
-    await onConfirm(destinations);
-    setConfirmed(true);
-    setSelected([]);
-    setPercentages({});
-    setConfirming(false);
-    setTimeout(() => setConfirmed(false), 3000);
-  }
-
-  if (losers.length === 0) return (
+  if (history.length === 0) return (
     <div style={{ textAlign: "center", padding: "50px 0", color: "#6b7280" }}>
-      <p style={{ fontSize: 15, marginBottom: 6 }}>No redistributions needed</p>
-      <p style={{ fontSize: 13 }}>Enter today's balances on the Reconciliation tab to see losses</p>
+      <p style={{ fontSize: 15 }}>No redistributions yet today</p>
+      <p style={{ fontSize: 13 }}>Redistributions happen inline when you enter a losing balance</p>
     </div>
   );
-
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
-      {/* Left - Losers */}
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#f87171", marginBottom: 12 }}>
-          📉 Accounts with Losses — {$$(totalToMove)} available
-        </div>
-        {losers.map(l => (
-          <div key={l.id} style={{ background: C.card, border: "1px solid #7f1d1d", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{l.name}</div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-              <span style={{ fontSize: 11, color: "#6b7280" }}>{(l.pctLost * 100).toFixed(1)}% of DD lost</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#f87171" }}>−{$$(l.move)}</span>
-            </div>
-          </div>
-        ))}
+    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 16 }}>
+        💸 Today's Redistributions ({history.length})
       </div>
-
-      {/* Right - Gainers */}
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80", marginBottom: 12 }}>
-          📈 Select Destinations (up to {MAX_DEST})
-        </div>
-        {gainers.length === 0
-          ? <div style={{ color: "#6b7280", fontSize: 12 }}>No profitable accounts today.</div>
-          : gainers.map(a => {
-            const isSel = !!selected.find(s => s.id === a.id);
-            return (
-              <div key={a.id} onClick={() => toggleSelect(a)}
-                style={{ background: isSel ? "#052e16" : C.card, border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8, cursor: selected.length >= MAX_DEST && !isSel ? "not-allowed" : "pointer", opacity: selected.length >= MAX_DEST && !isSel ? 0.5 : 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{a.name}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Current: {$$(a.bal)}</div>
-                  </div>
-                  {isSel && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={e => e.stopPropagation()}>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 10, color: "#4ade80", marginBottom: 2 }}>% of total</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <input type="number" min="0" max="100" value={percentages[a.id] || 0}
-                            onChange={e => updatePct(a.id, e.target.value)}
-                            style={{ background: "#0d1f0d", border: `1px solid ${pctValid ? "#22c55e" : "#f87171"}`, borderRadius: 6, padding: "3px 6px", fontSize: 12, color: "#fff", width: 52, outline: "none", textAlign: "center" }} />
-                          <span style={{ fontSize: 12, color: "#4ade80" }}>%</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "#4ade80", marginTop: 2 }}>+{$$(Math.ceil(totalToMove * (percentages[a.id] || 0) / 100))}</div>
-                      </div>
-                    </div>
-                  )}
-                  {!isSel && <div style={{ fontSize: 11, color: "#6b7280" }}>tap to select</div>}
-                </div>
-              </div>
-            );
-          })
-        }
-
-        {selected.length > 0 && (
-          <div style={{ background: "#0d1f0d", border: `1px solid ${pctValid ? "#166534" : "#7f1d1d"}`, borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>Summary</div>
-              <div style={{ fontSize: 11, color: pctValid ? "#4ade80" : "#f87171", fontWeight: 700 }}>
-                {totalPct}% {pctValid ? "✓" : `— need ${100 - totalPct}% more`}
-              </div>
-            </div>
-            {destinations.map(d => (
-              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#d1fae5", marginBottom: 4 }}>
-                <span>{d.name} ({d.pct}%)</span>
-                <span>+{$$(d.share)} → {$$(d.newBal)}</span>
-              </div>
-            ))}
-            <div style={{ borderTop: "1px solid #166534", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "#6b7280" }}>Total moved</span>
-              <span style={{ color: "#4ade80", fontWeight: 700 }}>{$$(destinations.reduce((s, d) => s + d.share, 0))}</span>
-            </div>
-            {confirmed && <div style={{ color: "#4ade80", fontSize: 12, fontWeight: 700, marginTop: 8 }}>✓ Balances updated!</div>}
-            <button onClick={handleConfirm} disabled={confirming || !pctValid}
-              style={{ width: "100%", background: pctValid ? "#16a34a" : "#1f2937", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, color: pctValid ? "#fff" : "#4b5563", cursor: pctValid ? "pointer" : "not-allowed", marginTop: 10 }}>
-              {confirming ? "Updating..." : "Confirm Redistribution"}
-            </button>
+      {history.map((r, i) => (
+        <div key={i} style={{ background: C.card, border: "1px solid #1f2937", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#f87171" }}>From: {r.from}</span>
+            <span style={{ fontSize: 11, color: "#6b7280" }}>{r.time}</span>
           </div>
-        )}
-      </div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Total moved: <span style={{ color: "#4ade80", fontWeight: 700 }}>${r.amount.toFixed(2)}</span></div>
+          {r.destinations.map((d, j) => (
+            <div key={j} style={{ fontSize: 12, color: "#9ca3af", paddingLeft: 8 }}>
+              → {d.name}: +${d.share}
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 });
 
-const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
+const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
   const activeEvals = evalAccounts.filter(a => !dones[a.id]);
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount);
   const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status === "Active");
@@ -296,6 +177,7 @@ const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, 
                 onNoChange={() => onNoChange(a.id)}
                 onDone={() => onDone(a.id)}
                 onBreach={() => onBreach(a)}
+                onRedistPopup={onRedistPopup}
               />
             ))}
           </div>
@@ -343,6 +225,7 @@ const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, 
               onNoChange={() => onNoChange(a.id)}
               onDone={() => onDone(a.id)}
               onBreach={() => onBreach(a)}
+              onRedistPopup={onRedistPopup}
             />
           ))}
         </div>
@@ -360,6 +243,7 @@ const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, 
               onNoChange={() => onNoChange(a.id)}
               onDone={() => onDone(a.id)}
               onBreach={() => onBreach(a)}
+              onRedistPopup={onRedistPopup}
             />
           ))}
         </div>
@@ -367,7 +251,7 @@ const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, 
     </div>
   );
 });
-function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
+function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
   const sorted = active.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -379,12 +263,12 @@ function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChang
         <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{sorted.length}</span>
       </div>
       {sorted.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} />
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} onRedistPopup={onRedistPopup} />
       ))}
     </div>
   );
 }
-const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
+const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
   const [localVal, setLocalVal] = React.useState(inputVal);
   React.useEffect(() => { setLocalVal(inputVal); }, [inputVal]);
   const v = parseFloat(localVal);
@@ -464,7 +348,13 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: done ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap", opacity: done ? 0.4 : 1 }}>
             {noChange ? "✓ No Change" : "No Change"}
           </button>
-          <input type="number" placeholder={String(a.bal)} value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={e => onInput(e.target.value)} disabled={noChange}
+          <input type="number" placeholder={String(a.bal)} value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={e => {
+              const val = parseFloat(e.target.value);
+              if (!isNaN(val) && val < a.bal && a.invested > 0) {
+                onRedistPopup(a, a.bal - val);
+              }
+              onInput(e.target.value);
+            }} disabled={noChange}
             style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
           {diff !== null && !done && (
             <span style={{ fontSize: 13, fontWeight: 600, color: zero ? "#6b7280" : pos ? "#4ade80" : "#f87171" }}>
@@ -475,6 +365,12 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             💥
           </button>
+          {a.invested > 0 && (
+            <button onClick={e => { e.stopPropagation(); onRedistPopup(a, a.invested); }} title="Redistribute invested funds"
+              style={{ background: "#1c1f26", border: "1px solid #374151", borderRadius: 6, padding: "3px 7px", fontSize: 13, color: "#fbbf24", cursor: "pointer" }}>
+              💰
+            </button>
+          )}
           <button onClick={e => { e.stopPropagation(); onDone(); }} title={done ? "Mark as active" : "Done for today"}
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             {done ? "✓" : "☐"}
@@ -491,7 +387,7 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
   );
 });
 
-function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, startIndex }) {
+function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup, startIndex }) {
   if (accounts.length === 0) return null;
   return (
     <div style={{ marginBottom: 10 }}>
@@ -500,13 +396,13 @@ function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNo
         <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
       </div>
       {accounts.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => { console.log("onBreach called", a.name); onBreach(a); }}/>
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} onRedistPopup={onRedistPopup} />
       ))}
     </div>
   );
 }
 
-function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, color }) {
+function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup, color }) {
   if (accounts.length === 0) return null;
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
@@ -530,7 +426,7 @@ function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChang
       {sorted.map(([dp, accs]) => {
         const start = idx;
         idx += accs.length;
-      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} startIndex={start} />;
+      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} onRedistPopup={onRedistPopup} startIndex={start} />;
       })}
     </div>
   );
@@ -554,6 +450,133 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
 }
 
 // ── Purchase Tab ──────────────────────────────────────────────────────────────
+
+function RedistPopupModal({ account, lossAmount, allAccounts, onConfirm, onDismiss }) {
+  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+  const [selected, setSelected] = React.useState([]);
+  const [percentages, setPercentages] = React.useState({});
+  const [search, setSearch] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const MAX = 4;
+
+  const available = allAccounts.filter(a =>
+    a.id !== account.id &&
+    a.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggle(a) {
+    if (selected.find(s => s.id === a.id)) {
+      const next = selected.filter(s => s.id !== a.id);
+      setSelected(next);
+      splitEvenly(next);
+    } else if (selected.length < MAX) {
+      const next = [...selected, a];
+      setSelected(next);
+      splitEvenly(next);
+    }
+  }
+
+  function splitEvenly(accts) {
+    if (!accts.length) { setPercentages({}); return; }
+    const even = Math.floor(100 / accts.length);
+    const rem = 100 - even * accts.length;
+    const p = {};
+    accts.forEach((a, i) => { p[a.id] = even + (i === 0 ? rem : 0); });
+    setPercentages(p);
+  }
+
+  function updatePct(id, val) {
+    setPercentages(prev => ({ ...prev, [id]: Math.min(100, Math.max(0, parseInt(val) || 0)) }));
+  }
+
+  const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
+  const pctValid = totalPct === 100 && selected.length > 0;
+  const totalToMove = lossAmount * account.n;
+
+  const destinations = selected.map(a => ({
+    ...a,
+    pct: percentages[a.id] || 0,
+    share: Math.ceil(totalToMove * (percentages[a.id] || 0) / 100),
+  }));
+
+  async function handleConfirm() {
+    setSubmitting(true);
+    await onConfirm(destinations);
+    setSubmitting(false);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: C.card, border: "1px solid #374151", borderRadius: 14, padding: 24, width: 480, maxHeight: "80vh", overflowY: "auto" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }}>💸 Redistribute Invested Funds</div>
+        <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 16 }}>
+          <span style={{ color: "#f87171" }}>{account.name}</span> lost{" "}
+          <span style={{ color: "#f87171", fontWeight: 700 }}>${totalToMove.toFixed(2)}</span> in invested funds
+          ({account.n} account{account.n > 1 ? "s" : ""} × ${lossAmount.toFixed(2)})
+        </div>
+
+        <input
+          placeholder="Search accounts..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", marginBottom: 12, boxSizing: "border-box" }}
+        />
+
+        <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 16 }}>
+          {available.map(a => {
+            const isSel = !!selected.find(s => s.id === a.id);
+            const disabled = selected.length >= MAX && !isSel;
+            return (
+              <div key={a.id} onClick={() => !disabled && toggle(a)}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isSel ? "#052e16" : "#1f2937", border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 8, padding: "8px 12px", marginBottom: 6, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }}>
+                <div>
+                  <div style={{ fontSize: 13, color: "#fff", fontWeight: isSel ? 600 : 400 }}>{a.name}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>{a.type === "perf" ? "Perf" : "Eval"} • ${a.invested}/acct • {a.n} acct{a.n > 1 ? "s" : ""}</div>
+                </div>
+                {isSel && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
+                    <input type="number" min="0" max="100" value={percentages[a.id] || 0}
+                      onChange={e => updatePct(a.id, e.target.value)}
+                      style={{ width: 48, background: "#0d1f0d", border: `1px solid ${pctValid ? "#22c55e" : "#f87171"}`, borderRadius: 6, padding: "3px 6px", fontSize: 12, color: "#fff", outline: "none", textAlign: "center" }} />
+                    <span style={{ fontSize: 12, color: "#4ade80" }}>%</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {selected.length > 0 && (
+          <div style={{ background: "#0d1f0d", border: "1px solid #166534", borderRadius: 8, padding: 12, marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>Summary</span>
+              <span style={{ fontSize: 12, color: pctValid ? "#4ade80" : "#f87171", fontWeight: 700 }}>
+                {totalPct}% {!pctValid && `— need ${100 - totalPct}% more`}
+              </span>
+            </div>
+            {destinations.map(d => (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#d1fae5", marginBottom: 3 }}>
+                <span>{d.name} ({d.pct}%)</span>
+                <span>+${Math.ceil(d.share / d.n)}/acct × {d.n} = +${d.share}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onDismiss}
+            style={{ flex: 1, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: 10, fontSize: 13, color: "#9ca3af", cursor: "pointer" }}>
+            Skip
+          </button>
+          <button onClick={handleConfirm} disabled={!pctValid || submitting}
+            style={{ flex: 2, background: pctValid ? "#16a34a" : "#1f2937", border: "none", borderRadius: 8, padding: 10, fontSize: 14, fontWeight: 700, color: pctValid ? "#fff" : "#4b5563", cursor: pctValid ? "pointer" : "not-allowed" }}>
+            {submitting ? "Updating..." : `Redistribute $${totalToMove.toFixed(2)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PurchaseTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -2058,6 +2081,8 @@ export default function App() {
   const [breachAccount, setBreachAccount] = useState(null);
   const [breachCount, setBreachCount] = useState("");
   const [breachSubmitting, setBreachSubmitting] = useState(false);
+  const [redistPopup, setRedistPopup] = useState(null);
+  const [redistHistory, setRedistHistory] = useState([]);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("gameplan");
@@ -2172,6 +2197,10 @@ export default function App() {
     setBreachCount("");
   }, []);
 
+  const onRedistPopup = useCallback((account, lossAmount) => {
+    setRedistPopup({ account, lossAmount });
+  }, []);
+
   async function handleBreach(a) {
     const count = parseInt(breachCount);
     if (!count || count < 1 || count > a.n) return;
@@ -2239,22 +2268,6 @@ export default function App() {
   const net = gain + loss;
   const filledCount = Object.entries(inputs).filter(([, v]) => v !== "" && !isNaN(parseFloat(v))).length + Object.values(noChanges).filter(Boolean).length;
 
-    const losers = useMemo(() => allAccounts.filter(a => {
-      if (noChanges[a.id]) return false;
-      if (a.status === "Failed" && a.invested > 0) return true;
-      return inputs[a.id] && parseFloat(inputs[a.id]) < a.bal;
-    }).map(a => {
-      if (a.status === "Failed" && a.invested > 0) {
-        return { ...a, newBal: 0, pctLost: 1, move: a.invested * a.n };
-      }
-      const ddRef = a.tradeDown ? a.ddToFloor : a.ddLeft;
-      const pctLost = ddRef > 0 ? Math.abs(parseFloat(inputs[a.id]) - a.bal) / ddRef : 0;
-      return { ...a, newBal: parseFloat(inputs[a.id]), pctLost, move: pctLost * a.invested };
-    }).filter(a => a.move > 0.5), [allAccounts, inputs, noChanges]);
-    const gainers = useMemo(() => allAccounts.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal)
-      .map(a => ({ ...a, newBal: parseFloat(inputs[a.id]) })), [allAccounts, inputs, noChanges]);
-    const totalToMove = useMemo(() => losers.reduce((sum, l) => sum + l.move, 0), [losers]);
-    const redists = losers;
 
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
 
@@ -2307,7 +2320,38 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {tab === "gameplan" && filledCount > 0 && <span style={{ fontSize: 12, color: "#60a5fa" }}>{filledCount} updated</span>}
-          {tab === "gameplan" && (
+          {redistPopup && (
+          <RedistPopupModal
+            account={redistPopup.account}
+            lossAmount={redistPopup.lossAmount}
+            allAccounts={[...evalAccounts, ...perfAccounts]}
+            onConfirm={async (destinations) => {
+              try {
+                await Promise.all(destinations.map(d => {
+                  const table = d.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+                  const investedField = d.type === "perf" ? "fldAWWar1WK3I9BVi" : "fldAplR2R67gEWPh1";
+                  const sharePerAccount = Math.ceil(d.share / d.n);
+                  return updateRecord(table, d.id, { [investedField]: d.invested + sharePerAccount });
+                }));
+                const loserTable = redistPopup.account.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+                const loserField = redistPopup.account.type === "perf" ? "fldAWWar1WK3I9BVi" : "fldAplR2R67gEWPh1";
+                const totalMoved = destinations.reduce((s, d) => s + d.share, 0);
+                const loserNewInvested = Math.max(0, redistPopup.account.invested - (totalMoved / redistPopup.account.n));
+                await updateRecord(loserTable, redistPopup.account.id, { [loserField]: loserNewInvested });
+                setRedistHistory(prev => [...prev, {
+                  time: new Date().toLocaleTimeString(),
+                  from: redistPopup.account.name,
+                  amount: totalMoved,
+                  destinations: destinations.map(d => ({ name: d.name, share: d.share }))
+                }]);
+                setRedistPopup(null);
+                await load();
+              } catch(e) { console.error("redist error:", e); }
+            }}
+            onDismiss={() => setRedistPopup(null)}
+          />
+        )}
+        {tab === "gameplan" && (
             <button onClick={save} disabled={saving || filledCount === 0}
               style={{ background: saved ? "#065f46" : "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: filledCount === 0 ? "not-allowed" : "pointer", opacity: filledCount === 0 ? 0.4 : 1 }}>
               {saving ? "Saving..." : saved ? "✓ Saved!" : `Save (${filledCount}) to Airtable`}
@@ -2358,25 +2402,11 @@ export default function App() {
             onNoChange={onNoChange}
             onDone={onDone}
             onBreach={onBreach}
+            onRedistPopup={onRedistPopup}
           />
         )}
 
-       {tab === "redist" && (
-                <RedistTab
-                  losers={losers}
-                  gainers={gainers}
-                  totalToMove={totalToMove}
-                  onConfirm={async (destinations) => {
-                    try {
-                      await Promise.all([
-                        ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
-                        ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
-                      ]);
-                      await load();
-                    } catch (e) {}
-                  }}
-                />
-              )}
+              {tab === "redist" && <RedistTab history={redistHistory} />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
