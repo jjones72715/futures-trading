@@ -2360,13 +2360,15 @@ export default function App() {
                   gainers={gainers}
                   totalToMove={totalToMove}
                   onConfirm={async (destinations) => {
+                    console.log("redist confirm - losers:", losers);
+                    console.log("redist confirm - destinations:", destinations);
                     try {
                       await Promise.all([
                         ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
                         ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
                       ]);
                       await load();
-                    } catch (e) {}
+                    } catch (e) { console.error("redist confirm error:", e); }
                   }}
                 />
               )}
