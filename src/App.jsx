@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
@@ -143,32 +143,56 @@ function SafetyBar({ safety }) {
 function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const [selected, setSelected] = useState([]);
+  const [percentages, setPercentages] = useState({});
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-
   const MAX_DEST = 4;
 
   function toggleSelect(a) {
     if (selected.find(s => s.id === a.id)) {
-      setSelected(selected.filter(s => s.id !== a.id));
+      const newSelected = selected.filter(s => s.id !== a.id);
+      setSelected(newSelected);
+      const newPcts = { ...percentages };
+      delete newPcts[a.id];
+      redistributeEvenly(newSelected, newPcts);
     } else if (selected.length < MAX_DEST) {
-      setSelected([...selected, a]);
+      const newSelected = [...selected, a];
+      setSelected(newSelected);
+      redistributeEvenly(newSelected, {});
     }
   }
 
-  const sharePerDest = selected.length > 0 ? totalToMove / selected.length : 0;
-  const destinations = selected.map(a => ({
-    ...a,
-    share: sharePerDest,
-    pct: selected.length > 0 ? 100 / selected.length : 0,
-    newBal: a.bal + sharePerDest,
-  }));
+  function redistributeEvenly(accts, existing) {
+    if (accts.length === 0) { setPercentages({}); return; }
+    const even = Math.floor(100 / accts.length);
+    const remainder = 100 - even * accts.length;
+    const newPcts = {};
+    accts.forEach((a, i) => {
+      newPcts[a.id] = even + (i === 0 ? remainder : 0);
+    });
+    setPercentages(newPcts);
+  }
+
+  function updatePct(id, val) {
+    const num = Math.min(100, Math.max(0, parseInt(val) || 0));
+    setPercentages(prev => ({ ...prev, [id]: num }));
+  }
+
+  const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
+  const pctValid = totalPct === 100;
+
+  const destinations = selected.map(a => {
+    const pct = percentages[a.id] || 0;
+    const share = Math.ceil(totalToMove * pct / 100);
+    return { ...a, pct, share, newBal: a.bal + share };
+  });
 
   async function handleConfirm() {
     setConfirming(true);
     await onConfirm(destinations);
     setConfirmed(true);
     setSelected([]);
+    setPercentages({});
     setConfirming(false);
     setTimeout(() => setConfirmed(false), 3000);
   }
@@ -176,7 +200,7 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   if (losers.length === 0) return (
     <div style={{ textAlign: "center", padding: "50px 0", color: "#6b7280" }}>
       <p style={{ fontSize: 15, marginBottom: 6 }}>No redistributions needed</p>
-      <p style={{ fontSize: 13 }}>Enter today's balances on the Gameplan tab to see losses</p>
+      <p style={{ fontSize: 13 }}>Enter today's balances on the Reconciliation tab to see losses</p>
     </div>
   );
 
@@ -198,7 +222,7 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
         ))}
       </div>
 
-      {/* Right - Gainers + selection */}
+      {/* Right - Gainers */}
       <div>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80", marginBottom: 12 }}>
           📈 Select Destinations (up to {MAX_DEST})
@@ -206,49 +230,57 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
         {gainers.length === 0
           ? <div style={{ color: "#6b7280", fontSize: 12 }}>No profitable accounts today.</div>
           : gainers.map(a => {
-              const isSel = !!selected.find(s => s.id === a.id);
-              const selIdx = selected.findIndex(s => s.id === a.id);
-              return (
-                <div key={a.id} onClick={() => toggleSelect(a)}
-                  style={{ background: isSel ? "#052e16" : C.card, border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8, cursor: selected.length >= MAX_DEST && !isSel ? "not-allowed" : "pointer", opacity: selected.length >= MAX_DEST && !isSel ? 0.5 : 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{a.name}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Current: {$$(a.bal)}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {isSel && (
-                        <>
-                          <div style={{ fontSize: 10, color: "#4ade80", fontWeight: 700 }}>+{(100 / selected.length).toFixed(0)}%</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>+{$$(sharePerDest)}</div>
-                          <div style={{ fontSize: 10, color: "#6b7280" }}>→ {$$(a.bal + sharePerDest)}</div>
-                        </>
-                      )}
-                      {!isSel && <div style={{ fontSize: 11, color: "#6b7280" }}>tap to select</div>}
-                    </div>
-                    {isSel && <div style={{ width: 22, height: 22, background: "#22c55e", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", marginLeft: 8 }}>{selIdx + 1}</div>}
+            const isSel = !!selected.find(s => s.id === a.id);
+            return (
+              <div key={a.id} onClick={() => toggleSelect(a)}
+                style={{ background: isSel ? "#052e16" : C.card, border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8, cursor: selected.length >= MAX_DEST && !isSel ? "not-allowed" : "pointer", opacity: selected.length >= MAX_DEST && !isSel ? 0.5 : 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{a.name}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>Current: {$$(a.bal)}</div>
                   </div>
+                  {isSel && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={e => e.stopPropagation()}>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 10, color: "#4ade80", marginBottom: 2 }}>% of total</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <input type="number" min="0" max="100" value={percentages[a.id] || 0}
+                            onChange={e => updatePct(a.id, e.target.value)}
+                            style={{ background: "#0d1f0d", border: `1px solid ${pctValid ? "#22c55e" : "#f87171"}`, borderRadius: 6, padding: "3px 6px", fontSize: 12, color: "#fff", width: 52, outline: "none", textAlign: "center" }} />
+                          <span style={{ fontSize: 12, color: "#4ade80" }}>%</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#4ade80", marginTop: 2 }}>+{$$(Math.ceil(totalToMove * (percentages[a.id] || 0) / 100))}</div>
+                      </div>
+                    </div>
+                  )}
+                  {!isSel && <div style={{ fontSize: 11, color: "#6b7280" }}>tap to select</div>}
                 </div>
-              );
-            })
+              </div>
+            );
+          })
         }
 
         {selected.length > 0 && (
-          <div style={{ background: "#0d1f0d", border: "1px solid #166534", borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
-            <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700, marginBottom: 8 }}>Summary</div>
+          <div style={{ background: "#0d1f0d", border: `1px solid ${pctValid ? "#166534" : "#7f1d1d"}`, borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>Summary</div>
+              <div style={{ fontSize: 11, color: pctValid ? "#4ade80" : "#f87171", fontWeight: 700 }}>
+                {totalPct}% {pctValid ? "✓" : `— need ${100 - totalPct}% more`}
+              </div>
+            </div>
             {destinations.map(d => (
               <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#d1fae5", marginBottom: 4 }}>
-                <span>{d.name}</span>
+                <span>{d.name} ({d.pct}%)</span>
                 <span>+{$$(d.share)} → {$$(d.newBal)}</span>
               </div>
             ))}
             <div style={{ borderTop: "1px solid #166534", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 12 }}>
               <span style={{ color: "#6b7280" }}>Total moved</span>
-              <span style={{ color: "#4ade80", fontWeight: 700 }}>{$$(totalToMove)}</span>
+              <span style={{ color: "#4ade80", fontWeight: 700 }}>{$$(destinations.reduce((s, d) => s + d.share, 0))}</span>
             </div>
             {confirmed && <div style={{ color: "#4ade80", fontSize: 12, fontWeight: 700, marginTop: 8 }}>✓ Balances updated!</div>}
-            <button onClick={handleConfirm} disabled={confirming}
-              style={{ width: "100%", background: "#16a34a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer", marginTop: 10 }}>
+            <button onClick={handleConfirm} disabled={confirming || !pctValid}
+              style={{ width: "100%", background: pctValid ? "#16a34a" : "#1f2937", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, color: pctValid ? "#fff" : "#4b5563", cursor: pctValid ? "pointer" : "not-allowed", marginTop: 10 }}>
               {confirming ? "Updating..." : "Confirm Redistribution"}
             </button>
           </div>
@@ -258,7 +290,7 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   );
 }
 
-function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
+const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const activeEvals = evalAccounts.filter(a => !dones[a.id]);
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount);
   const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status === "Active");
@@ -384,8 +416,8 @@ function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChang
       ))}
     </div>
   );
-}
-function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
+});
+const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
   const v = parseFloat(inputVal);
   const hasV = inputVal !== "" && !isNaN(v);
   const diff = noChange ? 0 : hasV ? (v - a.bal) * a.n : null;
@@ -488,7 +520,7 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
       </div>
     </div>
   );
-}
+});
 
 function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, startIndex }) {
   if (accounts.length === 0) return null;
