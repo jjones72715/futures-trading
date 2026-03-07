@@ -2381,7 +2381,7 @@ export default function App() {
                 ["purchases", "🛒 Purchases"],
                 ["mgmt", "🔄 Account Management"],
                 ["gameplan", "📊 Reconciliation"],
-                ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
+                ["redist", `💸 Redistribution${redistHistory.length > 0 ? ` (${redistHistory.length})` : ""}`],
                 ["pl", "📈 P&L"],
               ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
