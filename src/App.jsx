@@ -1117,6 +1117,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const [purchases, setPurchases] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [evalToPerfMap, setEvalToPerfMap] = useState({});
 
   const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ"];
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
@@ -1395,32 +1396,7 @@ const PAYOUT_STRATEGIES = [
 ];
 
 // Eval type → Perf type map (baked in from Airtable)
-const EVAL_TO_PERF_TYPE = {
-  "rec5O8lSTqB4fXPsP": "recTL4uJ1G8BUZK21",
-  "rec8HfoHBk5m9oscj": "recw2Utx3ln49Wh2M",
-  "rec8lBqRQBKOtFljx": "recnOYUQIGLddgDco",
-  "recCAYjMChppH9u8K": "recq5VXV6SJUsP8Fb",
-  "recCePd3gcQGGiMe6": "recDK9X8GHYJb1P8a",
-  "recD4IfxYzFKOxWGU": "recCipNXVOSRHLqKQ",
-  "recMLV7McrX0yqfd1": "recK8KZqNZD7qlRxc",
-  "recMeH14HcTVOTABK": "rechY3DxrUfj1v60L",
-  "recXHjiUdh5YzWpds": "recsuOqgFYGIJiCDc",
-  "rece3sSv032SWiy8H": "recYUQKZ5R19Snwyk",
-  "recf85p2PhQs3O4Qx": "recO5gj9RRGP2ToTN",
-  "recjSpqACE1VGGL9l": "recT9NCOWvAH8sU13",
-  "reckab8EkDpFCco4e": "recXp5quJOrP2JD1x",
-  "reclSB5U37mNwP5yE": "recyK8fcdcuPkPPVy",
-  "recldNrpc0Uw2iy0Q": "rec7d4W5dlXgAIDeg",
-  "recmK6e815Mus0M4r": "recRkoFdYqIgmBnaz",
-  "recmXkCwRhX8CwdHA": "recQZlpiDSUgEcf17",
-  "recnMxSRnwffHQqGf": "rectnqPEVI7UEgffE",
-  "recpznnL6QT5BGnBL": "rec7xL7pCvC13SDvW",
-  "recrwjjhAEaj98I29": "recD4Q1JfDsoqibVP",
-  "recsMsMF8YosOvAKr": "recAPuxF9wQmpqcns",
-  "recx9L2t4eHPFzPAi": "recKSnwwT6dMYrVgG",
-};
-
-function AccountManagementTab() {
+function AccountManagementTab({ evalToPerfMap }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
   const inp = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
@@ -1520,7 +1496,7 @@ function AccountManagementTab() {
     ? (Array.isArray(selectedEval.fields["Evaluation Account Type"])
         ? selectedEval.fields["Evaluation Account Type"][0] : null)
     : null;
-  const perfTypeId = evalTypeId ? EVAL_TO_PERF_TYPE[evalTypeId] : null;
+  const perfTypeId = evalTypeId ? evalToPerfMap[evalTypeId] : null;
   const perfType = perfTypeId ? PERF_TYPES.find(t => t.id === perfTypeId) : null;
 
   // Stage info for selected perf
@@ -1730,7 +1706,7 @@ function AccountManagementTab() {
                   ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active eval accounts{traderId ? " for this trader" : ""}.</div>
                   : evalAccounts.map(r => {
                       const etId = Array.isArray(r.fields["Evaluation Account Type"]) ? r.fields["Evaluation Account Type"][0] : null;
-                      const ptId = etId ? EVAL_TO_PERF_TYPE[etId] : null;
+                      const ptId = etId ? evalToPerfMap[etId] : null;
                       const pt = ptId ? PERF_TYPES.find(t => t.id === ptId) : null;
                       return (
                         <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
@@ -2083,9 +2059,27 @@ export default function App() {
 
   useEffect(() => { load(); }, []);
 
+  async function loadEvalToPerfMap() {
+    try {
+      const records = await fetchTable("tbleHzHF5FgskLxs3", ["Name", "Performance Account Type"]);
+      const map = {};
+      records.forEach(r => {
+        const perfTypes = r.fields["Performance Account Type"];
+        if (Array.isArray(perfTypes) && perfTypes.length > 0) {
+          map[r.id] = perfTypes[0];
+        }
+      });
+      setEvalToPerfMap(map);
+      return map;
+    } catch (e) {
+      return {};
+    }
+  }
+
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
     try {
+      const dynamicMap = await loadEvalToPerfMap();
       const [pr, er] = await Promise.all([
         fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target"]),
         fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight"]),
@@ -2378,7 +2372,7 @@ export default function App() {
                 />
               )}
               {tab === "purchases" && <PurchaseTab />}
-              {tab === "mgmt" && <AccountManagementTab />}
+              {tab === "mgmt" && <AccountManagementTab evalToPerfMap={evalToPerfMap} />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
               {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
