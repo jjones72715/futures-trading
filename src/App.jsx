@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
@@ -107,7 +107,7 @@ function SafetyBar({ safety }) {
   );
 }
 
-function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
+const RedistTab = React.memo(function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const [selected, setSelected] = useState([]);
   const [percentages, setPercentages] = useState({});
@@ -155,10 +155,6 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
   });
 
   async function handleConfirm() {
-    console.log("destinations:", destinations);
-    console.log("selected:", selected);
-    console.log("percentages:", percentages);
-    console.log("totalToMove:", totalToMove);
     setConfirming(true);
     await onConfirm(destinations);
     setConfirmed(true);
@@ -259,7 +255,7 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
       </div>
     </div>
   );
-}
+});
 
 const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const activeEvals = evalAccounts.filter(a => !dones[a.id]);
@@ -2243,7 +2239,7 @@ export default function App() {
   const net = gain + loss;
   const filledCount = Object.entries(inputs).filter(([, v]) => v !== "" && !isNaN(parseFloat(v))).length + Object.values(noChanges).filter(Boolean).length;
 
-    const losers = allAccounts.filter(a => {
+    const losers = useMemo(() => allAccounts.filter(a => {
       if (noChanges[a.id]) return false;
       if (a.status === "Failed" && a.invested > 0) return true;
       return inputs[a.id] && parseFloat(inputs[a.id]) < a.bal;
@@ -2254,10 +2250,10 @@ export default function App() {
       const ddRef = a.tradeDown ? a.ddToFloor : a.ddLeft;
       const pctLost = ddRef > 0 ? Math.abs(parseFloat(inputs[a.id]) - a.bal) / ddRef : 0;
       return { ...a, newBal: parseFloat(inputs[a.id]), pctLost, move: pctLost * a.invested };
-    }).filter(a => a.move > 0.5);
-    const gainers = allAccounts.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal)
-      .map(a => ({ ...a, newBal: parseFloat(inputs[a.id]) }));
-    const totalToMove = losers.reduce((sum, l) => sum + l.move, 0);
+    }).filter(a => a.move > 0.5), [allAccounts, inputs, noChanges]);
+    const gainers = useMemo(() => allAccounts.filter(a => !noChanges[a.id] && inputs[a.id] && parseFloat(inputs[a.id]) > a.bal)
+      .map(a => ({ ...a, newBal: parseFloat(inputs[a.id]) })), [allAccounts, inputs, noChanges]);
+    const totalToMove = useMemo(() => losers.reduce((sum, l) => sum + l.move, 0), [losers]);
     const redists = losers;
 
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -2371,17 +2367,13 @@ export default function App() {
                   gainers={gainers}
                   totalToMove={totalToMove}
                   onConfirm={async (destinations) => {
-                    console.log("redist confirm - losers:", losers);
-                    console.log("redist confirm - destinations:", destinations);
                     try {
-                      console.log("updating losers:", losers.map(l => ({ id: l.id, table: l.type === "perf" ? PERF_TABLE : EVAL_TABLE, newBal: l.newBal })));
-                      console.log("updating destinations:", destinations.map(d => ({ id: d.id, table: d.type === "perf" ? PERF_TABLE : EVAL_TABLE, newBal: d.newBal })));
                       await Promise.all([
                         ...losers.map(l => updateRecord(l.type === "perf" ? PERF_TABLE : EVAL_TABLE, l.id, { "Current Balance": l.newBal })),
                         ...destinations.map(d => updateRecord(d.type === "perf" ? PERF_TABLE : EVAL_TABLE, d.id, { "Current Balance": d.newBal })),
                       ]);
                       await load();
-                    } catch (e) { console.error("redist update error:", e); }
+                    } catch (e) {}
                   }}
                 />
               )}
