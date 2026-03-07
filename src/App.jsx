@@ -418,8 +418,10 @@ function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChang
   );
 }
 const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
-  const v = parseFloat(inputVal);
-  const hasV = inputVal !== "" && !isNaN(v);
+  const [localVal, setLocalVal] = React.useState(inputVal);
+  React.useEffect(() => { setLocalVal(inputVal); }, [inputVal]);
+  const v = parseFloat(localVal);
+  const hasV = localVal !== "" && !isNaN(v);
   const diff = noChange ? 0 : hasV ? (v - a.bal) * a.n : null;
   const pos = diff > 0;
   const zero = diff === 0;
@@ -495,7 +497,7 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: done ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap", opacity: done ? 0.4 : 1 }}>
             {noChange ? "✓ No Change" : "No Change"}
           </button>
-          <input type="number" placeholder={String(a.bal)} value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange}
+          <input type="number" placeholder={String(a.bal)} value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={e => onInput(e.target.value)} disabled={noChange}
             style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
           {diff !== null && !done && (
             <span style={{ fontSize: 13, fontWeight: 600, color: zero ? "#6b7280" : pos ? "#4ade80" : "#f87171" }}>
