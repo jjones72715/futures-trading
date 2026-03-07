@@ -942,6 +942,161 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     </div>
   );
 }
+function PLTab({ evalAccounts, perfAccounts }) {
+  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+  const [startingLiq, setStartingLiq] = useState("");
+  const [purchases, setPurchases] = useState([]);
+  const [payouts, setPayouts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ"];
+  const RITHMIC_DX = ["Rithmic", "DX Feed"];
+
+  useEffect(() => { loadPLData(); }, []);
+
+  async function loadPLData() {
+    setLoading(true);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const [purchaseRes, payoutRes] = await Promise.all([
+        fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=500`),
+        fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=500`),
+      ]);
+      const purchaseData = await purchaseRes.json();
+      const payoutData = await payoutRes.json();
+      setPurchases((purchaseData.records || []).filter(r => r.fields["Date Purchased"] === today));
+      setPayouts((payoutData.records || []).filter(r => r.fields["Date Received"] === today));
+    } catch (e) {}
+    setLoading(false);
+  }
+
+  const activeEvals = evalAccounts;
+  const nonPayoutPerf = perfAccounts.filter(a => !a.payoutAccount);
+  const payoutPerf = perfAccounts.filter(a => a.payoutAccount);
+
+  const rmcEvals = activeEvals.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
+  const tdvEvals = activeEvals.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
+  const xEvals = activeEvals.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
+  const totalActiveEvals = rmcEvals + tdvEvals + xEvals;
+  const investedEvals = activeEvals.reduce((s, a) => s + (a.invested * a.n || 0), 0);
+
+  const rmcPerf = nonPayoutPerf.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
+  const tdvPerf = nonPayoutPerf.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
+  const xPerf = nonPayoutPerf.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
+  const totalActivePerf = rmcPerf + tdvPerf + xPerf;
+  const investedPerf = nonPayoutPerf.reduce((s, a) => s + (a.invested * a.n || 0), 0);
+
+  const rmcLive = payoutPerf.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
+  const tdvLive = payoutPerf.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
+  const xLive = payoutPerf.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
+  const totalActiveLive = rmcLive + tdvLive + xLive;
+  const profitInActive = payoutPerf.reduce((s, a) => s + (a.invested * a.n || 0), 0);
+
+  const cashedOut = payouts.reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
+
+  const profitFromOthers = payouts
+    .filter(r => {
+      const trader = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+      return trader && OTHER_TRADERS.includes(trader);
+    })
+    .reduce((s, r) => {
+      const total = r.fields["Total Amount"] || 0;
+      const acct = perfAccounts.find(a => {
+        const pa = r.fields["Performance Account"];
+        return Array.isArray(pa) && pa[0] === a.id;
+      });
+      const invested = acct ? (acct.invested * acct.n) : 0;
+      const profit = Math.max(0, total - invested);
+      return s + (profit * 0.5);
+    }, 0);
+
+  const todayEvalSpend = purchases
+    .filter(r => ["New", "Reset", "Monthly Billing"].includes(r.fields["Purchase Type"]?.name || r.fields["Purchase Type"]))
+    .reduce((s, r) => s + (r.fields["Total Cost"] || 0), 0);
+
+  const startLiq = parseFloat(startingLiq) || 0;
+  const payoutProfits50 = payouts.reduce((s, r) => {
+    const total = r.fields["Total Amount"] || 0;
+    const acct = perfAccounts.find(a => {
+      const pa = r.fields["Performance Account"];
+      return Array.isArray(pa) && pa[0] === a.id;
+    });
+    const invested = acct ? (acct.invested * acct.n) : 0;
+    const profit = Math.max(0, total - invested);
+    return s + (profit * 0.5);
+  }, 0);
+  const endLiq = startLiq + todayEvalSpend - payoutProfits50;
+
+  function StatBox({ label, value, color = "#fff", sub }) {
+    return (
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px" }}>
+        <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>{label}</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color }}>{value}</div>
+        {sub && <div style={{ fontSize: 10, color: "#4b5563", marginTop: 2 }}>{sub}</div>}
+      </div>
+    );
+  }
+
+  function SectionHeader({ title, color }) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 0 10px" }}>
+        <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+      </div>
+    );
+  }
+
+  if (loading) return <div style={{ color: "#6b7280", padding: 40, textAlign: "center" }}>Loading P&L data...</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Starting Liquidation $</div>
+          <input type="number" placeholder="Enter yesterday's ending Liq $..." value={startingLiq} onChange={e => setStartingLiq(e.target.value)}
+            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", width: 260, outline: "none" }} />
+        </div>
+        <button onClick={loadPLData} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#9ca3af", cursor: "pointer", marginTop: 18 }}>
+          🔄 Refresh
+        </button>
+      </div>
+
+      <SectionHeader title="Evaluation Accounts" color="#8b5cf6" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+        <StatBox label="RMC Evals" value={rmcEvals} color="#a78bfa" />
+        <StatBox label="TDV Evals" value={tdvEvals} color="#a78bfa" />
+        <StatBox label="X Evals" value={xEvals} color="#a78bfa" />
+        <StatBox label="Active Evals" value={totalActiveEvals} color="#fff" />
+        <StatBox label="$ Invested Evals" value={$$(investedEvals)} color="#c4b5fd" />
+      </div>
+
+      <SectionHeader title="Performance Accounts" color="#3b82f6" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+        <StatBox label="RMC Perf" value={rmcPerf} color="#93c5fd" />
+        <StatBox label="TDV Perf" value={tdvPerf} color="#93c5fd" />
+        <StatBox label="X Perf" value={xPerf} color="#93c5fd" />
+        <StatBox label="Active Perf" value={totalActivePerf} color="#fff" />
+        <StatBox label="$ Invested Perf" value={$$(investedPerf)} color="#93c5fd" />
+      </div>
+
+      <SectionHeader title="Live & Payout Accounts" color="#f59e0b" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <StatBox label="RMC Live" value={rmcLive} color="#fcd34d" />
+        <StatBox label="TDV Live" value={tdvLive} color="#fcd34d" />
+        <StatBox label="X Live" value={xLive} color="#fcd34d" />
+        <StatBox label="Active Live" value={totalActiveLive} color="#fff" />
+      </div>
+
+      <SectionHeader title="Financials" color="#10b981" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <StatBox label="Profit in Active" value={$$(profitInActive)} color="#4ade80" />
+        <StatBox label="Liquidation $" value={$$(endLiq)} color="#f87171" sub={`Start: ${$$(startLiq)} + Spend: ${$$(todayEvalSpend)} − Profits: ${$$(payoutProfits50)}`} />
+        <StatBox label="Cashed Out Today" value={$$(cashedOut)} color="#4ade80" />
+        <StatBox label="Profit from Others" value={$$(profitFromOthers)} color="#4ade80" />
+      </div>
+    </div>
+  );
+}
 const PERF_TYPES = [
   { id: "rec7d4W5dlXgAIDeg", name: "Trade Day 100K Perf", accountSize: 100000 },
   { id: "rec7xL7pCvC13SDvW", name: "LucidFlex 150K Perf", accountSize: 150000 },
@@ -1992,6 +2147,7 @@ export default function App() {
                 ["redist", `💸 Redistribution${redists.length > 0 ? ` (${redists.length})` : ""}`],
                 ["purchases", "🛒 Purchases"],
                 ["accounts", "📋 All Accounts"],
+                ["pl", "📈 P&L"],
                 ["mgmt", "🔄 Account Management"],
               ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
@@ -2029,6 +2185,7 @@ export default function App() {
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
+              {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
             </div>
         );
