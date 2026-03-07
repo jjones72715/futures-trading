@@ -351,7 +351,7 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
           <input type="number" placeholder={String(a.bal)} value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={e => {
               const val = parseFloat(e.target.value);
               if (!isNaN(val) && val < a.bal && a.invested > 0) {
-                onRedistPopup(a, a.bal - val);
+                onRedistPopup(a, val, false);
               }
               onInput(e.target.value);
             }} disabled={noChange}
@@ -366,7 +366,7 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             💥
           </button>
           {a.invested > 0 && (
-            <button onClick={e => { e.stopPropagation(); onRedistPopup(a, a.invested); }} title="Redistribute invested funds"
+            <button onClick={e => { e.stopPropagation(); onRedistPopup(a, a.invested, true); }} title="Redistribute invested funds"
               style={{ background: "#1c1f26", border: "1px solid #374151", borderRadius: 6, padding: "3px 7px", fontSize: 13, color: "#fbbf24", cursor: "pointer" }}>
               💰
             </button>
@@ -451,8 +451,15 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
 
 // ── Purchase Tab ──────────────────────────────────────────────────────────────
 
-function RedistPopupModal({ account, lossAmount, allAccounts, onConfirm, onDismiss }) {
+function RedistPopupModal({ account, value, manual, allAccounts, onConfirm, onDismiss }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+  const ddRef = account.ddLeft || account.ddToFloor || 1;
+  const balanceLoss = manual ? 0 : (account.bal - parseFloat(value));
+  const pctLost = manual ? 1 : Math.min(1, balanceLoss / ddRef);
+  const defaultAmount = manual
+    ? account.invested
+    : Math.max(0, parseFloat((pctLost * account.invested).toFixed(2)));
+  const [amount, setAmount] = React.useState(defaultAmount);
   const [selected, setSelected] = React.useState([]);
   const [percentages, setPercentages] = React.useState({});
   const [search, setSearch] = React.useState("");
@@ -491,7 +498,7 @@ function RedistPopupModal({ account, lossAmount, allAccounts, onConfirm, onDismi
 
   const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
   const pctValid = totalPct === 100 && selected.length > 0;
-  const totalToMove = lossAmount * account.n;
+  const totalToMove = amount * account.n;
 
   const destinations = selected.map(a => ({
     ...a,
@@ -509,10 +516,17 @@ function RedistPopupModal({ account, lossAmount, allAccounts, onConfirm, onDismi
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: C.card, border: "1px solid #374151", borderRadius: 14, padding: 24, width: 480, maxHeight: "80vh", overflowY: "auto" }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }}>💸 Redistribute Invested Funds</div>
-        <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 16 }}>
-          <span style={{ color: "#f87171" }}>{account.name}</span> lost{" "}
-          <span style={{ color: "#f87171", fontWeight: 700 }}>${totalToMove.toFixed(2)}</span> in invested funds
-          ({account.n} account{account.n > 1 ? "s" : ""} × ${lossAmount.toFixed(2)})
+        <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 12 }}>
+          Redistributing from <span style={{ color: "#f87171" }}>{account.name}</span>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>Amount to redistribute per account</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "#f87171" }}>$</span>
+            <input type="number" value={amount} onChange={e => setAmount(parseFloat(e.target.value) || 0)}
+              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 10px", fontSize: 14, color: "#fff", outline: "none", width: 120 }} />
+            <span style={{ fontSize: 12, color: "#6b7280" }}>× {account.n} acct{account.n > 1 ? "s" : ""} = <span style={{ color: "#f87171" }}>${(amount * account.n).toFixed(2)}</span> total</span>
+          </div>
         </div>
 
         <input
@@ -2197,8 +2211,8 @@ export default function App() {
     setBreachCount("");
   }, []);
 
-  const onRedistPopup = useCallback((account, lossAmount) => {
-    setRedistPopup({ account, lossAmount });
+  const onRedistPopup = useCallback((account, value, manual = false) => {
+    setRedistPopup({ account, value, manual });
   }, []);
 
   async function handleBreach(a) {
@@ -2323,7 +2337,8 @@ export default function App() {
           {redistPopup && (
           <RedistPopupModal
             account={redistPopup.account}
-            lossAmount={redistPopup.lossAmount}
+            value={redistPopup.value}
+            manual={redistPopup.manual}
             allAccounts={[...evalAccounts, ...perfAccounts]}
             onConfirm={async (destinations) => {
               try {
