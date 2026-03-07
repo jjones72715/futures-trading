@@ -626,10 +626,12 @@ function PurchaseTab() {
   }
 
   async function loadTraders() {
+    console.log("[PurchaseTab] loadTraders called");
     try {
       const traders = await fetchTable(TRADERS_TABLE, ["Name"]);
+      console.log("[PurchaseTab] traders fetched:", traders.length, traders.map(r => r.fields["Name"]));
       setTraderList(traders.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (e) {}
+    } catch (e) { console.error("[PurchaseTab] loadTraders error:", e); }
   }
 
   function handleSelectPurchase(purchaseId) {
@@ -1425,9 +1427,11 @@ function AccountManagementTab({ evalToPerfMap }) {
   const [err, setErr] = useState(null);
 
   useEffect(() => {
+    console.log("[AccountManagementTab] fetching traders");
     fetchTable(TRADERS_TABLE, ["Name"]).then(traders => {
+      console.log("[AccountManagementTab] traders fetched:", traders.length, traders.map(r => r.fields["Name"]));
       setTraderList(traders.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
-    }).catch(() => {});
+    }).catch(e => { console.error("[AccountManagementTab] traders error:", e); });
   }, []);
   useEffect(() => { if (traderId || activeTab === "payouts") loadData(); }, [traderId, activeTab]);
 
