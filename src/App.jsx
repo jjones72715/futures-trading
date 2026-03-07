@@ -9,14 +9,6 @@ const EVAL_TYPE_TABLE = "tbleHzHF5FgskLxs3";
 const PAYOUT_TABLE = "tblIEpLE5eIV7k6B7";
 const PAYOUT_STATUSES = ["Requested", "Processing", "Approved", "Received"];
 
-const TRADERS = [
-  { id: "rec0jB7J1Ir1ZspvM", name: "Amanda Seratt" },
-  { id: "rec4l8EM9peAdyin4", name: "Judy Jones" },
-  { id: "recG04aHVI38R6HnR", name: "Cherelyn Jones" },
-  { id: "reccHyxv7emOGQJsQ", name: "Jefferies Parker" },
-  { id: "recmziqSnANAPjtuH", name: "Jonathan Jones" },
-];
-
 // Baked-in eval accounts by trader
 const EVAL_ACCOUNTS_BY_TRADER = {
   "rec0jB7J1Ir1ZspvM": [
@@ -588,12 +580,14 @@ function PurchaseTab() {
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [traderId, setTraderId] = useState("");
   const [evalTypeList, setEvalTypeList] = useState([]);
+  const [traderList, setTraderList] = useState([]);
 
   useEffect(() => {
     loadActivePurchases();
     loadEvalAccounts();
     loadRecent();
     loadEvalTypes();
+    loadTraders();
   }, []);
 
   async function loadActivePurchases() {
@@ -628,6 +622,13 @@ function PurchaseTab() {
     try {
       const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]);
       setEvalTypeList(evalTypes.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (e) {}
+  }
+
+  async function loadTraders() {
+    try {
+      const traders = await fetchTable(TRADERS_TABLE, ["Name"]);
+      setTraderList(traders.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {}
   }
 
@@ -670,7 +671,7 @@ function PurchaseTab() {
 
   const selectedPurchase = activePurchases.find(r => r.id === selectedPurchaseId);
   const selectedEvalType = evalTypeList.find(t => t.id === evalTypeId);
-  const trader = selectedPurchase ? TRADERS.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
+  const trader = selectedPurchase ? traderList.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
   const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "reset" ? selectedPurchaseId : traderId);
   console.log("canSubmit check:", { mode, evalTypeId, costPer, date, numAccounts, selectedPurchaseId, traderId });
@@ -709,7 +710,7 @@ function PurchaseTab() {
         }
         await createRecord(PURCHASE_TABLE, fields);
       } else {
-        const traderObj = TRADERS.find(t => t.id === traderId);
+        const traderObj = traderList.find(t => t.id === traderId);
         const purchaseName = `${traderObj?.name || "Unknown"} - ${evalType?.name} - ${date}`;
 
         // Create the eval account record first
@@ -885,7 +886,7 @@ function PurchaseTab() {
               {label("Select Trader")}
               <select value={traderId} onChange={e => setTraderId(e.target.value)} style={sel}>
                 <option value="">Choose trader...</option>
-                {TRADERS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {traderList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
 
@@ -1392,6 +1393,7 @@ function AccountManagementTab({ evalToPerfMap }) {
   const [perfAccounts, setPerfAccounts] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [traderList, setTraderList] = useState([]);
 
   // Passed Evals state
   const [selectedEvalId, setSelectedEvalId] = useState("");
@@ -1422,6 +1424,11 @@ function AccountManagementTab({ evalToPerfMap }) {
   const [success, setSuccess] = useState("");
   const [err, setErr] = useState(null);
 
+  useEffect(() => {
+    fetchTable(TRADERS_TABLE, ["Name"]).then(traders => {
+      setTraderList(traders.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
+    }).catch(() => {});
+  }, []);
   useEffect(() => { if (traderId || activeTab === "payouts") loadData(); }, [traderId, activeTab]);
 
   async function loadData() {
@@ -1480,7 +1487,7 @@ function AccountManagementTab({ evalToPerfMap }) {
     ? (Array.isArray(selectedEval.fields["Evaluation Account Type"])
         ? selectedEval.fields["Evaluation Account Type"][0] : null)
     : null;
-  const perfTypeId = evalTypeId ? evalToPerfMap[evalTypeId] : null;
+  const perfTypeId = evalToPerfMap?.[evalTypeId] ?? null;
   const perfType = perfTypeId ? PERF_TYPES.find(t => t.id === perfTypeId) : null;
 
   // Stage info for selected perf
@@ -1508,7 +1515,7 @@ function AccountManagementTab({ evalToPerfMap }) {
     if (!selectedEvalId || !perfTypeId || !startingBalance || !dateActivated) return;
     setSubmitting(true); setErr(null);
     try {
-      const trader = TRADERS.find(t => t.id === traderId);
+      const trader = traderList.find(t => t.id === traderId);
       const pt = PERF_TYPES.find(t => t.id === perfTypeId);
       const firstStage = PAYOUT_STRATEGIES.find(s => s.perfTypeId === perfTypeId && s.stage === 1);
       await updateRecord(EVAL_TABLE, selectedEvalId, { "Status": "Passed" });
@@ -1574,7 +1581,7 @@ function AccountManagementTab({ evalToPerfMap }) {
     setSubmitting(true); setErr(null);
     try {
       const perf = perfAccounts.find(r => r.id === selectedPerfId);
-      const trader = TRADERS.find(t => t.id === traderId);
+      const trader = traderList.find(t => t.id === traderId);
       // Update perf account status
       await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
       // Create payout record
@@ -1676,7 +1683,7 @@ function AccountManagementTab({ evalToPerfMap }) {
           {label("Trader")}
           <select value={traderId} onChange={e => { setTraderId(e.target.value); resetForm(); }} style={sel}>
             <option value="">All Traders</option>
-            {TRADERS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {traderList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
 
