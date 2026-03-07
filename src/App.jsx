@@ -1445,8 +1445,14 @@ function AccountManagementTab() {
           return Array.isArray(t) && t.includes(traderId);
         });
 
-      setEvalAccounts(filterByTrader(er.records || []).filter(r => r.fields["Status"] === "Active"));
-      setPerfAccounts(filterByTrader(pr.records || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"])));
+      setEvalAccounts(filterByTrader(er.records || []).filter(r => {
+        const status = r.fields["Status"]?.name || r.fields["Status"];
+        return status === "Active";
+      }));
+      setPerfAccounts(filterByTrader(pr.records || []).filter(r => {
+        const status = r.fields["Status"]?.name || r.fields["Status"];
+        return ["Active", "Live", "Waiting on Payout"].includes(status);
+      }));
 
       // Payouts: filter by trader if selected, show non-Received by default
       const allPayouts = payr.records || [];
@@ -2105,8 +2111,14 @@ export default function App() {
         };
       };
 
-      const allEvals = (er || []).filter(r => r.fields["Status"] === "Active");
-      const allPerfs = (pr || []).filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["Status"]));
+      const allEvals = (er || []).filter(r => {
+        const status = r.fields["Status"]?.name || r.fields["Status"];
+        return status === "Active";
+      });
+      const allPerfs = (pr || []).filter(r => {
+        const status = r.fields["Status"]?.name || r.fields["Status"];
+        return ["Active", "Live", "Waiting on Payout"].includes(status);
+      });
       const evals = allEvals.map(mapEval);
       const perfs = allPerfs.map(mapPerf);
       setEvalAccounts(evals);
