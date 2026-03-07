@@ -260,10 +260,10 @@ function RedistTab({ losers, gainers, totalToMove, onConfirm }) {
 
 function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const activeEvals = evalAccounts.filter(a => !dones[a.id]);
-  const activePerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Waiting on Payout" && a.status !== "Live" && !dones[a.id]);
-  const livePerf = perfAccounts.filter(a => a.status === "Live" && !dones[a.id]);
-  const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status !== "Waiting on Payout" && !dones[a.id]);
-  const waitingPayout = perfAccounts.filter(a => a.status === "Waiting on Payout" && !dones[a.id]);
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount);
+  const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.payoutAccount && a.status === "Live");
+  const waitingPayout = perfAccounts.filter(a => a.payoutAccount && a.status === "Waiting on Payout");
   const allAccounts = [...evalAccounts, ...perfAccounts];
   const doneAccounts = allAccounts.filter(a => dones[a.id]);
 
@@ -319,23 +319,23 @@ function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, done
     <div>
       {activeEvals.length > 0 && <>
         <SectionHeader title="Evaluation Accounts" color="#8b5cf6" count={activeEvals.length} />
-        <FeedColumns accounts={activeEvals} />
+        <FeedColumns accounts={activeEvals.filter(a => !dones[a.id])} />
       </>}
 
-      {(activePerf.length > 0 || livePerf.length > 0) && <>
-        <SectionHeader title="Performance Accounts" color="#3b82f6" count={activePerf.length + livePerf.length} />
-        <FeedColumns accounts={[...activePerf, ...livePerf]} />
+      {standardPerf.filter(a => !dones[a.id]).length > 0 && <>
+        <SectionHeader title="Performance Accounts" color="#3b82f6" count={standardPerf.filter(a => !dones[a.id]).length} />
+        <FeedColumns accounts={standardPerf.filter(a => !dones[a.id])} />
       </>}
 
-      {payoutAccounts.length > 0 && <>
-        <SectionHeader title="Payout Accounts" color="#f59e0b" count={payoutAccounts.length} />
-        <FeedColumns accounts={payoutAccounts} />
+      {(payoutAccounts.filter(a => !dones[a.id]).length > 0 || livePerf.filter(a => !dones[a.id]).length > 0) && <>
+        <SectionHeader title="Payout Accounts" color="#f59e0b" count={payoutAccounts.filter(a => !dones[a.id]).length + livePerf.filter(a => !dones[a.id]).length} />
+        <FeedColumns accounts={[...payoutAccounts, ...livePerf].filter(a => !dones[a.id])} />
       </>}
 
-      {waitingPayout.length > 0 && <>
-        <SectionHeader title="Waiting on Payout" color="#6b7280" count={waitingPayout.length} />
+      {waitingPayout.filter(a => !dones[a.id]).length > 0 && <>
+        <SectionHeader title="Waiting on Payout" color="#6b7280" count={waitingPayout.filter(a => !dones[a.id]).length} />
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {waitingPayout.map((a, i) => (
+          {waitingPayout.filter(a => !dones[a.id]).map((a, i) => (
             <AccountRow key={a.id} a={a} i={i}
               inputVal={inputs[a.id] || ""}
               noChange={!!noChanges[a.id]}
@@ -2195,9 +2195,11 @@ export default function App() {
     setSaving(false);
   }
 
-  const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Live" && a.status !== "Waiting on Payout");
-  const waitingPayout = perfAccounts.filter(a => a.status === "Waiting on Payout" && !a.payoutAccount);
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount);
+  const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.payoutAccount && a.status === "Live");
+  const waitingPayout = perfAccounts.filter(a => a.payoutAccount && a.status === "Waiting on Payout");
+  const liveOrPayout = [...payoutAccounts, ...livePerf];
   const allAccounts = [...evalAccounts, ...perfAccounts];
 
   const gain = allAccounts.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d > 0 ? s + d : s; }, 0);
