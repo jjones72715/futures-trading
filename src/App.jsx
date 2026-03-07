@@ -620,8 +620,8 @@ function PurchaseTab() {
 
   async function loadEvalTypes() {
     try {
-      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]);
-      console.log("evalTypes loaded:", evalTypes);
+      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name"]);
+      console.log("evalTypes raw:", evalTypes);
       setEvalTypeList(evalTypes.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) { console.error("loadEvalTypes error:", e); }
   }
