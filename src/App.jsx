@@ -17,31 +17,6 @@ const TRADERS = [
   { id: "recmziqSnANAPjtuH", name: "Jonathan Jones" },
 ];
 
-const EVAL_TYPES = [
-  { id: "rec5O8lSTqB4fXPsP", name: "Day Traders 150K Static", cost: 1750, accountSize: 150000 },
-  { id: "rec8HfoHBk5m9oscj", name: "Top Step 150K", cost: 4500, accountSize: 150000 },
-  { id: "rec8lBqRQBKOtFljx", name: "Tradeify 150K Select", cost: 4500, accountSize: 150000 },
-  { id: "recCAYjMChppH9u8K", name: "Tradeify 100K Select", cost: 3000, accountSize: 100000 },
-  { id: "recCePd3gcQGGiMe6", name: "Bulenox 50K EOD", cost: 2500, accountSize: 50000 },
-  { id: "recD4IfxYzFKOxWGU", name: "TPT 150K", cost: 4500, accountSize: 150000 },
-  { id: "recMLV7McrX0yqfd1", name: "FFN 100K Standard", cost: 3600, accountSize: 100000 },
-  { id: "recMeH14HcTVOTABK", name: "Phidias Fundamental 100K", cost: 3000, accountSize: 100000 },
-  { id: "recXHjiUdh5YzWpds", name: "FFN 150K Standard", cost: 5000, accountSize: 150000 },
-  { id: "rece3sSv032SWiy8H", name: "TPT 100K", cost: 3000, accountSize: 100000 },
-  { id: "recf85p2PhQs3O4Qx", name: "Funded Next 50K Legacy", cost: 2000, accountSize: 50000 },
-  { id: "recjSpqACE1VGGL9l", name: "LucidFlex 100K", cost: 3000, accountSize: 100000 },
-  { id: "reckab8EkDpFCco4e", name: "Day Traders 100K Static", cost: 1500, accountSize: 100000 },
-  { id: "reclSB5U37mNwP5yE", name: "Funded Next 100K Legacy", cost: 3000, accountSize: 100000 },
-  { id: "recldNrpc0Uw2iy0Q", name: "Trade Day 100K", cost: 3000, accountSize: 100000 },
-  { id: "recmK6e815Mus0M4r", name: "TOF 50k Elite", cost: 2000, accountSize: 50000 },
-  { id: "recmXkCwRhX8CwdHA", name: "BluSky 300k Blu+", cost: 5000, accountSize: 300000 },
-  { id: "recnMxSRnwffHQqGf", name: "MFFU 50K Flex", cost: 2000, accountSize: 50000 },
-  { id: "recpznnL6QT5BGnBL", name: "LucidFlex 150K", cost: 4500, accountSize: 150000 },
-  { id: "recrwjjhAEaj98I29", name: "Phidias Static", cost: 500, accountSize: 25000 },
-  { id: "recsMsMF8YosOvAKr", name: "Legends Elite 150K", cost: 4500, accountSize: 150000 },
-  { id: "recx9L2t4eHPFzPAi", name: "Legends Elite 100K", cost: 3000, accountSize: 100000 },
-];
-
 // Baked-in eval accounts by trader
 const EVAL_ACCOUNTS_BY_TRADER = {
   "rec0jB7J1Ir1ZspvM": [
@@ -612,11 +587,13 @@ function PurchaseTab() {
   const [recentPurchases, setRecentPurchases] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [traderId, setTraderId] = useState("");
+  const [evalTypeList, setEvalTypeList] = useState([]);
 
   useEffect(() => {
     loadActivePurchases();
     loadEvalAccounts();
     loadRecent();
+    loadEvalTypes();
   }, []);
 
   async function loadActivePurchases() {
@@ -647,6 +624,13 @@ function PurchaseTab() {
     setLoadingRecent(false);
   }
 
+  async function loadEvalTypes() {
+    try {
+      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]);
+      setEvalTypeList(evalTypes.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (e) {}
+  }
+
   function handleSelectPurchase(purchaseId) {
     setSelectedPurchaseId(purchaseId);
     const p = activePurchases.find(r => r.id === purchaseId);
@@ -657,7 +641,7 @@ function PurchaseTab() {
       console.log("typeId found:", typeId);
       if (typeId) {
         setEvalTypeId(typeId);
-        const et = EVAL_TYPES.find(t => t.id === typeId);
+        const et = evalTypeList.find(t => t.id === typeId);
         if (et) setCostPer(et.cost.toString());
       }
       const evalArr = p.fields["Evaluation Account"];
@@ -668,7 +652,7 @@ function PurchaseTab() {
 
   function handleEvalTypeChange(typeId) {
     setEvalTypeId(typeId);
-    const et = EVAL_TYPES.find(t => t.id === typeId);
+    const et = evalTypeList.find(t => t.id === typeId);
     if (et) setCostPer(et.cost.toString());
   }
 
@@ -685,7 +669,7 @@ function PurchaseTab() {
   }
 
   const selectedPurchase = activePurchases.find(r => r.id === selectedPurchaseId);
-  const selectedEvalType = EVAL_TYPES.find(t => t.id === evalTypeId);
+  const selectedEvalType = evalTypeList.find(t => t.id === evalTypeId);
   const trader = selectedPurchase ? TRADERS.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
   const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "reset" ? selectedPurchaseId : traderId);
@@ -695,7 +679,7 @@ function PurchaseTab() {
     if (!canSubmit) return;
     setSubmitting(true); setErr(null);
     try {
-      const evalType = EVAL_TYPES.find(t => t.id === evalTypeId);
+      const evalType = evalTypeList.find(t => t.id === evalTypeId);
       const accountSize = evalType ? evalType.accountSize : 0;
       if (mode === "reset") {
         await updateRecord(PURCHASE_TABLE, selectedPurchaseId, { "Status": "Failed" });
@@ -909,7 +893,7 @@ function PurchaseTab() {
               {label("Evaluation Account Type")}
               <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
                 <option value="">Choose type...</option>
-                {EVAL_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                {evalTypeList.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
@@ -972,7 +956,7 @@ function PurchaseTab() {
               {label("Evaluation Account Type")}
               <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
                 <option value="">Choose type...</option>
-                {EVAL_TYPES.sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                {evalTypeList.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
