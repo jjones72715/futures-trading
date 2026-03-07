@@ -1383,7 +1383,7 @@ const PAYOUT_STRATEGIES = [
 ];
 
 // Eval type → Perf type map (baked in from Airtable)
-function AccountManagementTab({ evalToPerfMap }) {
+function AccountManagementTab({ evalToPerfMap = {} }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
   const inp = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
@@ -1701,7 +1701,7 @@ function AccountManagementTab({ evalToPerfMap }) {
                   ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active eval accounts{traderId ? " for this trader" : ""}.</div>
                   : evalAccounts.map(r => {
                       const etId = Array.isArray(r.fields["Evaluation Account Type"]) ? r.fields["Evaluation Account Type"][0] : null;
-                      const ptId = etId ? evalToPerfMap[etId] : null;
+                      const ptId = etId ? evalToPerfMap?.[etId] : null;
                       const pt = ptId ? PERF_TYPES.find(t => t.id === ptId) : null;
                       return (
                         <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
