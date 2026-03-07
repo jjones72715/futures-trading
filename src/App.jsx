@@ -289,7 +289,7 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
         </div>
       </div>
 
-      <div style={{ width: 80, flexShrink: 0 }}><StatusPill status={a.status} /></div>
+      {a.status === "Live" && <div style={{ width: 80, flexShrink: 0 }}><StatusPill status={a.status} /></div>}
 
       <div style={{ width: 105, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Progress</div>
@@ -302,8 +302,8 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
       </div>
 
       <div style={{ width: 80, flexShrink: 0 }}>
-        <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Trade Limit</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : "#93c5fd" }}>{$$(a.limit)}</div>
+        <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Daily Target</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: done ? "#4b5563" : "#4ade80" }}>{$$(a.dailyTarget)}</div>
       </div>
 
       <div style={{ width: 80, flexShrink: 0 }}>
@@ -334,8 +334,8 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
       <div style={{ flex: 1, minWidth: 220 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Today's Ending Balance</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input type="number" placeholder="Enter balance..." value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange || done}
-            style={{ background: (noChange || done) ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: (noChange || done) ? "#4b5563" : "#fff", width: 125, outline: "none" }} />
+          <input type="number" placeholder={$$(a.bal)} value={inputVal} onChange={e => onInput(e.target.value)} disabled={noChange}
+            style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", appearance: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
           <button onClick={onNoChange} disabled={done}
             style={{ background: noChange ? "#166534" : "#1f2937", border: `1px solid ${noChange ? "#22c55e" : "#374151"}`, borderRadius: 7, padding: "6px 10px", fontSize: 11, color: noChange ? "#4ade80" : "#9ca3af", cursor: done ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap", opacity: done ? 0.4 : 1 }}>
             {noChange ? "✓ No Change" : "No Change"}
@@ -347,7 +347,7 @@ function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDon
           )}
           <button onClick={onDone} title={done ? "Mark as active" : "Done for today"}
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
-            {done ? "✓" : "○"}
+            {done ? "✓" : "☐"}
           </button>
           <button onClick={e => { e.stopPropagation(); console.log("breach clicked", a.name); onBreach(); }} title="Log a breach"
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
@@ -901,13 +901,17 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   function AccountMiniCard({ a }) {
     return (
       <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 7, padding: "5px 8px", marginBottom: 4, opacity: dones[a.id] ? 0.5 : 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+          {a.status === "Live" && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
           <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
           <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>
           <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
           {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
+          {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
         </div>
       </div>
     );
@@ -1939,6 +1943,7 @@ export default function App() {
           contractMultiplier: f["Contract Multiplier"] || 1,
           payoutAccount: f["Payout Account"] || false,
           dataProvider: dp,
+          dailyTarget: f["Daily Target"] || 0,
         };
       };
 
@@ -2047,8 +2052,9 @@ export default function App() {
     setSaving(false);
   }
 
-  const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount || a.status === "Waiting on Payout");
-  const standardPerf = perfAccounts.filter(a => !liveOrPayout.includes(a));
+  const liveOrPayout = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Live" && a.status !== "Waiting on Payout");
+  const waitingPayout = perfAccounts.filter(a => a.status === "Waiting on Payout" && !a.payoutAccount);
   const allAccounts = [...evalAccounts, ...perfAccounts];
 
   const gain = allAccounts.reduce((s, a) => { const v = parseFloat(inputs[a.id]); if (noChanges[a.id] || isNaN(v) || !inputs[a.id]) return s; const d = (v - a.bal) * a.n; return d > 0 ? s + d : s; }, 0);
@@ -2162,6 +2168,7 @@ export default function App() {
             <Section title="Evaluation Accounts" accounts={evalAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { console.log("setBreachAccount called", a); setBreachAccount(a); setBreachCount(""); }} color="#8b5cf6" />
             <Section title="Performance Accounts" accounts={standardPerf} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#3b82f6" />
             <Section title="Live & Payout Accounts" accounts={liveOrPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onDone} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#f59e0b" />
+            <Section title="Waiting on Payout" accounts={waitingPayout} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }} color="#6b7280" />
             <DoneSection accounts={allAccounts} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} />
           </>
         )}
