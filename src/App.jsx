@@ -578,7 +578,7 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
         <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{done.length}</span>
       </div>
       {done.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={true} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => { setBreachAccount(a); setBreachCount(""); }}/>
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={true} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)}/>
       ))}
     </div>
   );
@@ -2182,6 +2182,11 @@ export default function App() {
     setDones(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
+  const onBreach = useCallback((a) => {
+    setBreachAccount(a);
+    setBreachCount("");
+  }, []);
+
   async function handleBreach(a) {
     const count = parseInt(breachCount);
     if (!count || count < 1 || count > a.n) return;
@@ -2350,7 +2355,7 @@ export default function App() {
             onInput={onInput}
             onNoChange={onNoChange}
             onDone={onDone}
-            onBreach={(a) => { setBreachAccount(a); setBreachCount(""); }}
+            onBreach={onBreach}
           />
         )}
 
