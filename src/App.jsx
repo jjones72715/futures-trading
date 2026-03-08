@@ -1145,6 +1145,18 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   const [freshAccounts, setFreshAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const traders = [
+    { key: "Jonathan Jones", label: "Jonathan" },
+    { key: "Cherelyn Jones", label: "Sherry" },
+    { key: "Amanda Seratt", label: "Amanda" },
+    { key: "Jefferies Parker", label: "Troy" },
+    { key: "Judy Jones", label: "Judy" },
+  ];
+
+  function getTraderFirstName(traderName) {
+    return traders.find(t => t.key === traderName)?.label || traderName.split(" ")[0];
+  }
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -1253,18 +1265,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     }
     loadData();
   }, []);
-
-  const traders = [
-    { key: "Jonathan Jones", label: "Jonathan" },
-    { key: "Cherelyn Jones", label: "Sherry" },
-    { key: "Amanda Seratt", label: "Amanda" },
-    { key: "Jefferies Parker", label: "Troy" },
-    { key: "Judy Jones", label: "Judy" },
-  ];
-
-  function getTraderFirstName(traderName) {
-    return traders.find(t => t.key === traderName)?.label || traderName.split(" ")[0];
-  }
 
   const usageMap = useMemo(() => {
     const map = {};
