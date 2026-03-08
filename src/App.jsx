@@ -1158,6 +1158,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   }
 
   useEffect(() => {
+    console.log("FirmUsageTab useEffect fired");
     async function loadData() {
       try {
         const BASE_ID = "app5RPYcCy7hqCu41";
@@ -1301,6 +1302,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     "L": { bg: "#b4521822", border: "#b45218", color: "#fdba74" },
   };
 
+  console.log("FirmUsageTab rendering, loading:", loading, "firms:", firms.length);
   if (loading) return (
     <div style={{ textAlign: "center", padding: 60, color: "#6b7280" }}>Loading firms...</div>
   );
