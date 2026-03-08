@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
@@ -1196,21 +1196,25 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     return traders.find(t => t.key === traderName)?.label || traderName.split(" ")[0];
   }
 
-  const usageMap = {};
-  [...evalAccounts, ...perfAccounts].forEach(a => {
-    const traderLabel = getTraderFirstName(a.trader);
-    const typeId = a.accountTypeId;
-    const firmId = a.type === "perf" ? perfTypeFirmMap[typeId] : evalTypeFirmMap[typeId];
-    if (!firmId || !firmMap[firmId]) return;
-    const firmName = firmMap[firmId].name;
-    if (!usageMap[firmName]) usageMap[firmName] = {};
-    if (!usageMap[firmName][traderLabel]) usageMap[firmName][traderLabel] = [];
-    const isLive = a.status === "Live";
-    const isPayout = a.payoutAccount;
-    const isPerf = a.type === "perf";
-    const label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
-    usageMap[firmName][traderLabel].push({ label, n: a.n, status: a.status });
-  });
+  const usageMap = useMemo(() => {
+    const map = {};
+    if (!Object.keys(evalTypeFirmMap).length && !Object.keys(perfTypeFirmMap).length) return map;
+    [...evalAccounts, ...perfAccounts].forEach(a => {
+      const traderLabel = getTraderFirstName(a.trader);
+      const typeId = a.accountTypeId;
+      const firmId = a.type === "perf" ? perfTypeFirmMap[typeId] : evalTypeFirmMap[typeId];
+      if (!firmId || !firmMap[firmId]) return;
+      const firmName = firmMap[firmId].name;
+      if (!map[firmName]) map[firmName] = {};
+      if (!map[firmName][traderLabel]) map[firmName][traderLabel] = [];
+      const isLive = a.status === "Live";
+      const isPayout = a.payoutAccount;
+      const isPerf = a.type === "perf";
+      const label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
+      map[firmName][traderLabel].push({ label, n: a.n, status: a.status });
+    });
+    return map;
+  }, [evalAccounts, perfAccounts, evalTypeFirmMap, perfTypeFirmMap, firmMap]);
 
   console.log("firms loaded:", firms.length, firms[0]);
   console.log("evalTypeFirmMap:", evalTypeFirmMap);
@@ -2355,7 +2359,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
-          accountTypeId: Array.isArray(f["Evaluation Account Type"]) ? f["Evaluation Account Type"][0]?.id || f["Evaluation Account Type"][0] || null : null,
+          accountTypeId: (() => { console.log("eval type field:", f["Evaluation Account Type"]); return Array.isArray(f["Evaluation Account Type"]) ? f["Evaluation Account Type"][0]?.id || f["Evaluation Account Type"][0] || null : null; })(),
         };
       };
 
