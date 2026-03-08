@@ -1139,26 +1139,49 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
 
   const [firms, setFirms] = useState([]);
+  const [firmMap, setFirmMap] = useState({});
+  const [evalTypeFirmMap, setEvalTypeFirmMap] = useState({});
+  const [perfTypeFirmMap, setPerfTypeFirmMap] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadFirms() {
+    async function loadData() {
       try {
-        const records = await fetchTable("tblR0iLSQZI1xXYa6", ["Name", "Data Provider", "Rank", "Max Accounts"]);
-        const sorted = records
-          .filter(r => r.fields["Rank"])
-          .sort((a, b) => a.fields["Rank"] - b.fields["Rank"]);
-        setFirms(sorted.map(r => ({
-          id: r.id,
-          name: r.fields["Name"],
-          provider: r.fields["Data Provider"]?.name || "Unknown",
-          rank: r.fields["Rank"],
-          maxAccounts: r.fields["Max Accounts"] || 0,
-        })));
+        const firmRecords = await fetchTable("tblR0iLSQZI1xXYa6", ["Name", "Data Provider", "Rank", "Max Accounts"]);
+        const fMap = {};
+        firmRecords.forEach(r => {
+          fMap[r.id] = {
+            id: r.id,
+            name: r.fields["Name"],
+            provider: r.fields["Data Provider"]?.name || "Unknown",
+            rank: r.fields["Rank"] || 999,
+            maxAccounts: r.fields["Max Accounts"] || 0,
+          };
+        });
+
+        const evalTypes = await fetchTable("tbleHzHF5FgskLxs3", ["Name", "Firm"]);
+        const etfMap = {};
+        evalTypes.forEach(r => {
+          const firm = r.fields["Firm"];
+          if (Array.isArray(firm) && firm.length > 0) etfMap[r.id] = firm[0];
+        });
+
+        const perfTypes = await fetchTable("tbluVaCiyff48ic7L", ["Name", "Firm"]);
+        const ptfMap = {};
+        perfTypes.forEach(r => {
+          const firm = r.fields["Firm"];
+          if (Array.isArray(firm) && firm.length > 0) ptfMap[r.id] = firm[0];
+        });
+
+        const sortedFirms = Object.values(fMap).sort((a, b) => a.rank - b.rank);
+        setFirms(sortedFirms);
+        setFirmMap(fMap);
+        setEvalTypeFirmMap(etfMap);
+        setPerfTypeFirmMap(ptfMap);
       } catch(e) { console.error(e); }
       setLoading(false);
     }
-    loadFirms();
+    loadData();
   }, []);
 
   const traders = [
@@ -1169,34 +1192,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     { key: "Judy Jones", label: "Judy" },
   ];
 
-  const FIRM_NAME_MAP = {
-    "Top Step": ["Top Step", "TopStep"],
-    "LUCID": ["Lucid", "LucidFlex"],
-    "TRADEIFY": ["Tradeify"],
-    "My Funded Futures": ["MFFU", "My Funded"],
-    "Take Profit Trader": ["TPT", "Take Profit"],
-    "LEGENDS": ["Legends"],
-    "TRADE DAY": ["Trade Day"],
-    "Funded Futures Network": ["FFN", "Funded Futures"],
-    "PHIDIAS": ["Phidias"],
-    "Top One Futures": ["TOF", "Top One"],
-    "DAY TRADERS": ["DayTraders", "Day Traders"],
-    "YRM": ["YRM"],
-    "FUNDEDNEXT": ["Funded Next", "FundedNext"],
-    "BULENOX": ["Bulenox"],
-    "Humble Futures": ["Humble"],
-    "BLUSKY": ["BluSky", "Blusky"],
-    "E8": ["E8"],
-    "SAVIUS": ["Savius"],
-    "The Futures Desk": ["TFD", "Futures Desk"],
-    "PURDIA": ["Purdia"],
-  };
-
-  function matchFirm(accountName, firmName) {
-    const keywords = FIRM_NAME_MAP[firmName] || [firmName];
-    return keywords.some(kw => accountName.toLowerCase().includes(kw.toLowerCase()));
-  }
-
   function getTraderFirstName(traderName) {
     return traders.find(t => t.key === traderName)?.label || traderName.split(" ")[0];
   }
@@ -1204,17 +1199,17 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   const usageMap = {};
   [...evalAccounts, ...perfAccounts].forEach(a => {
     const traderLabel = getTraderFirstName(a.trader);
-    firms.forEach(f => {
-      if (matchFirm(a.name, f.name)) {
-        if (!usageMap[f.name]) usageMap[f.name] = {};
-        if (!usageMap[f.name][traderLabel]) usageMap[f.name][traderLabel] = [];
-        const isPerf = a.type === "perf";
-        const isLive = a.status === "Live";
-        const isPayout = a.payoutAccount;
-        let label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
-        usageMap[f.name][traderLabel].push({ label, n: a.n, status: a.status });
-      }
-    });
+    const typeId = a.accountTypeId;
+    const firmId = a.type === "perf" ? perfTypeFirmMap[typeId] : evalTypeFirmMap[typeId];
+    if (!firmId || !firmMap[firmId]) return;
+    const firmName = firmMap[firmId].name;
+    if (!usageMap[firmName]) usageMap[firmName] = {};
+    if (!usageMap[firmName][traderLabel]) usageMap[firmName][traderLabel] = [];
+    const isLive = a.status === "Live";
+    const isPayout = a.payoutAccount;
+    const isPerf = a.type === "perf";
+    const label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
+    usageMap[firmName][traderLabel].push({ label, n: a.n, status: a.status });
   });
 
   const providers = ["Project X", "Rithmic", "Tradovate", "DX Feed"];
@@ -2324,6 +2319,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
+          accountTypeId: Array.isArray(f["Performance Account Type"]) ? f["Performance Account Type"][0]?.id || null : null,
         };
       };
 
@@ -2352,6 +2348,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
+          accountTypeId: Array.isArray(f["Evaluation Account Type"]) ? f["Evaluation Account Type"][0]?.id || null : null,
         };
       };
 
