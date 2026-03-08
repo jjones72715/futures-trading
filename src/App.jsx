@@ -1142,43 +1142,116 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   const [firmMap, setFirmMap] = useState({});
   const [evalTypeFirmMap, setEvalTypeFirmMap] = useState({});
   const [perfTypeFirmMap, setPerfTypeFirmMap] = useState({});
+  const [freshAccounts, setFreshAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const firmRecords = await fetchTable("tblR0iLSQZI1xXYa6", ["Name", "Data Provider", "Rank", "Max Accounts"]);
+        const BASE_ID = "app5RPYcCy7hqCu41";
+
+        async function rawFetch(tableId, fieldIds) {
+          const params = fieldIds.map(f => `fields[]=${f}`).join("&");
+          const res = await fetch(`/.netlify/functions/airtable/${BASE_ID}/${tableId}?${params}&maxRecords=200`);
+          const data = await res.json();
+          return data.records || [];
+        }
+
+        // Firms
+        const firmRecords = await rawFetch("tblR0iLSQZI1xXYa6", [
+          "fldLqQfeIMSYFL1LP", // Name
+          "fldLBVgBwuRwJFmrA", // Data Provider
+          "fldghWptUYGuMlX23", // Rank
+          "fldhSmdkyf9hOiF8y", // Max Accounts
+        ]);
         const fMap = {};
         firmRecords.forEach(r => {
+          const f = r.fields;
+          const providerRaw = f["fldLBVgBwuRwJFmrA"];
           fMap[r.id] = {
             id: r.id,
-            name: r.fields["Name"],
-            provider: (() => { const p = r.fields["Data Provider"]; return p?.name || p || "Unknown"; })(),
-            rank: r.fields["Rank"] || 999,
-            maxAccounts: r.fields["Max Accounts"] || 0,
+            name: f["fldLqQfeIMSYFL1LP"] || "",
+            provider: providerRaw?.name || providerRaw || "Unknown",
+            rank: f["fldghWptUYGuMlX23"] || 999,
+            maxAccounts: f["fldhSmdkyf9hOiF8y"] || 0,
           };
         });
 
-        const evalTypes = await fetchTable("tbleHzHF5FgskLxs3", ["Name", "Firm"]);
+        // Eval Account Types → Firm
+        const evalTypeRecords = await rawFetch("tbleHzHF5FgskLxs3", [
+          "fldAQaWr9KEulun1F", // Name
+          "fldFNqDvRQEFMLL7t", // Firm
+        ]);
         const etfMap = {};
-        evalTypes.forEach(r => {
-          const firm = r.fields["Firm"];
-          if (Array.isArray(firm) && firm.length > 0) etfMap[r.id] = firm[0];
+        evalTypeRecords.forEach(r => {
+          const firm = r.fields["fldFNqDvRQEFMLL7t"];
+          if (Array.isArray(firm) && firm.length > 0) etfMap[r.id] = firm[0].id || firm[0];
         });
 
-        const perfTypes = await fetchTable("tbluVaCiyff48ic7L", ["Name", "Firm"]);
+        // Perf Account Types → Firm
+        const perfTypeRecords = await rawFetch("tbluVaCiyff48ic7L", [
+          "fld0WVZAcXGSerJFT", // Name
+          "fldx4poR2II5g5mMp", // Firm
+        ]);
         const ptfMap = {};
-        perfTypes.forEach(r => {
-          const firm = r.fields["Firm"];
-          if (Array.isArray(firm) && firm.length > 0) ptfMap[r.id] = firm[0];
+        perfTypeRecords.forEach(r => {
+          const firm = r.fields["fldx4poR2II5g5mMp"];
+          if (Array.isArray(firm) && firm.length > 0) ptfMap[r.id] = firm[0].id || firm[0];
         });
+
+        // Eval Accounts
+        const evalRecords = await rawFetch("tblWeri8TXWPQY9Dc", [
+          "fldmzqIB76bjvJF3L", // Name
+          "fldWV8bPpsFkWpYux", // Status
+          "fld44diXukpSDXv3Y", // Trader
+          "fldXpePekEYHk8YCs", // Number of Accounts
+          "fldfiNV9CrkjveYH8", // Evaluation Account Type
+        ]);
+        const freshEvals = evalRecords
+          .filter(r => r.fields["fldWV8bPpsFkWpYux"]?.name === "Active")
+          .map(r => ({
+            id: r.id,
+            name: r.fields["fldmzqIB76bjvJF3L"] || "",
+            type: "eval",
+            status: "Active",
+            trader: r.fields["fld44diXukpSDXv3Y"]?.[0]?.name || "",
+            n: r.fields["fldXpePekEYHk8YCs"] || 1,
+            payoutAccount: false,
+            accountTypeId: r.fields["fldfiNV9CrkjveYH8"]?.[0]?.id || r.fields["fldfiNV9CrkjveYH8"]?.[0] || null,
+          }));
+
+        // Perf Accounts
+        const perfRecords = await rawFetch("tblhM1DWRiWXnhSKb", [
+          "fldfyrSV2RPcv1jU1", // Name
+          "fld7UANxkXuwL90xT", // Status
+          "fldi7WIXgdknUa1rw", // Trader
+          "fldiJ3GD2NLLc3YIi", // Number of Accounts
+          "fldoYCHsUB3CvfssN", // Performance Account Type
+          "fldr6G6F98yV0aNpN", // Payout Account
+        ]);
+        const freshPerfs = perfRecords
+          .filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["fld7UANxkXuwL90xT"]?.name))
+          .map(r => ({
+            id: r.id,
+            name: r.fields["fldfyrSV2RPcv1jU1"] || "",
+            type: "perf",
+            status: r.fields["fld7UANxkXuwL90xT"]?.name || "",
+            trader: r.fields["fldi7WIXgdknUa1rw"]?.[0]?.name || "",
+            n: r.fields["fldiJ3GD2NLLc3YIi"] || 1,
+            payoutAccount: r.fields["fldr6G6F98yV0aNpN"] || false,
+            accountTypeId: r.fields["fldoYCHsUB3CvfssN"]?.[0]?.id || r.fields["fldoYCHsUB3CvfssN"]?.[0] || null,
+          }));
+
+        console.log("fresh eval sample:", freshEvals[0]);
+        console.log("etfMap sample:", Object.entries(etfMap).slice(0, 3));
 
         const sortedFirms = Object.values(fMap).sort((a, b) => a.rank - b.rank);
         setFirms(sortedFirms);
         setFirmMap(fMap);
         setEvalTypeFirmMap(etfMap);
         setPerfTypeFirmMap(ptfMap);
-      } catch(e) { console.error(e); }
+        setFreshAccounts([...freshEvals, ...freshPerfs]);
+      } catch(e) { console.error("FirmUsageTab load error:", e); }
       setLoading(false);
     }
     loadData();
@@ -1199,7 +1272,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   const usageMap = useMemo(() => {
     const map = {};
     if (!Object.keys(evalTypeFirmMap).length && !Object.keys(perfTypeFirmMap).length) return map;
-    [...evalAccounts, ...perfAccounts].forEach(a => {
+    freshAccounts.forEach(a => {
       const traderLabel = getTraderFirstName(a.trader);
       const typeId = a.accountTypeId;
       const firmId = a.type === "perf" ? perfTypeFirmMap[typeId] : evalTypeFirmMap[typeId];
@@ -1214,7 +1287,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
       map[firmName][traderLabel].push({ label, n: a.n, status: a.status });
     });
     return map;
-  }, [evalAccounts, perfAccounts, evalTypeFirmMap, perfTypeFirmMap, firmMap]);
+  }, [freshAccounts, evalTypeFirmMap, perfTypeFirmMap, firmMap]);
 
   const providers = ["Project X", "Rithmic", "Tradovate", "DX Feed"];
   const providerColors = {
@@ -2294,8 +2367,8 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "fldoYCHsUB3CvfssN"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "fldfiNV9CrkjveYH8"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
@@ -2323,7 +2396,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
-          accountTypeId: (f["fldoYCHsUB3CvfssN"] || f["Performance Account Type"] || [])[0]?.id || (f["fldoYCHsUB3CvfssN"] || f["Performance Account Type"] || [])[0] || null,
+          accountTypeId: (f["Performance Account Type"] || [])[0]?.id || (f["Performance Account Type"] || [])[0] || null,
         };
       };
 
@@ -2352,7 +2425,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
-          accountTypeId: (f["fldfiNV9CrkjveYH8"] || f["Evaluation Account Type"] || [])[0]?.id || (f["fldfiNV9CrkjveYH8"] || f["Evaluation Account Type"] || [])[0] || null,
+          accountTypeId: (f["Evaluation Account Type"] || [])[0]?.id || (f["Evaluation Account Type"] || [])[0] || null,
         };
       };
 
