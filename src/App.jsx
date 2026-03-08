@@ -1197,7 +1197,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
         const etfMap = {};
         evalTypeRecords.forEach(r => {
           const firm = r.fields["fldFNqDvRQEFMLL7t"];
-          etfMap[r.id] = (r.fields["Firm"] || [])[0] || null;
+          etfMap[r.id] = (r.fields["fldFNqDvRQEFMLL7t"] || [])[0] || null;
         });
 
         // Perf Account Types → Firm
@@ -1208,7 +1208,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
         const ptfMap = {};
         perfTypeRecords.forEach(r => {
           const firm = r.fields["fldx4poR2II5g5mMp"];
-          ptfMap[r.id] = (r.fields["Firm"] || [])[0] || null;
+          ptfMap[r.id] = (r.fields["fldx4poR2II5g5mMp"] || [])[0] || null;
         });
 
         // Eval Accounts
