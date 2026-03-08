@@ -1212,6 +1212,13 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     usageMap[firmName][traderLabel].push({ label, n: a.n, status: a.status });
   });
 
+  console.log("firms loaded:", firms.length, firms[0]);
+  console.log("evalTypeFirmMap:", evalTypeFirmMap);
+  console.log("perfTypeFirmMap:", perfTypeFirmMap);
+  console.log("sample eval account:", evalAccounts[0]);
+  console.log("sample perf account:", perfAccounts[0]);
+  console.log("usageMap:", usageMap);
+
   const providers = ["Project X", "Rithmic", "Tradovate", "DX Feed"];
   const providerColors = {
     "Project X": { bg: "#0c1a2e", border: "#1e3a5f", header: "#1d4ed8", text: "#93c5fd" },
