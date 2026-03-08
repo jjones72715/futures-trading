@@ -1153,7 +1153,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
           fMap[r.id] = {
             id: r.id,
             name: r.fields["Name"],
-            provider: r.fields["Data Provider"]?.name || "Unknown",
+            provider: (() => { const p = r.fields["Data Provider"]; return p?.name || p || "Unknown"; })(),
             rank: r.fields["Rank"] || 999,
             maxAccounts: r.fields["Max Accounts"] || 0,
           };
@@ -2326,7 +2326,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
-          accountTypeId: Array.isArray(f["Performance Account Type"]) ? f["Performance Account Type"][0]?.id || null : null,
+          accountTypeId: Array.isArray(f["Performance Account Type"]) ? f["Performance Account Type"][0]?.id || f["Performance Account Type"][0] || null : null,
         };
       };
 
@@ -2355,7 +2355,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
-          accountTypeId: Array.isArray(f["Evaluation Account Type"]) ? f["Evaluation Account Type"][0]?.id || null : null,
+          accountTypeId: Array.isArray(f["Evaluation Account Type"]) ? f["Evaluation Account Type"][0]?.id || f["Evaluation Account Type"][0] || null : null,
         };
       };
 
