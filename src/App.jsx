@@ -1147,10 +1147,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
 
   useEffect(() => {
     async function loadData() {
-      // Temp: log raw eval record to see exact field keys
-      const _rawRes = await fetch(`/.netlify/functions/airtable/app5RPYcCy7hqCu41/tblWeri8TXWPQY9Dc?maxRecords=1`);
-      const _rawData = await _rawRes.json();
-      console.log("raw eval record:", JSON.stringify(_rawData.records?.[0]?.fields));
       try {
         const BASE_ID = "app5RPYcCy7hqCu41";
 
@@ -1189,7 +1185,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
         const etfMap = {};
         evalTypeRecords.forEach(r => {
           const firm = r.fields["fldFNqDvRQEFMLL7t"];
-          if (Array.isArray(firm) && firm.length > 0) etfMap[r.id] = firm[0].id || firm[0];
+          etfMap[r.id] = (r.fields["Firm"] || [])[0] || null;
         });
 
         // Perf Account Types → Firm
@@ -1200,7 +1196,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
         const ptfMap = {};
         perfTypeRecords.forEach(r => {
           const firm = r.fields["fldx4poR2II5g5mMp"];
-          if (Array.isArray(firm) && firm.length > 0) ptfMap[r.id] = firm[0].id || firm[0];
+          ptfMap[r.id] = (r.fields["Firm"] || [])[0] || null;
         });
 
         // Eval Accounts
@@ -1221,7 +1217,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
             trader: r.fields["fld44diXukpSDXv3Y"]?.[0]?.name || "",
             n: r.fields["fldXpePekEYHk8YCs"] || 1,
             payoutAccount: false,
-            accountTypeId: r.fields["fldfiNV9CrkjveYH8"]?.[0]?.id || r.fields["fldfiNV9CrkjveYH8"]?.[0] || null,
+            accountTypeId: (r.fields["Evaluation Account Type"] || r.fields["fldfiNV9CrkjveYH8"] || [])[0] || null,
           }));
 
         // Perf Accounts
@@ -1243,11 +1239,8 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
             trader: r.fields["fldi7WIXgdknUa1rw"]?.[0]?.name || "",
             n: r.fields["fldiJ3GD2NLLc3YIi"] || 1,
             payoutAccount: r.fields["fldr6G6F98yV0aNpN"] || false,
-            accountTypeId: r.fields["fldoYCHsUB3CvfssN"]?.[0]?.id || r.fields["fldoYCHsUB3CvfssN"]?.[0] || null,
+            accountTypeId: (r.fields["Performance Account Type"] || r.fields["fldoYCHsUB3CvfssN"] || [])[0] || null,
           }));
-
-        console.log("fresh eval sample:", freshEvals[0]);
-        console.log("etfMap sample:", Object.entries(etfMap).slice(0, 3));
 
         const sortedFirms = Object.values(fMap).sort((a, b) => a.rank - b.rank);
         setFirms(sortedFirms);
@@ -2400,7 +2393,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
-          accountTypeId: (f["Performance Account Type"] || [])[0]?.id || (f["Performance Account Type"] || [])[0] || null,
+          accountTypeId: (f["Performance Account Type"] || [])[0] || null,
         };
       };
 
@@ -2429,7 +2422,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
-          accountTypeId: (f["Evaluation Account Type"] || [])[0]?.id || (f["Evaluation Account Type"] || [])[0] || null,
+          accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
         };
       };
 
