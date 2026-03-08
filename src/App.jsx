@@ -1158,7 +1158,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   }
 
   useEffect(() => {
-    console.log("FirmUsageTab useEffect fired");
     async function loadData() {
       try {
         const BASE_ID = "app5RPYcCy7hqCu41";
@@ -1195,8 +1194,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
           "fldAQaWr9KEulun1F", // Name
           "fldFNqDvRQEFMLL7t", // Firm
         ]);
-        console.log("evalTypeRecords count:", evalTypeRecords.length);
-        console.log("evalTypeRecords sample:", JSON.stringify(evalTypeRecords[0]?.fields));
         const etfMap = {};
         evalTypeRecords.forEach(r => {
           const firm = r.fields["fldFNqDvRQEFMLL7t"];
@@ -1222,8 +1219,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
           "fldXpePekEYHk8YCs", // Number of Accounts
           "fldfiNV9CrkjveYH8", // Evaluation Account Type
         ]);
-        console.log("evalRaw count:", evalRecords.length);
-        console.log("evalRaw sample fields:", JSON.stringify(evalRecords[0]?.fields));
         const freshEvals = evalRecords
           .filter(r => ["Active", "Passed"].includes(r.fields["fldWV8bPpsFkWpYux"]?.name))
           .map(r => ({
@@ -1306,7 +1301,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     "L": { bg: "#b4521822", border: "#b45218", color: "#fdba74" },
   };
 
-  console.log("FirmUsageTab rendering, loading:", loading, "firms:", firms.length);
   if (loading) return (
     <div style={{ textAlign: "center", padding: 60, color: "#6b7280" }}>Loading firms...</div>
   );
