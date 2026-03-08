@@ -1195,6 +1195,8 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
           "fldAQaWr9KEulun1F", // Name
           "fldFNqDvRQEFMLL7t", // Firm
         ]);
+        console.log("evalTypeRecords count:", evalTypeRecords.length);
+        console.log("evalTypeRecords sample:", JSON.stringify(evalTypeRecords[0]?.fields));
         const etfMap = {};
         evalTypeRecords.forEach(r => {
           const firm = r.fields["fldFNqDvRQEFMLL7t"];
@@ -1220,6 +1222,8 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
           "fldXpePekEYHk8YCs", // Number of Accounts
           "fldfiNV9CrkjveYH8", // Evaluation Account Type
         ]);
+        console.log("evalRaw count:", evalRecords.length);
+        console.log("evalRaw sample fields:", JSON.stringify(evalRecords[0]?.fields));
         const freshEvals = evalRecords
           .filter(r => r.fields["fldWV8bPpsFkWpYux"]?.name === "Active")
           .map(r => ({
