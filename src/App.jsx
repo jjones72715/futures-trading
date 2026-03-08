@@ -1135,6 +1135,194 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     </div>
   );
 }
+function FirmUsageTab({ evalAccounts, perfAccounts }) {
+  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
+
+  const [firms, setFirms] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadFirms() {
+      try {
+        const records = await fetchTable("tblR0iLSQZI1xXYa6", ["Name", "Data Provider", "Rank", "Max Accounts"]);
+        const sorted = records
+          .filter(r => r.fields["Rank"])
+          .sort((a, b) => a.fields["Rank"] - b.fields["Rank"]);
+        setFirms(sorted.map(r => ({
+          id: r.id,
+          name: r.fields["Name"],
+          provider: r.fields["Data Provider"]?.name || "Unknown",
+          rank: r.fields["Rank"],
+          maxAccounts: r.fields["Max Accounts"] || 0,
+        })));
+      } catch(e) { console.error(e); }
+      setLoading(false);
+    }
+    loadFirms();
+  }, []);
+
+  const traders = [
+    { key: "Jonathan Jones", label: "Jonathan" },
+    { key: "Cherelyn Jones", label: "Sherry" },
+    { key: "Amanda Seratt", label: "Amanda" },
+    { key: "Jefferies Parker", label: "Troy" },
+    { key: "Judy Jones", label: "Judy" },
+  ];
+
+  const FIRM_NAME_MAP = {
+    "Top Step": ["Top Step", "TopStep"],
+    "LUCID": ["Lucid", "LucidFlex"],
+    "TRADEIFY": ["Tradeify"],
+    "My Funded Futures": ["MFFU", "My Funded"],
+    "Take Profit Trader": ["TPT", "Take Profit"],
+    "LEGENDS": ["Legends"],
+    "TRADE DAY": ["Trade Day"],
+    "Funded Futures Network": ["FFN", "Funded Futures"],
+    "PHIDIAS": ["Phidias"],
+    "Top One Futures": ["TOF", "Top One"],
+    "DAY TRADERS": ["DayTraders", "Day Traders"],
+    "YRM": ["YRM"],
+    "FUNDEDNEXT": ["Funded Next", "FundedNext"],
+    "BULENOX": ["Bulenox"],
+    "Humble Futures": ["Humble"],
+    "BLUSKY": ["BluSky", "Blusky"],
+    "E8": ["E8"],
+    "SAVIUS": ["Savius"],
+    "The Futures Desk": ["TFD", "Futures Desk"],
+    "PURDIA": ["Purdia"],
+  };
+
+  function matchFirm(accountName, firmName) {
+    const keywords = FIRM_NAME_MAP[firmName] || [firmName];
+    return keywords.some(kw => accountName.toLowerCase().includes(kw.toLowerCase()));
+  }
+
+  function getTraderFirstName(traderName) {
+    return traders.find(t => t.key === traderName)?.label || traderName.split(" ")[0];
+  }
+
+  const usageMap = {};
+  [...evalAccounts, ...perfAccounts].forEach(a => {
+    const traderLabel = getTraderFirstName(a.trader);
+    firms.forEach(f => {
+      if (matchFirm(a.name, f.name)) {
+        if (!usageMap[f.name]) usageMap[f.name] = {};
+        if (!usageMap[f.name][traderLabel]) usageMap[f.name][traderLabel] = [];
+        const isPerf = a.type === "perf";
+        const isLive = a.status === "Live";
+        const isPayout = a.payoutAccount;
+        let label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
+        usageMap[f.name][traderLabel].push({ label, n: a.n, status: a.status });
+      }
+    });
+  });
+
+  const providers = ["Project X", "Rithmic", "Tradovate", "DX Feed"];
+  const providerColors = {
+    "Project X": { bg: "#0c1a2e", border: "#1e3a5f", header: "#1d4ed8", text: "#93c5fd" },
+    "Rithmic": { bg: "#0f1a0f", border: "#1a3a1a", header: "#15803d", text: "#86efac" },
+    "Tradovate": { bg: "#1a0f1a", border: "#3a1a3a", header: "#7e22ce", text: "#d8b4fe" },
+    "DX Feed": { bg: "#1a1a0f", border: "#3a3a1a", header: "#a16207", text: "#fde047" },
+  };
+
+  const labelColors = {
+    "E": { bg: "#7c3aed22", border: "#7c3aed", color: "#c4b5fd" },
+    "P": { bg: "#15803d22", border: "#15803d", color: "#86efac" },
+    "F": { bg: "#1d4ed822", border: "#1d4ed8", color: "#93c5fd" },
+    "L": { bg: "#b4521822", border: "#b45218", color: "#fdba74" },
+  };
+
+  if (loading) return (
+    <div style={{ textAlign: "center", padding: 60, color: "#6b7280" }}>Loading firms...</div>
+  );
+
+  const traderLabels = traders.map(t => t.label);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>E = EVAL</span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>||</span>
+        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>P = PERFORMANCE</span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>||</span>
+        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>F = FUNDED/PAYOUT</span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>||</span>
+        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>L = LIVE</span>
+      </div>
+
+      {providers.map(provider => {
+        const providerFirms = firms.filter(f => f.provider === provider);
+        if (providerFirms.length === 0) return null;
+        const pc = providerColors[provider];
+
+        return (
+          <div key={provider} style={{ marginBottom: 28 }}>
+            <div style={{ background: pc.header, borderRadius: "10px 10px 0 0", padding: "8px 16px", fontSize: 14, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>
+              {provider.toUpperCase()}
+            </div>
+
+            <div style={{ background: pc.bg, border: `1px solid ${pc.border}`, borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 60px " + traderLabels.map(() => "1fr").join(" "), background: "#0a0a0a", padding: "8px 12px", borderBottom: `1px solid ${pc.border}` }}>
+                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Rank</div>
+                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Firm</div>
+                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Max</div>
+                {traderLabels.map(t => (
+                  <div key={t} style={{ fontSize: 11, color: pc.text, fontWeight: 700, textAlign: "center" }}>{t}</div>
+                ))}
+              </div>
+
+              {providerFirms.map((f, i) => {
+                const traderUsage = usageMap[f.name] || {};
+                const hasAny = Object.keys(traderUsage).length > 0;
+                return (
+                  <div key={f.id} style={{
+                    display: "grid",
+                    gridTemplateColumns: "40px 1fr 60px " + traderLabels.map(() => "1fr").join(" "),
+                    padding: "8px 12px",
+                    borderBottom: i < providerFirms.length - 1 ? `1px solid ${pc.border}` : "none",
+                    background: hasAny ? pc.bg : "#0a0a0a",
+                    alignItems: "center",
+                  }}>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>{f.rank}</div>
+                    <div style={{ fontSize: 13, color: hasAny ? "#fff" : "#4b5563", fontWeight: hasAny ? 600 : 400 }}>{f.name}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.maxAccounts}</div>
+                    {traderLabels.map(t => {
+                      const accts = traderUsage[t] || [];
+                      return (
+                        <div key={t} style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
+                          {accts.length === 0
+                            ? <span style={{ fontSize: 11, color: "#1f2937" }}>—</span>
+                            : accts.map((a, j) => {
+                              const lc = labelColors[a.label] || labelColors["E"];
+                              return (
+                                <span key={j} style={{
+                                  background: lc.bg,
+                                  border: `1px solid ${lc.border}`,
+                                  color: lc.color,
+                                  borderRadius: 4,
+                                  padding: "2px 6px",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                }}>
+                                  {a.label}
+                                </span>
+                              );
+                            })
+                          }
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PLTab({ evalAccounts, perfAccounts }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const [startingLiq, setStartingLiq] = useState("");
@@ -2398,6 +2586,7 @@ export default function App() {
                 ["gameplan", "📊 Reconciliation"],
                 ["redist", `💸 Redistribution${redistHistory.length > 0 ? ` (${redistHistory.length})` : ""}`],
                 ["pl", "📈 P&L"],
+                ["firms", "🏢 Firm Usage"],
               ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ background: "none", border: "none", borderBottom: tab === key ? "2px solid #3b82f6" : "2px solid transparent", color: tab === key ? "#60a5fa" : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
@@ -2426,6 +2615,7 @@ export default function App() {
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
               {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
+              {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
             </div>
         );
