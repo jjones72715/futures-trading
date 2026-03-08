@@ -1147,6 +1147,10 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
 
   useEffect(() => {
     async function loadData() {
+      // Temp: log raw eval record to see exact field keys
+      const _rawRes = await fetch(`/.netlify/functions/airtable/app5RPYcCy7hqCu41/tblWeri8TXWPQY9Dc?maxRecords=1`);
+      const _rawData = await _rawRes.json();
+      console.log("raw eval record:", JSON.stringify(_rawData.records?.[0]?.fields));
       try {
         const BASE_ID = "app5RPYcCy7hqCu41";
 
