@@ -1216,13 +1216,6 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     return map;
   }, [evalAccounts, perfAccounts, evalTypeFirmMap, perfTypeFirmMap, firmMap]);
 
-  console.log("firms loaded:", firms.length, firms[0]);
-  console.log("evalTypeFirmMap:", evalTypeFirmMap);
-  console.log("perfTypeFirmMap:", perfTypeFirmMap);
-  console.log("sample eval account:", evalAccounts[0]);
-  console.log("sample perf account:", perfAccounts[0]);
-  console.log("usageMap:", usageMap);
-
   const providers = ["Project X", "Rithmic", "Tradovate", "DX Feed"];
   const providerColors = {
     "Project X": { bg: "#0c1a2e", border: "#1e3a5f", header: "#1d4ed8", text: "#93c5fd" },
@@ -2301,8 +2294,8 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
@@ -2330,7 +2323,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
-          accountTypeId: Array.isArray(f["Performance Account Type"]) ? f["Performance Account Type"][0]?.id || f["Performance Account Type"][0] || null : null,
+          accountTypeId: (f["Performance Account Type"] || [])[0]?.id || (f["Performance Account Type"] || [])[0] || null,
         };
       };
 
@@ -2359,7 +2352,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
-          accountTypeId: (() => { console.log("eval type field:", f["Evaluation Account Type"]); return Array.isArray(f["Evaluation Account Type"]) ? f["Evaluation Account Type"][0]?.id || f["Evaluation Account Type"][0] || null : null; })(),
+          accountTypeId: (f["Evaluation Account Type"] || [])[0]?.id || (f["Evaluation Account Type"] || [])[0] || null,
         };
       };
 
