@@ -2294,8 +2294,8 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "fldoYCHsUB3CvfssN"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "fldfiNV9CrkjveYH8"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
@@ -2323,7 +2323,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
-          accountTypeId: (f["Performance Account Type"] || [])[0]?.id || (f["Performance Account Type"] || [])[0] || null,
+          accountTypeId: (f["fldoYCHsUB3CvfssN"] || f["Performance Account Type"] || [])[0]?.id || (f["fldoYCHsUB3CvfssN"] || f["Performance Account Type"] || [])[0] || null,
         };
       };
 
@@ -2352,7 +2352,7 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
-          accountTypeId: (f["Evaluation Account Type"] || [])[0]?.id || (f["Evaluation Account Type"] || [])[0] || null,
+          accountTypeId: (f["fldfiNV9CrkjveYH8"] || f["Evaluation Account Type"] || [])[0]?.id || (f["fldfiNV9CrkjveYH8"] || f["Evaluation Account Type"] || [])[0] || null,
         };
       };
 
