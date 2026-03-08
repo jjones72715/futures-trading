@@ -1225,7 +1225,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
         console.log("evalRaw count:", evalRecords.length);
         console.log("evalRaw sample fields:", JSON.stringify(evalRecords[0]?.fields));
         const freshEvals = evalRecords
-          .filter(r => r.fields["fldWV8bPpsFkWpYux"]?.name === "Active")
+          .filter(r => ["Active", "Passed"].includes(r.fields["fldWV8bPpsFkWpYux"]?.name))
           .map(r => ({
             id: r.id,
             name: r.fields["fldmzqIB76bjvJF3L"] || "",
@@ -1247,7 +1247,7 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
           "fldr6G6F98yV0aNpN", // Payout Account
         ]);
         const freshPerfs = perfRecords
-          .filter(r => ["Active", "Live", "Waiting on Payout"].includes(r.fields["fld7UANxkXuwL90xT"]?.name))
+          .filter(r => ["Active", "Live", "Waiting on Payout", "Passed"].includes(r.fields["fld7UANxkXuwL90xT"]?.name))
           .map(r => ({
             id: r.id,
             name: r.fields["fldfyrSV2RPcv1jU1"] || "",
