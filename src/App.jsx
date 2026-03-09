@@ -1145,17 +1145,19 @@ function FirmUsageTab() {
   useEffect(() => {
     async function loadData() {
       try {
-        // Load firms sorted by rank
+        // Load firms first so fMap is available for account name resolution
         const firmRecords = await fetchTable("tblR0iLSQZI1xXYa6", [
           "Name", "Data Provider", "Rank", "Max Accounts"
         ]);
+        const fMap = {};
+        firmRecords.forEach(r => { fMap[r.id] = r; });
         const sortedFirms = firmRecords
           .filter(r => r.fields["Rank"])
           .sort((a, b) => a.fields["Rank"] - b.fields["Rank"])
           .map(r => ({
             id: r.id,
             name: r.fields["Name"],
-            provider: r.fields["Data Provider"]?.[0] || r.fields["Data Provider"]?.name || "Unknown",
+            provider: r.fields["Data Provider"]?.name || r.fields["Data Provider"] || "Unknown",
             rank: r.fields["Rank"],
             maxAccounts: r.fields["Max Accounts"] || 0,
           }));
@@ -1191,7 +1193,7 @@ function FirmUsageTab() {
               status: r.fields["Status"],
               trader: r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
-              firmName: r.fields["Firm Name"]?.[0] || "",
+              firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
               payoutAccount: false,
             })),
           ...perfRecords
@@ -1202,7 +1204,7 @@ function FirmUsageTab() {
               status: r.fields["Status"],
               trader: r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
-              firmName: r.fields["Firm Name"]?.[0] || "",
+              firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
               payoutAccount: r.fields["Payout Account"] || false,
             })),
         ];
