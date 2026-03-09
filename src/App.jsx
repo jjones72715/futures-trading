@@ -1415,16 +1415,22 @@ function PLTab({ evalAccounts, perfAccounts }) {
 
   const cashedOut = payouts.reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
 
-  const totalOtherPayouts = payouts
+  const profitFromOthers = payouts
     .filter(r => {
       const trader = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
       return trader && OTHER_TRADERS.includes(trader);
     })
-    .reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
-  const otherAccountsCash = perfAccounts
-    .filter(a => OTHER_TRADERS.includes(a.trader))
-    .reduce((s, a) => s + (a.invested * a.n || 0), 0);
-  const profitFromOthers = Math.max(0, totalOtherPayouts - otherAccountsCash) / 2;
+    .reduce((s, r) => {
+      const total = r.fields["Total Amount"] || 0;
+      const investedPerAcct = r.fields["$ Invested Per Account Before Payout"] || 0;
+      const acct = perfAccounts.find(a => {
+        const pa = r.fields["Performance Account"];
+        return Array.isArray(pa) && pa[0] === a.id;
+      });
+      const n = acct ? acct.n : 1;
+      const invested = investedPerAcct * n;
+      return s + Math.max(0, total - invested) * 0.5;
+    }, 0);
 
   const todayEvalSpend = purchases
     .filter(r => ["New", "Reset", "Monthly Billing"].includes(r.fields["Purchase Type"]?.name || r.fields["Purchase Type"]))
