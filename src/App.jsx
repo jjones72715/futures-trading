@@ -2318,22 +2318,14 @@ export default function App() {
   const [inputs, setInputs] = useState({});
   const [noChanges, setNoChanges] = useState(() => {
     try {
-      const saved = localStorage.getItem("noChanges");
-      if (!saved) return {};
-      const { date, data } = JSON.parse(saved);
-      const today = new Date().toISOString().split("T")[0];
-      if (date !== today) return {};
-      return data;
+      const saved = localStorage.getItem("tradingNoChanges");
+      return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
   const [dones, setDones] = useState(() => {
     try {
-      const saved = localStorage.getItem("dones");
-      if (!saved) return {};
-      const { date, data } = JSON.parse(saved);
-      const today = new Date().toISOString().split("T")[0];
-      if (date !== today) return {};
-      return data;
+      const saved = localStorage.getItem("tradingDones");
+      return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
   const [loading, setLoading] = useState(true);
@@ -2348,6 +2340,16 @@ export default function App() {
   const [tab, setTab] = useState("gameplan");
 
   useEffect(() => { load(); }, []);
+
+  function advanceDay() {
+    if (!window.confirm("Advance to next trading day? This will clear all Done and No Change marks.")) return;
+    setDones({});
+    setNoChanges({});
+    setInputs({});
+    localStorage.removeItem("tradingDones");
+    localStorage.removeItem("tradingNoChanges");
+    load();
+  }
 
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
@@ -2446,8 +2448,7 @@ export default function App() {
     setNoChanges(prev => {
       const next = { ...prev, [id]: !prev[id] };
       if (next[id]) setInputs(p => ({ ...p, [id]: "" }));
-      const today = new Date().toISOString().split("T")[0];
-      localStorage.setItem("noChanges", JSON.stringify({ date: today, data: next }));
+      localStorage.setItem("tradingNoChanges", JSON.stringify(next));
       return next;
     });
   }, []);
@@ -2455,8 +2456,7 @@ export default function App() {
   const onDone = useCallback((id) => {
     setDones(prev => {
       const next = { ...prev, [id]: !prev[id] };
-      const today = new Date().toISOString().split("T")[0];
-      localStorage.setItem("dones", JSON.stringify({ date: today, data: next }));
+      localStorage.setItem("tradingDones", JSON.stringify(next));
       return next;
     });
   }, []);
@@ -2628,6 +2628,7 @@ export default function App() {
             </button>
           )}
           {tab === "gameplan" && <button onClick={load} style={{ background: "transparent", color: "#9ca3af", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>}
+          {tab === "gameplan" && <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>}
         </div>
       </div>
 
