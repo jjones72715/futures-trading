@@ -2316,8 +2316,26 @@ export default function App() {
   const [perfAccounts, setPerfAccounts] = useState([]);
   const [evalAccounts, setEvalAccounts] = useState([]);
   const [inputs, setInputs] = useState({});
-  const [noChanges, setNoChanges] = useState({});
-  const [dones, setDones] = useState({});
+  const [noChanges, setNoChanges] = useState(() => {
+    try {
+      const saved = localStorage.getItem("noChanges");
+      if (!saved) return {};
+      const { date, data } = JSON.parse(saved);
+      const today = new Date().toISOString().split("T")[0];
+      if (date !== today) return {};
+      return data;
+    } catch { return {}; }
+  });
+  const [dones, setDones] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dones");
+      if (!saved) return {};
+      const { date, data } = JSON.parse(saved);
+      const today = new Date().toISOString().split("T")[0];
+      if (date !== today) return {};
+      return data;
+    } catch { return {}; }
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [breachAccount, setBreachAccount] = useState(null);
@@ -2426,14 +2444,21 @@ export default function App() {
 
   const onNoChange = useCallback((id) => {
     setNoChanges(prev => {
-      const next = !prev[id];
-      if (next) setInputs(p => ({ ...p, [id]: "" }));
-      return { ...prev, [id]: next };
+      const next = { ...prev, [id]: !prev[id] };
+      if (next[id]) setInputs(p => ({ ...p, [id]: "" }));
+      const today = new Date().toISOString().split("T")[0];
+      localStorage.setItem("noChanges", JSON.stringify({ date: today, data: next }));
+      return next;
     });
   }, []);
 
   const onDone = useCallback((id) => {
-    setDones(prev => ({ ...prev, [id]: !prev[id] }));
+    setDones(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      const today = new Date().toISOString().split("T")[0];
+      localStorage.setItem("dones", JSON.stringify({ date: today, data: next }));
+      return next;
+    });
   }, []);
 
   const onBreach = useCallback((a) => {
