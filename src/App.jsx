@@ -457,8 +457,8 @@ function RedistPopupModal({ account, value, manual, allAccounts, onConfirm, onDi
   const balanceLoss = manual ? 0 : (account.bal - parseFloat(value));
   const pctLost = manual ? 1 : Math.min(1, balanceLoss / ddRef);
   const defaultAmount = manual
-    ? account.invested
-    : Math.max(0, parseFloat((pctLost * account.invested).toFixed(2)));
+    ? account.invested * account.n
+    : Math.max(0, parseFloat((pctLost * account.invested * account.n).toFixed(2)));
   const [amount, setAmount] = React.useState(defaultAmount);
   const [selected, setSelected] = React.useState([]);
   const [percentages, setPercentages] = React.useState({});
@@ -498,7 +498,7 @@ function RedistPopupModal({ account, value, manual, allAccounts, onConfirm, onDi
 
   const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
   const pctValid = totalPct === 100 && selected.length > 0;
-  const totalToMove = amount * account.n;
+  const totalToMove = amount;
 
   const destinations = selected.map(a => ({
     ...a,
@@ -520,12 +520,12 @@ function RedistPopupModal({ account, value, manual, allAccounts, onConfirm, onDi
           Redistributing from <span style={{ color: "#f87171" }}>{account.name}</span>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>Amount to redistribute per account</div>
+          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>Total amount to redistribute</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: "#f87171" }}>$</span>
             <input type="number" value={amount} onChange={e => setAmount(parseFloat(e.target.value) || 0)}
               style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 10px", fontSize: 14, color: "#fff", outline: "none", width: 120 }} />
-            <span style={{ fontSize: 12, color: "#6b7280" }}>× {account.n} acct{account.n > 1 ? "s" : ""} = <span style={{ color: "#f87171" }}>${(amount * account.n).toFixed(2)}</span> total</span>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>÷ {account.n} acct{account.n > 1 ? "s" : ""} = <span style={{ color: "#f87171" }}>${(amount / account.n).toFixed(2)}</span>/acct</span>
           </div>
         </div>
 
