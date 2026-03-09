@@ -630,9 +630,8 @@ function PurchaseTab() {
   async function loadActivePurchases() {
     setLoadingActive(true);
     try {
-      const res = await fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=100`);
-      const data = await res.json();
-      const active = (data.records || []).filter(r => r.fields["Status"] === "Active");
+      const records = await fetchTable(PURCHASE_TABLE, ["Name", "Status", "Trader", "Evaluation Account Type", "Evaluation Account", "Date Purchased", "Cost Per Account", "Number of Accounts", "Purchase Type"]);
+      const active = records.filter(r => r.fields["Status"] === "Active");
       setActivePurchases(active);
     } catch (e) {}
     setLoadingActive(false);
