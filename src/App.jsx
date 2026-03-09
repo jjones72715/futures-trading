@@ -1686,6 +1686,8 @@ function AccountManagementTab() {
   const [stageAction, setStageAction] = useState("");
   const [newBalance, setNewBalance] = useState("");
   const [tradingDays, setTradingDays] = useState("");
+  const [tradeDown, setTradeDown] = useState(false);
+  const [tradeDownFloor, setTradeDownFloor] = useState("");
   const [resetTradingDays, setResetTradingDays] = useState(true);
 
   // Payout Management state
@@ -1752,6 +1754,7 @@ function AccountManagementTab() {
     setNumAccounts(1); setInvestedPerAccount(""); setActivationFee(""); setContractMultiplier(1);
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
+    setTradeDown(false); setTradeDownFloor("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
     setPostPayoutStageId(""); setErr(null);
@@ -1851,6 +1854,14 @@ function AccountManagementTab() {
         "Trading Days this Cycle": tradingDays ? parseInt(tradingDays) : 0,
       };
       if (contractMultiplier) fields["Contract Multiplier"] = parseFloat(contractMultiplier);
+      // Auto-set payout account when advancing to stage 2 or higher
+      if (nextStage.stage >= 2) {
+        fields["Payout Account"] = true;
+      }
+      if (tradeDown) {
+        fields["Trade Down Account"] = true;
+        if (tradeDownFloor) fields["Trade Down Floor"] = parseFloat(tradeDownFloor);
+      }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
       setSuccess(`✓ Advanced to Stage ${nextStage.stage}!`);
       setTimeout(() => setSuccess(""), 4000);
@@ -2111,6 +2122,22 @@ function AccountManagementTab() {
                     <input type="number" placeholder={resetTradingDays ? "Starting days (0 if blank)" : "Days to carry over..."} value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
                   </div>
                 </div>
+                {/* Trade Down section */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={tradeDown} onChange={e => setTradeDown(e.target.checked)}
+                      style={{ width: 16, height: 16, cursor: "pointer" }} />
+                    <span style={{ fontSize: 13, color: "#d1d5db" }}>Trade Down Account</span>
+                  </label>
+                </div>
+                {tradeDown && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4 }}>Trade Down Floor ($)</div>
+                    <input type="number" value={tradeDownFloor} onChange={e => setTradeDownFloor(e.target.value)}
+                      placeholder="e.g. 48000"
+                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", width: "100%" }} />
+                  </div>
+                )}
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#16a34a" : "#1f2937", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
