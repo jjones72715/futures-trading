@@ -1176,8 +1176,10 @@ function FirmUsageTab() {
         const traderRecords = await fetchTable("tbla0lbJ9z1PAhNy7", [
           "Name", "Restricted Firms"
         ]);
+        const traderIdMap = {};
         const restrictMap = {};
         traderRecords.forEach(r => {
+          traderIdMap[r.id] = r.fields["Name"];
           const restricted = r.fields["Restricted Firms"] || [];
           if (restricted.length > 0) {
             restrictMap[r.fields["Name"]] = restricted.map(f => f.name || f);
@@ -1191,7 +1193,7 @@ function FirmUsageTab() {
               type: "eval",
               name: r.fields["Name"],
               status: r.fields["Status"],
-              trader: r.fields["Trader"]?.[0] || "",
+              trader: traderIdMap[r.fields["Trader"]?.[0]] || r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
               firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
               payoutAccount: false,
@@ -1202,7 +1204,7 @@ function FirmUsageTab() {
               type: "perf",
               name: r.fields["Name"],
               status: r.fields["Status"],
-              trader: r.fields["Trader"]?.[0] || "",
+              trader: traderIdMap[r.fields["Trader"]?.[0]] || r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
               firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
               payoutAccount: r.fields["Payout Account"] || false,
