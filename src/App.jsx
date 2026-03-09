@@ -1791,6 +1791,10 @@ function AccountManagementTab() {
   const payoutAvailableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === payoutPerfTypeId).sort((a, b) => a.stage - b.stage);
 
   async function handleConvertEval() {
+    if (!perfTypeId) {
+      alert("Performance account type not found. Please wait a moment and try again.");
+      return;
+    }
     if (!selectedEvalId || !perfTypeId || !startingBalance || !dateActivated) return;
     setSubmitting(true); setErr(null);
     try {
