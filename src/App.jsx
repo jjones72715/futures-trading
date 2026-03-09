@@ -2341,6 +2341,53 @@ function AccountManagementTab() {
   );
 }
   
+// ── Advance Day Modal ─────────────────────────────────────────────────────────
+
+function AdvanceDayModal({ accounts, onConfirm, onCancel }) {
+  const [overrides, setOverrides] = useState(() =>
+    Object.fromEntries(accounts.map(a => [a.id, a.override]))
+  );
+
+  function toggle(id) {
+    setOverrides(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  const confirmed = accounts.map(a => ({ ...a, override: overrides[a.id] }));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 14, padding: 24, width: 480, maxWidth: "95vw", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#f59e0b", marginBottom: 6 }}>⏭ Advance to Next Day</div>
+        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>Review which accounts will have their trading day count incremented. Toggle to override.</div>
+        <div style={{ overflowY: "auto", flex: 1, marginBottom: 16 }}>
+          {accounts.length === 0 && (
+            <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center", padding: "20px 0" }}>No accounts with balance entered.</div>
+          )}
+          {accounts.map(a => (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #1f2937" }}>
+              <input type="checkbox" checked={!!overrides[a.id]} onChange={() => toggle(a.id)} style={{ width: 16, height: 16, accentColor: "#f59e0b", cursor: "pointer" }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#e5e7eb" }}>{a.name}</div>
+                <div style={{ fontSize: 11, color: a.accountType === "perf" ? "#6366f1" : "#f59e0b", marginTop: 1, textTransform: "uppercase", letterSpacing: 1 }}>
+                  {a.accountType === "perf" ? "Performance" : "Evaluation"}
+                </div>
+                <div style={{ fontSize: 11, color: overrides[a.id] ? "#4ade80" : "#6b7280", marginTop: 2 }}>{a.reason}</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>Day {(a.tradingDays || 0) + (overrides[a.id] ? 1 : 0)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel} style={{ flex: 1, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "9px", fontSize: 13, color: "#9ca3af", cursor: "pointer" }}>Cancel</button>
+          <button onClick={() => onConfirm(confirmed)} style={{ flex: 1, background: "#d97706", border: "none", borderRadius: 8, padding: "9px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" }}>
+            Confirm & Advance
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -2366,6 +2413,8 @@ export default function App() {
   const [breachSubmitting, setBreachSubmitting] = useState(false);
   const [redistPopup, setRedistPopup] = useState(null);
   const [redistHistory, setRedistHistory] = useState([]);
+  const [showAdvanceDayModal, setShowAdvanceDayModal] = useState(false);
+  const [advanceDayAccounts, setAdvanceDayAccounts] = useState([]);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("gameplan");
@@ -2373,21 +2422,47 @@ export default function App() {
   useEffect(() => { load(); }, []);
 
   function advanceDay() {
-    if (!window.confirm("Advance to next trading day? This will clear all Done and No Change marks.")) return;
-    setDones({});
-    setNoChanges({});
-    setInputs({});
-    localStorage.removeItem("tradingDones");
-    localStorage.removeItem("tradingNoChanges");
-    load();
+    const perfItems = perfAccounts
+      .filter(a => inputs[a.id] && !noChanges[a.id] && !["Failed", "Passed", "Waiting on Payout"].includes(a.status))
+      .map(a => {
+        const newBal = parseFloat(inputs[a.id]);
+        const dailyChange = newBal - a.bal;
+        const type = a.tradingDayType;
+        const minProfit = a.minProfitDay || 0;
+        let qualifies = false;
+        let reason = "";
+        if (type === "Profitable Day") {
+          qualifies = dailyChange >= minProfit;
+          reason = qualifies
+            ? `+$${dailyChange.toFixed(0)} ≥ min $${minProfit} ✓`
+            : `$${dailyChange.toFixed(0)} < min $${minProfit} ✗`;
+        } else {
+          qualifies = dailyChange !== 0;
+          reason = qualifies ? `Balance changed $${dailyChange >= 0 ? "+" : ""}${dailyChange.toFixed(0)} ✓` : "No change ✗";
+        }
+        return { ...a, accountType: "perf", newBal, dailyChange, qualifies, reason, override: qualifies };
+      });
+
+    const evalItems = evalAccounts
+      .filter(a => inputs[a.id] && !noChanges[a.id] && a.status === "Active")
+      .map(a => {
+        const newBal = parseFloat(inputs[a.id]);
+        const dailyChange = newBal - a.bal;
+        const qualifies = dailyChange !== 0;
+        const reason = qualifies ? `Balance changed $${dailyChange >= 0 ? "+" : ""}${dailyChange.toFixed(0)} ✓` : "No change ✗";
+        return { ...a, accountType: "eval", newBal, dailyChange, qualifies, reason, override: qualifies };
+      });
+
+    setAdvanceDayAccounts([...perfItems, ...evalItems]);
+    setShowAdvanceDayModal(true);
   }
 
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]),
       ]);
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
@@ -2416,6 +2491,10 @@ export default function App() {
           dailyTarget: f["Daily Target"] || 0,
           hwm: f["High Water Mark"] || 0,
           accountTypeId: (f["Performance Account Type"] || [])[0] || null,
+          tradingDayType: (f["Trading Day Type"] || [])[0] || null,
+          minProfitDay: (f["Min Profitable Day Amount"] || [])[0] || 0,
+          tradingDays: f["Trading Days this Cycle"] || 0,
+          cycleStartBal: f["Cycle Start Balance"] || 0,
         };
       };
 
@@ -2445,6 +2524,7 @@ export default function App() {
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           dailyTarget: f["Daily Target"] || 0,
           accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
+          tradingDays: f["Trading Days Completed"] || 0,
         };
       };
 
@@ -2620,6 +2700,33 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {tab === "gameplan" && filledCount > 0 && <span style={{ fontSize: 12, color: "#60a5fa" }}>{filledCount} updated</span>}
+          {showAdvanceDayModal && (
+            <AdvanceDayModal
+              accounts={advanceDayAccounts}
+              onCancel={() => setShowAdvanceDayModal(false)}
+              onConfirm={async (confirmed) => {
+                setShowAdvanceDayModal(false);
+                const toUpdate = confirmed.filter(a => a.override);
+                await Promise.all(toUpdate.map(a => {
+                  if (a.accountType === "perf") {
+                    return updateRecord(PERF_TABLE, a.id, {
+                      "Trading Days this Cycle": (a.tradingDays || 0) + 1
+                    });
+                  } else {
+                    return updateRecord(EVAL_TABLE, a.id, {
+                      "Trading Days Completed": (a.tradingDays || 0) + 1
+                    });
+                  }
+                }));
+                setDones({});
+                setNoChanges({});
+                setInputs({});
+                localStorage.removeItem("tradingDones");
+                localStorage.removeItem("tradingNoChanges");
+                await load();
+              }}
+            />
+          )}
           {redistPopup && (
           <RedistPopupModal
             account={redistPopup.account}
