@@ -850,7 +850,7 @@ function PurchaseTab() {
               <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading active accounts...</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                {activePurchases.map(p => {
+                {activePurchases.filter(r => r.fields["Purchase Type"] === "New" && r.fields["Evaluation Account Type"]).map(p => {
                   const f = p.fields;
                   const isSelected = selectedPurchaseId === p.id;
                   return (
