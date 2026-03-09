@@ -1182,7 +1182,11 @@ function FirmUsageTab() {
           traderIdMap[r.id] = r.fields["Name"];
           const restricted = r.fields["Restricted Firms"] || [];
           if (restricted.length > 0) {
-            restrictMap[r.fields["Name"]] = restricted.map(f => f.name || f);
+            // Could be [{id, name}] objects OR plain ID strings
+            restrictMap[r.fields["Name"]] = restricted.map(f => {
+              if (typeof f === "object") return f.name;
+              return fMap[f]?.fields?.["Name"] || f;
+            }).filter(Boolean);
           }
         });
 
@@ -1244,7 +1248,9 @@ function FirmUsageTab() {
       const isPayout = a.payoutAccount;
       const isPerf = a.type === "perf";
       const label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
-      map[a.firmName][tLabel].push(label);
+      if (!map[a.firmName][tLabel].includes(label)) {
+        map[a.firmName][tLabel].push(label);
+      }
     });
     return map;
   }, [accounts]);
