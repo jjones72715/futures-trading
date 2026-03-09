@@ -1135,15 +1135,86 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     </div>
   );
 }
-function FirmUsageTab({ evalAccounts, perfAccounts }) {
+function FirmUsageTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-
   const [firms, setFirms] = useState([]);
-  const [firmMap, setFirmMap] = useState({});
-  const [evalTypeFirmMap, setEvalTypeFirmMap] = useState({});
-  const [perfTypeFirmMap, setPerfTypeFirmMap] = useState({});
-  const [freshAccounts, setFreshAccounts] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [restrictions, setRestrictions] = useState({}); // traderName → [firmName]
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Load firms sorted by rank
+        const firmRecords = await fetchTable("tblR0iLSQZI1xXYa6", [
+          "Name", "Data Provider", "Rank", "Max Accounts"
+        ]);
+        const sortedFirms = firmRecords
+          .filter(r => r.fields["Rank"])
+          .sort((a, b) => a.fields["Rank"] - b.fields["Rank"])
+          .map(r => ({
+            id: r.id,
+            name: r.fields["Name"],
+            provider: r.fields["Data Provider"]?.[0] || r.fields["Data Provider"]?.name || "Unknown",
+            rank: r.fields["Rank"],
+            maxAccounts: r.fields["Max Accounts"] || 0,
+          }));
+
+        // Load eval accounts with firm lookup
+        const evalRecords = await fetchTable("tblWeri8TXWPQY9Dc", [
+          "Name", "Status", "Trader", "Number of Accounts", "Firm Name"
+        ]);
+
+        // Load perf accounts with firm lookup
+        const perfRecords = await fetchTable("tblhM1DWRiWXnhSKb", [
+          "Name", "Status", "Trader", "Number of Accounts", "Firm Name", "Payout Account"
+        ]);
+
+        // Load traders with restricted firms
+        const traderRecords = await fetchTable("tbla0lbJ9z1PAhNy7", [
+          "Name", "Restricted Firms"
+        ]);
+        const restrictMap = {};
+        traderRecords.forEach(r => {
+          const restricted = r.fields["Restricted Firms"] || [];
+          if (restricted.length > 0) {
+            restrictMap[r.fields["Name"]] = restricted.map(f => f.name || f);
+          }
+        });
+
+        const allAccounts = [
+          ...evalRecords
+            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]))
+            .map(r => ({
+              type: "eval",
+              name: r.fields["Name"],
+              status: r.fields["Status"],
+              trader: r.fields["Trader"]?.[0] || "",
+              n: r.fields["Number of Accounts"] || 1,
+              firmName: r.fields["Firm Name"]?.[0] || "",
+              payoutAccount: false,
+            })),
+          ...perfRecords
+            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]))
+            .map(r => ({
+              type: "perf",
+              name: r.fields["Name"],
+              status: r.fields["Status"],
+              trader: r.fields["Trader"]?.[0] || "",
+              n: r.fields["Number of Accounts"] || 1,
+              firmName: r.fields["Firm Name"]?.[0] || "",
+              payoutAccount: r.fields["Payout Account"] || false,
+            })),
+        ];
+
+        setFirms(sortedFirms);
+        setAccounts(allAccounts);
+        setRestrictions(restrictMap);
+      } catch(e) { console.error("FirmUsageTab error:", e); }
+      setLoading(false);
+    }
+    loadData();
+  }, []);
 
   const traders = [
     { key: "Jonathan Jones", label: "Jonathan" },
@@ -1153,147 +1224,32 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
     { key: "Judy Jones", label: "Judy" },
   ];
 
-  function getTraderFirstName(traderName) {
-    return traders.find(t => t.key === traderName)?.label || traderName.split(" ")[0];
-  }
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const BASE_ID = "app5RPYcCy7hqCu41";
-
-        async function rawFetch(tableId, fieldIds) {
-          const params = fieldIds.map(f => `fields[]=${f}`).join("&");
-          const res = await fetch(`/.netlify/functions/airtable/${BASE_ID}/${tableId}?${params}&maxRecords=200`);
-          const data = await res.json();
-          return data.records || [];
-        }
-
-        // Firms
-        const firmRecords = await rawFetch("tblR0iLSQZI1xXYa6", [
-          "fldLqQfeIMSYFL1LP", // Name
-          "fldLBVgBwuRwJFmrA", // Data Provider
-          "fldghWptUYGuMlX23", // Rank
-          "fldhSmdkyf9hOiF8y", // Max Accounts
-        ]);
-        const fMap = {};
-        firmRecords.forEach(r => {
-          const f = r.fields;
-          const providerRaw = f["fldLBVgBwuRwJFmrA"];
-          fMap[r.id] = {
-            id: r.id,
-            name: f["fldLqQfeIMSYFL1LP"] || "",
-            provider: providerRaw?.name || providerRaw || "Unknown",
-            rank: f["fldghWptUYGuMlX23"] || 999,
-            maxAccounts: f["fldhSmdkyf9hOiF8y"] || 0,
-          };
-        });
-
-        // Eval Account Types → Firm
-        const evalTypeRecords = await rawFetch("tbleHzHF5FgskLxs3", [
-          "fldAQaWr9KEulun1F", // Name
-          "fldFNqDvRQEFMLL7t", // Firm
-        ]);
-        const etfMap = {};
-        evalTypeRecords.forEach(r => {
-          const firm = r.fields["fldFNqDvRQEFMLL7t"];
-          etfMap[r.id] = (r.fields["fldFNqDvRQEFMLL7t"] || [])[0] || null;
-        });
-
-        // Perf Account Types → Firm
-        const perfTypeRecords = await rawFetch("tbluVaCiyff48ic7L", [
-          "fld0WVZAcXGSerJFT", // Name
-          "fldx4poR2II5g5mMp", // Firm
-        ]);
-        const ptfMap = {};
-        perfTypeRecords.forEach(r => {
-          const firm = r.fields["fldx4poR2II5g5mMp"];
-          ptfMap[r.id] = (r.fields["fldx4poR2II5g5mMp"] || [])[0] || null;
-        });
-
-        // Eval Accounts
-        const evalRecords = await rawFetch("tblWeri8TXWPQY9Dc", [
-          "fldmzqIB76bjvJF3L", // Name
-          "fldWV8bPpsFkWpYux", // Status
-          "fld44diXukpSDXv3Y", // Trader
-          "fldXpePekEYHk8YCs", // Number of Accounts
-          "fldfiNV9CrkjveYH8", // Evaluation Account Type
-        ]);
-        const freshEvals = evalRecords
-          .filter(r => ["Active", "Passed"].includes(r.fields["fldWV8bPpsFkWpYux"]?.name))
-          .map(r => ({
-            id: r.id,
-            name: r.fields["fldmzqIB76bjvJF3L"] || "",
-            type: "eval",
-            status: "Active",
-            trader: r.fields["fld44diXukpSDXv3Y"]?.[0]?.name || "",
-            n: r.fields["fldXpePekEYHk8YCs"] || 1,
-            payoutAccount: false,
-            accountTypeId: (r.fields["Evaluation Account Type"] || r.fields["fldfiNV9CrkjveYH8"] || [])[0] || null,
-          }));
-
-        // Perf Accounts
-        const perfRecords = await rawFetch("tblhM1DWRiWXnhSKb", [
-          "fldfyrSV2RPcv1jU1", // Name
-          "fld7UANxkXuwL90xT", // Status
-          "fldi7WIXgdknUa1rw", // Trader
-          "fldiJ3GD2NLLc3YIi", // Number of Accounts
-          "fldoYCHsUB3CvfssN", // Performance Account Type
-          "fldr6G6F98yV0aNpN", // Payout Account
-        ]);
-        const freshPerfs = perfRecords
-          .filter(r => ["Active", "Live", "Waiting on Payout", "Passed"].includes(r.fields["fld7UANxkXuwL90xT"]?.name))
-          .map(r => ({
-            id: r.id,
-            name: r.fields["fldfyrSV2RPcv1jU1"] || "",
-            type: "perf",
-            status: r.fields["fld7UANxkXuwL90xT"]?.name || "",
-            trader: r.fields["fldi7WIXgdknUa1rw"]?.[0]?.name || "",
-            n: r.fields["fldiJ3GD2NLLc3YIi"] || 1,
-            payoutAccount: r.fields["fldr6G6F98yV0aNpN"] || false,
-            accountTypeId: (r.fields["Performance Account Type"] || r.fields["fldoYCHsUB3CvfssN"] || [])[0] || null,
-          }));
-
-        const sortedFirms = Object.values(fMap).sort((a, b) => a.rank - b.rank);
-        setFirms(sortedFirms);
-        setFirmMap(fMap);
-        setEvalTypeFirmMap(etfMap);
-        setPerfTypeFirmMap(ptfMap);
-        setFreshAccounts([...freshEvals, ...freshPerfs]);
-      } catch(e) { console.error("FirmUsageTab load error:", e); }
-      setLoading(false);
-    }
-    loadData();
-  }, []);
-
+  // Build usageMap: firmName → traderLabel → [label]
   const usageMap = useMemo(() => {
     const map = {};
-    if (!Object.keys(evalTypeFirmMap).length && !Object.keys(perfTypeFirmMap).length) return map;
-    freshAccounts.forEach(a => {
-      const traderLabel = getTraderFirstName(a.trader);
-      const typeId = a.accountTypeId;
-      const firmId = a.type === "perf" ? perfTypeFirmMap[typeId] : evalTypeFirmMap[typeId];
-      if (!firmId || !firmMap[firmId]) return;
-      const firmName = firmMap[firmId].name;
-      if (!map[firmName]) map[firmName] = {};
-      if (!map[firmName][traderLabel]) map[firmName][traderLabel] = [];
+    accounts.forEach(a => {
+      if (!a.firmName) return;
+      const traderObj = traders.find(t => t.key === a.trader);
+      if (!traderObj) return;
+      const tLabel = traderObj.label;
+      if (!map[a.firmName]) map[a.firmName] = {};
+      if (!map[a.firmName][tLabel]) map[a.firmName][tLabel] = [];
       const isLive = a.status === "Live";
       const isPayout = a.payoutAccount;
       const isPerf = a.type === "perf";
       const label = isLive ? "L" : isPayout ? "F" : isPerf ? "P" : "E";
-      map[firmName][traderLabel].push({ label, n: a.n, status: a.status });
+      map[a.firmName][tLabel].push(label);
     });
     return map;
-  }, [freshAccounts, evalTypeFirmMap, perfTypeFirmMap, firmMap]);
+  }, [accounts]);
 
   const providers = ["Project X", "Rithmic", "Tradovate", "DX Feed"];
   const providerColors = {
-    "Project X": { bg: "#0c1a2e", border: "#1e3a5f", header: "#1d4ed8", text: "#93c5fd" },
-    "Rithmic": { bg: "#0f1a0f", border: "#1a3a1a", header: "#15803d", text: "#86efac" },
-    "Tradovate": { bg: "#1a0f1a", border: "#3a1a3a", header: "#7e22ce", text: "#d8b4fe" },
-    "DX Feed": { bg: "#1a1a0f", border: "#3a3a1a", header: "#a16207", text: "#fde047" },
+    "Project X":  { header: "#1d4ed8", border: "#1e3a5f", bg: "#0c1a2e", text: "#93c5fd" },
+    "Rithmic":    { header: "#15803d", border: "#1a3a1a", bg: "#0f1a0f", text: "#86efac" },
+    "Tradovate":  { header: "#7e22ce", border: "#3a1a3a", bg: "#1a0f1a", text: "#d8b4fe" },
+    "DX Feed":    { header: "#a16207", border: "#3a3a1a", bg: "#1a1a0f", text: "#fde047" },
   };
-
   const labelColors = {
     "E": { bg: "#7c3aed22", border: "#7c3aed", color: "#c4b5fd" },
     "P": { bg: "#15803d22", border: "#15803d", color: "#86efac" },
@@ -1306,32 +1262,30 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
   );
 
   const traderLabels = traders.map(t => t.label);
+  const gridCols = `40px 1fr 50px ${traderLabels.map(() => "1fr").join(" ")}`;
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>E = EVAL</span>
-        <span style={{ fontSize: 12, color: "#6b7280" }}>||</span>
-        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>P = PERFORMANCE</span>
-        <span style={{ fontSize: 12, color: "#6b7280" }}>||</span>
-        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>F = FUNDED/PAYOUT</span>
-        <span style={{ fontSize: 12, color: "#6b7280" }}>||</span>
-        <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>L = LIVE</span>
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        {[["E","EVAL","#c4b5fd"], ["P","PERFORMANCE","#86efac"], ["F","FUNDED/PAYOUT","#93c5fd"], ["L","LIVE","#fdba74"]].map(([k, v, c]) => (
+          <span key={k} style={{ fontSize: 12, color: c, fontWeight: 600 }}>{k} = {v}</span>
+        ))}
       </div>
 
       {providers.map(provider => {
-        const providerFirms = firms.filter(f => f.provider === provider);
-        if (providerFirms.length === 0) return null;
-        const pc = providerColors[provider];
+        const pFirms = firms.filter(f => f.provider === provider);
+        if (!pFirms.length) return null;
+        const pc = providerColors[provider] || providerColors["Rithmic"];
 
         return (
           <div key={provider} style={{ marginBottom: 28 }}>
             <div style={{ background: pc.header, borderRadius: "10px 10px 0 0", padding: "8px 16px", fontSize: 14, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>
               {provider.toUpperCase()}
             </div>
-
             <div style={{ background: pc.bg, border: `1px solid ${pc.border}`, borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 60px " + traderLabels.map(() => "1fr").join(" "), background: "#0a0a0a", padding: "8px 12px", borderBottom: `1px solid ${pc.border}` }}>
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: gridCols, padding: "8px 12px", borderBottom: `1px solid ${pc.border}`, background: "#0a0a0a" }}>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Rank</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Firm</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Max</div>
@@ -1340,44 +1294,43 @@ function FirmUsageTab({ evalAccounts, perfAccounts }) {
                 ))}
               </div>
 
-              {providerFirms.map((f, i) => {
+              {pFirms.map((f, i) => {
                 const traderUsage = usageMap[f.name] || {};
                 const hasAny = Object.keys(traderUsage).length > 0;
+
                 return (
                   <div key={f.id} style={{
-                    display: "grid",
-                    gridTemplateColumns: "40px 1fr 60px " + traderLabels.map(() => "1fr").join(" "),
+                    display: "grid", gridTemplateColumns: gridCols,
                     padding: "8px 12px",
-                    borderBottom: i < providerFirms.length - 1 ? `1px solid ${pc.border}` : "none",
+                    borderBottom: i < pFirms.length - 1 ? `1px solid ${pc.border}` : "none",
                     background: hasAny ? pc.bg : "#0a0a0a",
                     alignItems: "center",
                   }}>
                     <div style={{ fontSize: 12, color: "#6b7280" }}>{f.rank}</div>
-                    <div style={{ fontSize: 13, color: hasAny ? "#fff" : "#4b5563", fontWeight: hasAny ? 600 : 400 }}>{f.name}</div>
+                    <div style={{ fontSize: 13, color: hasAny ? "#fff" : "#374151", fontWeight: hasAny ? 600 : 400 }}>{f.name}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.maxAccounts}</div>
-                    {traderLabels.map(t => {
-                      const accts = traderUsage[t] || [];
+                    {traderLabels.map(tLabel => {
+                      const labels = traderUsage[tLabel] || [];
+                      const traderKey = traders.find(t => t.label === tLabel)?.key;
+                      const isRestricted = restrictions[traderKey]?.includes(f.name);
                       return (
-                        <div key={t} style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
-                          {accts.length === 0
-                            ? <span style={{ fontSize: 11, color: "#1f2937" }}>—</span>
-                            : accts.map((a, j) => {
-                              const lc = labelColors[a.label] || labelColors["E"];
-                              return (
-                                <span key={j} style={{
-                                  background: lc.bg,
-                                  border: `1px solid ${lc.border}`,
-                                  color: lc.color,
-                                  borderRadius: 4,
-                                  padding: "2px 6px",
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                }}>
-                                  {a.label}
-                                </span>
-                              );
-                            })
-                          }
+                        <div key={tLabel} style={{ display: "flex", gap: 3, justifyContent: "center", flexWrap: "wrap" }}>
+                          {isRestricted && labels.length === 0 && (
+                            <span title="Restricted" style={{ fontSize: 13 }}>⛔</span>
+                          )}
+                          {labels.map((lbl, j) => {
+                            const lc = labelColors[lbl];
+                            return (
+                              <span key={j} style={{
+                                background: lc.bg, border: `1px solid ${lc.border}`,
+                                color: lc.color, borderRadius: 4,
+                                padding: "2px 6px", fontSize: 11, fontWeight: 700,
+                              }}>{lbl}</span>
+                            );
+                          })}
+                          {!isRestricted && labels.length === 0 && (
+                            <span style={{ fontSize: 11, color: "#1f2937" }}>—</span>
+                          )}
                         </div>
                       );
                     })}
