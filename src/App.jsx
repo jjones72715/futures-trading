@@ -1422,12 +1422,8 @@ function PLTab({ evalAccounts, perfAccounts }) {
     })
     .reduce((s, r) => {
       const total = r.fields["Total Amount"] || 0;
-      const investedPerAcct = r.fields["$ Invested Per Account Before Payout"] || 0;
-      const acct = perfAccounts.find(a => {
-        const pa = r.fields["Performance Account"];
-        return Array.isArray(pa) && pa[0] === a.id;
-      });
-      const n = acct ? acct.n : 1;
+      const investedPerAcct = r.fields["$ Invested Per Account before Payout"] || 0;
+      const n = r.fields["Number of Accounts"] || 1;
       const invested = investedPerAcct * n;
       return s + Math.max(0, total - invested) * 0.5;
     }, 0);
@@ -1439,12 +1435,8 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const startLiq = parseFloat(startingLiq) || 0;
   const payoutProfits50 = payouts.reduce((s, r) => {
     const total = r.fields["Total Amount"] || 0;
-    const acct = perfAccounts.find(a => {
-      const pa = r.fields["Performance Account"];
-      return Array.isArray(pa) && pa[0] === a.id;
-    });
-    const n = acct ? acct.n : 1;
-    const investedPerAcct = r.fields["$ Invested Per Account Before Payout"] ?? (acct ? acct.invested : 0);
+    const investedPerAcct = r.fields["$ Invested Per Account before Payout"] || 0;
+    const n = r.fields["Number of Accounts"] || 1;
     const invested = investedPerAcct * n;
     const profit = Math.max(0, total - invested);
     return s + (profit * 0.5);
