@@ -1415,21 +1415,16 @@ function PLTab({ evalAccounts, perfAccounts }) {
 
   const cashedOut = payouts.reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
 
-  const profitFromOthers = payouts
+  const totalOtherPayouts = payouts
     .filter(r => {
       const trader = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
       return trader && OTHER_TRADERS.includes(trader);
     })
-    .reduce((s, r) => {
-      const total = r.fields["Total Amount"] || 0;
-      const acct = perfAccounts.find(a => {
-        const pa = r.fields["Performance Account"];
-        return Array.isArray(pa) && pa[0] === a.id;
-      });
-      const invested = acct ? (acct.invested * acct.n) : 0;
-      const profit = Math.max(0, total - invested);
-      return s + (profit * 0.5);
-    }, 0);
+    .reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
+  const otherAccountsCash = perfAccounts
+    .filter(a => OTHER_TRADERS.includes(a.trader))
+    .reduce((s, a) => s + (a.invested * a.n || 0), 0);
+  const profitFromOthers = Math.max(0, totalOtherPayouts - otherAccountsCash) / 2;
 
   const todayEvalSpend = purchases
     .filter(r => ["New", "Reset", "Monthly Billing"].includes(r.fields["Purchase Type"]?.name || r.fields["Purchase Type"]))
@@ -2461,7 +2456,7 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]),
         fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]),
       ]);
 
@@ -2473,7 +2468,7 @@ export default function App() {
         return {
           id: r.id, type: "perf",
           name: f["Name"] || "?",
-          trader: "",
+          trader: (Array.isArray(f["Trader"]) ? f["Trader"][0] : f["Trader"]) || "",
           status: f["Status"] || "",
           bal: f["Current Balance"] || 0,
           ddLeft: f["Current Drawdown Left"] || 0,
