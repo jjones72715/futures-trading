@@ -1443,7 +1443,9 @@ function PLTab({ evalAccounts, perfAccounts }) {
       const pa = r.fields["Performance Account"];
       return Array.isArray(pa) && pa[0] === a.id;
     });
-    const invested = acct ? (acct.invested * acct.n) : 0;
+    const n = acct ? acct.n : 1;
+    const investedPerAcct = r.fields["$ Invested Per Account Before Payout"] ?? (acct ? acct.invested : 0);
+    const invested = investedPerAcct * n;
     const profit = Math.max(0, total - invested);
     return s + (profit * 0.5);
   }, 0);
