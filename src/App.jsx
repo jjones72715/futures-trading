@@ -1207,6 +1207,8 @@ function FirmUsageTab() {
             })),
         ];
 
+        console.log("firm sample:", JSON.stringify(sortedFirms[0]));
+        console.log("accounts sample:", JSON.stringify(allAccounts[0]));
         setFirms(sortedFirms);
         setAccounts(allAccounts);
         setRestrictions(restrictMap);
@@ -1263,6 +1265,8 @@ function FirmUsageTab() {
 
   const traderLabels = traders.map(t => t.label);
   const gridCols = `40px 1fr 50px ${traderLabels.map(() => "1fr").join(" ")}`;
+
+  console.log("rendering providers - firms by provider:", providers.map(p => p + ": " + firms.filter(f => f.provider === p).length));
 
   return (
     <div>
