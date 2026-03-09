@@ -1876,8 +1876,8 @@ function AccountManagementTab() {
     try {
       const perf = perfAccounts.find(r => r.id === selectedPerfId);
       const trader = traderList.find(t => t.id === traderId);
-      // Update perf account status
-      await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
+      // Update perf account status and zero out invested per account
+      await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout", "Invested Per Account": 0 });
       // Create payout record
       await createRecord(PAYOUT_TABLE, {
         "Name": `${trader?.name?.split(" ")[0]} - ${perf?.fields["Name"]} - ${today}`,
