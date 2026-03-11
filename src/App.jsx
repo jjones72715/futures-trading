@@ -1370,23 +1370,28 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const localToday = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const [selectedDate, setSelectedDate] = useState(localToday());
+
   const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ"];
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
 
-  useEffect(() => { loadPLData(); }, []);
+  useEffect(() => { loadPLData(); }, [selectedDate]);
 
   async function loadPLData() {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
       const [purchaseRes, payoutRes] = await Promise.all([
         fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=500`),
         fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=500`),
       ]);
       const purchaseData = await purchaseRes.json();
       const payoutData = await payoutRes.json();
-      setPurchases((purchaseData.records || []).filter(r => r.fields["Date Purchased"] === today));
-      setPayouts((payoutData.records || []).filter(r => r.fields["Date Received"] === today));
+      setPurchases((purchaseData.records || []).filter(r => r.fields["Date Purchased"] === selectedDate));
+      setPayouts((payoutData.records || []).filter(r => r.fields["Date Received"] === selectedDate));
     } catch (e) {}
     setLoading(false);
   }
@@ -1467,6 +1472,11 @@ function PLTab({ evalAccounts, perfAccounts }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Date</div>
+          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", outline: "none", colorScheme: "dark" }} />
+        </div>
         <div>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Starting Liquidation $</div>
           <input type="number" placeholder="Enter yesterday's ending Liq $..." value={startingLiq} onChange={e => setStartingLiq(e.target.value)}
