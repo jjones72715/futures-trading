@@ -1523,145 +1523,39 @@ function PLTab({ evalAccounts, perfAccounts }) {
     </div>
   );
 }
-const PERF_TYPES = [
-  { id: "rec7d4W5dlXgAIDeg", name: "Trade Day 100K Perf", accountSize: 100000 },
-  { id: "rec7xL7pCvC13SDvW", name: "LucidFlex 150K Perf", accountSize: 150000 },
-  { id: "recAPuxF9wQmpqcns", name: "Legends Elite 150K Perf", accountSize: 150000 },
-  { id: "recCipNXVOSRHLqKQ", name: "TPT 150K Perf", accountSize: 150000 },
-  { id: "recDGkltGuqhdmcUC", name: "Savius 300k Perf", accountSize: 300000 },
-  { id: "recDK9X8GHYJb1P8a", name: "Bulenox 50K EOD Perf", accountSize: 50000 },
-  { id: "recFWL0IRGxPfZAt0", name: "TFD - 100K Perf", accountSize: 100000 },
-  { id: "recIMu5FNdytf70y1", name: "Legends - Live", accountSize: 5500 },
-  { id: "recK8KZqNZD7qlRxc", name: "FFN 100K Standard Perf", accountSize: 100000 },
-  { id: "recKSnwwT6dMYrVgG", name: "Legends Elite 100K Perf", accountSize: 100000 },
-  { id: "recO5gj9RRGP2ToTN", name: "Funded Next 50K Legacy Perf", accountSize: 50000 },
-  { id: "recP1UQ1FelJnw5ft", name: "YRM 50k Instant Prime", accountSize: 50000 },
-  { id: "recQZlpiDSUgEcf17", name: "BluSky 300k Blu+ Perf", accountSize: 300000 },
-  { id: "recRkoFdYqIgmBnaz", name: "TOF 50k Elite Perf", accountSize: 50000 },
-  { id: "recSoGeDruvqUQPQ0", name: "Savius 100k Perf", accountSize: 100000 },
-  { id: "recT9NCOWvAH8sU13", name: "LucidFlex 100K Perf", accountSize: 100000 },
-  { id: "recTL4uJ1G8BUZK21", name: "Day Traders 150K Static Perf", accountSize: 150000 },
-  { id: "recWqBIPXHYBR7NwW", name: "YRM 100k Instant Prime", accountSize: 100000 },
-  { id: "recXp5quJOrP2JD1x", name: "Day Traders 100K Static Perf", accountSize: 100000 },
-  { id: "recYUQKZ5R19Snwyk", name: "TPT 100K Perf", accountSize: 100000 },
-  { id: "rechY3DxrUfj1v60L", name: "Phidias Fundamental 100K Perf", accountSize: 100000 },
-  { id: "recjaLPJKlnks4qV4", name: "YRM 150k Instant Prime", accountSize: 150000 },
-  { id: "recnOYUQIGLddgDco", name: "Tradeify 150K Select Perf", accountSize: 150000 },
-  { id: "recnYzi1GE4j3hy1q", name: "Tradeify - 100k - Live", accountSize: 0 },
-  { id: "recq5VXV6SJUsP8Fb", name: "Tradeify 100K Select Perf", accountSize: 100000 },
-  { id: "recsuOqgFYGIJiCDc", name: "FFN 150K Standard Perf", accountSize: 150000 },
-  { id: "rectnqPEVI7UEgffE", name: "MFFU 50K Flex Perf", accountSize: 0 },
-  { id: "recvzxGesKyxmKXbk", name: "TFD - Live", accountSize: 3250 },
-  { id: "recw2Utx3ln49Wh2M", name: "Top Step 150K Perf", accountSize: 0 },
-  { id: "recwug1Q5nN8D3wAN", name: "Savius 150k Perf", accountSize: 150000 },
-  { id: "recyK8fcdcuPkPPVy", name: "Funded Next 100K Legacy Perf", accountSize: 100000 },
-  { id: "rec9ZOHsi52US5d4P", name: "Purdia - Live", accountSize: 3000 },
-  { id: "recD4Q1JfDsoqibVP", name: "Phidias Static Perf", accountSize: 25000 },
-];
-
-// Payout Strategies baked in, grouped by perf type ID
-const PAYOUT_STRATEGIES = [
-  { id: "recD7r0vpYgh2nM9Z", name: "Top Step 150K Perf - Stage 1", perfTypeId: "recw2Utx3ln49Wh2M", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "rec9PKDHP0M3g7kSg", name: "Top Step 150K Perf - Stage 2", perfTypeId: "recw2Utx3ln49Wh2M", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "rech8KSemQ9e1rnuS", name: "Top Step 150K Perf - Stage 3", perfTypeId: "recw2Utx3ln49Wh2M", stage: 3, target: 7250, next: "Stage 4" },
-  { id: "recjEGACKPVzLHeRd", name: "Top Step 150K Perf - Stage 4", perfTypeId: "recw2Utx3ln49Wh2M", stage: 4, target: 8500, next: "Stage 5" },
-  { id: "rectT9yByjG2c0RiJ", name: "Top Step 150K Perf - Stage 5", perfTypeId: "recw2Utx3ln49Wh2M", stage: 5, target: 10000, next: "Stage 5" },
-  { id: "recRZFFc0t4O0buZ8", name: "Tradeify 150K Select Perf - Stage 1", perfTypeId: "recnOYUQIGLddgDco", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recIDn2XMdUHiLUFu", name: "Tradeify 150K Select Perf - Stage 2", perfTypeId: "recnOYUQIGLddgDco", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recPhwIfdMPJXOAfZ", name: "Tradeify 150K Select Perf - Stage 3", perfTypeId: "recnOYUQIGLddgDco", stage: 3, target: 7250, next: "Stage 4" },
-  { id: "reckHmSu5AimCRm4R", name: "Tradeify 150K Select Perf - Stage 4", perfTypeId: "recnOYUQIGLddgDco", stage: 4, target: 8500, next: "Stage 5" },
-  { id: "reclO0Dq8mHH7rB0X", name: "Tradeify 150K Select Perf - Stage 5", perfTypeId: "recnOYUQIGLddgDco", stage: 5, target: 10000, next: "Stage 5" },
-  { id: "recP5m0AXWwPC9UIj", name: "Tradeify 100K Select Perf - Stage 1", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "recOtClnmFZqr2nYy", name: "Tradeify 100K Select Perf - Stage 2", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recmKme5aziu8Wbfn", name: "Tradeify 100K Select Perf - Stage 3", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 3, target: 7000, next: "Stage 4" },
-  { id: "recpgFOxmZ9p4vRxV", name: "Tradeify 100K Select Perf - Stage 4", perfTypeId: "recq5VXV6SJUsP8Fb", stage: 4, target: 8000, next: "Stage 4" },
-  { id: "recOpcjZ0SSYR7iTp", name: "Phidias Fundamental 100K Perf - Stage 1", perfTypeId: "rechY3DxrUfj1v60L", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "rec1D8Ri0nSlLjERR", name: "Phidias Fundamental 100K Perf - Stage 2", perfTypeId: "rechY3DxrUfj1v60L", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recDmiXqq7XJN2bOA", name: "Phidias Fundamental 100K Perf - Stage 3", perfTypeId: "rechY3DxrUfj1v60L", stage: 3, target: 5000, next: "Stage 3" },
-  { id: "recI9o7mw8zKtz4On", name: "Bulenox 50K EOD Perf - Stage 1", perfTypeId: "recDK9X8GHYJb1P8a", stage: 1, target: 4100, next: "Stage 2" },
-  { id: "recvhV5OdyCbgtOVf", name: "Bulenox 50K EOD Perf - Stage 2", perfTypeId: "recDK9X8GHYJb1P8a", stage: 2, target: 4100, next: "Stage 2" },
-  { id: "recDvHemEQ7Y7Nnqp", name: "Legends Elite 100K Perf - Stage 1", perfTypeId: "recKSnwwT6dMYrVgG", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "recOSyjvLkdLAZsHY", name: "Legends Elite 100K Perf - Stage 2", perfTypeId: "recKSnwwT6dMYrVgG", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recZ6pKQvnGv87PWA", name: "Legends Elite 100K Perf - Stage 3", perfTypeId: "recKSnwwT6dMYrVgG", stage: 3, target: 4000, next: "Stage 3" },
-  { id: "recPRosIMqNFcAcNy", name: "Legends Elite 150K Perf - Stage 1", perfTypeId: "recAPuxF9wQmpqcns", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recsvNgIREUZUpnjQ", name: "Legends Elite 150K Perf - Stage 2", perfTypeId: "recAPuxF9wQmpqcns", stage: 2, target: 7000, next: "Stage 3" },
-  { id: "recKwHHARudU5dX27", name: "Legends Elite 150K Perf - Stage 3", perfTypeId: "recAPuxF9wQmpqcns", stage: 3, target: 4500, next: "Stage 3" },
-  { id: "receyRAkF2faFKi4a", name: "TPT 100K Perf - Stage 1", perfTypeId: "recYUQKZ5R19Snwyk", stage: 1, target: 3000, next: "Stage 2" },
-  { id: "recJUJI0Q0Eoa5Kq3", name: "TPT 100K Perf - Stage 2", perfTypeId: "recYUQKZ5R19Snwyk", stage: 2, target: 5000, next: "Stage 3" },
-  { id: "reche2Pz8nnzvF46G", name: "TPT 100K Perf - Stage 3", perfTypeId: "recYUQKZ5R19Snwyk", stage: 3, target: 6000, next: "Stage 3" },
-  { id: "rec4K9uXXUgTGtjZ7", name: "TPT 150K Perf - Stage 1", perfTypeId: "recCipNXVOSRHLqKQ", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "recfP5fQwJWVqTcnI", name: "TPT 150K Perf - Stage 2", perfTypeId: "recCipNXVOSRHLqKQ", stage: 2, target: 6500, next: "Stage 3" },
-  { id: "rec2SMczeds8jhkhj", name: "TPT 150K Perf - Stage 3", perfTypeId: "recCipNXVOSRHLqKQ", stage: 3, target: 7500, next: "Stage 3" },
-  { id: "recuviYwkqyLwdIoz", name: "Day Traders 150K Static Perf - Stage 1", perfTypeId: "recTL4uJ1G8BUZK21", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recqYJjYPDPHjAa3E", name: "Day Traders 150K Static Perf - Stage 2", perfTypeId: "recTL4uJ1G8BUZK21", stage: 2, target: 7000, next: "Stage 3" },
-  { id: "recighzEcblaNmfrd", name: "Day Traders 150K Static Perf - Stage 3", perfTypeId: "recTL4uJ1G8BUZK21", stage: 3, target: 5500, next: "Stage 3" },
-  { id: "recz6SFULnonIwekq", name: "Day Traders 100K Static Perf - Stage 1", perfTypeId: "recXp5quJOrP2JD1x", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "recYuo5CQ28zmnNry", name: "Day Traders 100K Static Perf - Stage 2", perfTypeId: "recXp5quJOrP2JD1x", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recNJasT559yfPpr5", name: "Day Traders 100K Static Perf - Stage 3", perfTypeId: "recXp5quJOrP2JD1x", stage: 3, target: 5000, next: "Stage 3" },
-  { id: "recUc21nJMFd5tMYs", name: "FFN 100K Standard Perf - Stage 1", perfTypeId: "recK8KZqNZD7qlRxc", stage: 1, target: 3600, next: "Stage 2" },
-  { id: "recYsveCxaJO2MUq9", name: "FFN 100K Standard Perf - Stage 2", perfTypeId: "recK8KZqNZD7qlRxc", stage: 2, target: 6100, next: "Stage 2" },
-  { id: "recl5tLEZAN0WIWIk", name: "FFN 150K Standard Perf - Stage 1", perfTypeId: "recsuOqgFYGIJiCDc", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "rec5pQGppBxD8TgVY", name: "FFN 150K Standard Perf - Stage 2", perfTypeId: "recsuOqgFYGIJiCDc", stage: 2, target: 7500, next: "Stage 2" },
-  { id: "reca7XG21oF468YLE", name: "Funded Next 100K Legacy Perf - Stage 1", perfTypeId: "recyK8fcdcuPkPPVy", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "recEEYTvwJrWslH3G", name: "Funded Next 100K Legacy Perf - Stage 2", perfTypeId: "recyK8fcdcuPkPPVy", stage: 2, target: 6000, next: "Stage 2" },
-  { id: "reczxROMH9n06y00e", name: "Funded Next 50K Legacy Perf - Stage 1", perfTypeId: "recO5gj9RRGP2ToTN", stage: 1, target: 4000, next: "Stage 2" },
-  { id: "rec7wj5WyPkl04oW3", name: "Funded Next 50K Legacy Perf - Stage 2", perfTypeId: "recO5gj9RRGP2ToTN", stage: 2, target: 6000, next: "Stage 2" },
-  { id: "recAdAd5eitPvjxPGTd", name: "MFFU 50K Flex Perf - Stage 1", perfTypeId: "rectnqPEVI7UEgffE", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "recqiSXFb5U2ol8IR", name: "MFFU 50K Flex Perf - Stage 2", perfTypeId: "rectnqPEVI7UEgffE", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recWtZZuk6d6ONOBe", name: "MFFU 50K Flex Perf - Stage 3", perfTypeId: "rectnqPEVI7UEgffE", stage: 3, target: 7250, next: "Stage 4" },
-  { id: "recGiVXiz94MqXf0E", name: "MFFU 50K Flex Perf - Stage 4", perfTypeId: "rectnqPEVI7UEgffE", stage: 4, target: 8500, next: "Stage 5" },
-  { id: "reczGNnCwgQUkHF1B", name: "MFFU 50K Flex Perf - Stage 5", perfTypeId: "rectnqPEVI7UEgffE", stage: 5, target: 10000, next: "Stage 5" },
-  { id: "recZh1dPJY83EvFVf", name: "YRM 100k Instant Prime - Stage 1", perfTypeId: "recWqBIPXHYBR7NwW", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recSHBvgxkaTe22f4", name: "YRM 100k Instant Prime - Stage 2", perfTypeId: "recWqBIPXHYBR7NwW", stage: 2, target: 6000, next: "Stage 3" },
-  { id: "recCEbkPjacMMNTo5", name: "YRM 100k Instant Prime - Stage 3", perfTypeId: "recWqBIPXHYBR7NwW", stage: 3, target: 7000, next: "Stage 4" },
-  { id: "recV4j9QkskbywTHU", name: "YRM 100k Instant Prime - Stage 4", perfTypeId: "recWqBIPXHYBR7NwW", stage: 4, target: 8000, next: "Stage 4" },
-  { id: "recaVNpZy4yrdS8UP", name: "YRM 150k Instant Prime - Stage 1", perfTypeId: "recjaLPJKlnks4qV4", stage: 1, target: 8000, next: "Stage 2" },
-  { id: "recg67je3c9g0Xysd", name: "YRM 150k Instant Prime - Stage 2", perfTypeId: "recjaLPJKlnks4qV4", stage: 2, target: 10000, next: "Stage 3" },
-  { id: "recdqFw0rElJRiDIy", name: "YRM 150k Instant Prime - Stage 3", perfTypeId: "recjaLPJKlnks4qV4", stage: 3, target: 12000, next: "Stage 4" },
-  { id: "recw90SPSPNVJ0XLG", name: "YRM 150k Instant Prime - Stage 4", perfTypeId: "recjaLPJKlnks4qV4", stage: 4, target: 14000, next: "Stage 4" },
-  { id: "recI316Gc26YqE9tU", name: "BluSky 300k Blu+ Perf - Stage 1", perfTypeId: "recQZlpiDSUgEcf17", stage: 1, target: 3500, next: "Stage 2" },
-  { id: "reckqsGWkxd02gGHP", name: "BluSky 300k Blu+ Perf - Stage 2", perfTypeId: "recQZlpiDSUgEcf17", stage: 2, target: 5500, next: "Stage 3" },
-  { id: "recNw4UWcm0TJtJ7e", name: "BluSky 300k Blu+ Perf - Stage 3", perfTypeId: "recQZlpiDSUgEcf17", stage: 3, target: 6500, next: "Stage 3" },
-  { id: "recovu0efQGWsqnhX", name: "Trade Day 100K Perf - Stage 1", perfTypeId: "rec7d4W5dlXgAIDeg", stage: 1, target: 4000, next: "Stage 2" },
-  { id: "recyzD07wTlx3LibV", name: "Trade Day 100K Perf - Stage 2", perfTypeId: "rec7d4W5dlXgAIDeg", stage: 2, target: 5000, next: "Stage 3" },
-  { id: "recpoE7nyS5LE5sMw", name: "Trade Day 100K Perf - Stage 3", perfTypeId: "rec7d4W5dlXgAIDeg", stage: 3, target: 6000, next: "Stage 3" },
-  { id: "recut8uRm3oxG0Apk", name: "TOF 50k Elite Perf - Stage 1", perfTypeId: "recRkoFdYqIgmBnaz", stage: 1, target: 4100, next: "Stage 2" },
-  { id: "recLGd12PCxyHnZHP", name: "TOF 50k Elite Perf - Stage 2", perfTypeId: "recRkoFdYqIgmBnaz", stage: 2, target: 4100, next: "Stage 2" },
-  { id: "recRfn6Gyn8SDP6Lh", name: "Savius 100k Perf - Stage 1", perfTypeId: "recSoGeDruvqUQPQ0", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recQa30ZBPFcPzIbB", name: "Savius 100k Perf - Stage 2", perfTypeId: "recSoGeDruvqUQPQ0", stage: 2, target: 5000, next: "Stage 2" },
-  { id: "recZWirPZvScMrFlo", name: "Savius 150k Perf - Stage 1", perfTypeId: "recwug1Q5nN8D3wAN", stage: 1, target: 7500, next: "Stage 2" },
-  { id: "recQxdZoDPPAZrgRM", name: "Savius 150k Perf - Stage 2", perfTypeId: "recwug1Q5nN8D3wAN", stage: 2, target: 7500, next: "Stage 2" },
-  { id: "recUHRRb0T0q8SLbp", name: "Savius 300k Perf - Stage 1", perfTypeId: "recDGkltGuqhdmcUC", stage: 1, target: 15000, next: "Stage 2" },
-  { id: "rec4IVV8mfPmaEpUf", name: "Savius 300k Perf - Stage 2", perfTypeId: "recDGkltGuqhdmcUC", stage: 2, target: 15000, next: "Stage 2" },
-  { id: "receZQOw8cUwIWlJ2", name: "LucidFlex 150K Perf - Stage 1", perfTypeId: "rec7xL7pCvC13SDvW", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recv6yJFkTzUnByxq", name: "LucidFlex 150K Perf - Stage 2", perfTypeId: "rec7xL7pCvC13SDvW", stage: 2, target: 6000, next: "Stage 2" },
-  { id: "rec7IcXyAVmyIAmMI", name: "LucidFlex 100K Perf - Stage 1", perfTypeId: "recT9NCOWvAH8sU13", stage: 1, target: 4500, next: "Stage 2" },
-  { id: "reccbesPPOKZ8bamt", name: "LucidFlex 100K Perf - Stage 2", perfTypeId: "recT9NCOWvAH8sU13", stage: 2, target: 5000, next: "Stage 2" },
-  { id: "recEmrtJAsQlYWdAa", name: "TFD - 100K Perf - Stage 1", perfTypeId: "recFWL0IRGxPfZAt0", stage: 1, target: 3000, next: "Live" },
-  { id: "recnr6WrMzmFf013p", name: "TFD - Live - Stage 1", perfTypeId: "recvzxGesKyxmKXbk", stage: 1, target: 5000, next: "Stage 2" },
-  { id: "recUvS1hrRYAM2beW", name: "TFD - Live - Stage 2", perfTypeId: "recvzxGesKyxmKXbk", stage: 2, target: 8000, next: "Stage 2" },
-  { id: "rec3fnr4KThLY7BS3", name: "Legends - Live - Stage 1", perfTypeId: "recIMu5FNdytf70y1", stage: 1, target: 10000, next: "Stage 2" },
-  { id: "recqUEg4i3D1WQK9v", name: "Legends - Live - Stage 2", perfTypeId: "recIMu5FNdytf70y1", stage: 2, target: 12500, next: "Stage 2" },
-  { id: "rec2PJiH0akm0Rzqb", name: "Tradeify - 100k - Live - Stage 1", perfTypeId: "recnYzi1GE4j3hy1q", stage: 1, target: 3000, next: "Stage 2" },
-  { id: "reclCiN25iUBLtUgI", name: "Tradeify - 100k - Live - Stage 2", perfTypeId: "recnYzi1GE4j3hy1q", stage: 2, target: 6000, next: "Stage 2" },
-  { id: "recmvcdI7DC49aniN", name: "Purdia - Live - Stage 1", perfTypeId: "rec9ZOHsi52US5d4P", stage: 1, target: 8000, next: "Stage 2" },
-  { id: "recEOg5lO4eyagw0V", name: "Purdia - Live - Stage 2", perfTypeId: "rec9ZOHsi52US5d4P", stage: 2, target: 10000, next: "Stage 2" },
-  { id: "reccOsSoA6kiuyqXK", name: "Phidias Static Perf - Stage 1", perfTypeId: "recD4Q1JfDsoqibVP", stage: 1, target: 1500, next: "Live" },
-  { id: "recy2k5FURS3dKciB", name: "YRM 50k Instant Prime - Stage 1", perfTypeId: "recP1UQ1FelJnw5ft", stage: 1, target: 3000, next: "Stage 2" },
-  { id: "reciQv2UV6KCSP23u", name: "YRM 50k Instant Prime - Stage 2", perfTypeId: "recP1UQ1FelJnw5ft", stage: 2, target: 3000, next: "Stage 2" },
-];
-
 // Eval type → Perf type map (baked in from Airtable)
 function AccountManagementTab() {
   const [evalToPerfMap, setEvalToPerfMap] = useState({});
+  const [perfTypes, setPerfTypes] = useState([]);
+  const [payoutStrategies, setPayoutStrategies] = useState([]);
   useEffect(() => {
-    fetchTable("tbleHzHF5FgskLxs3", ["Name", "Performance Account Type"]).then(records => {
+    Promise.all([
+      fetchTable("tbleHzHF5FgskLxs3", ["Name", "Performance Account Type"]),
+      fetchTable("tbluVaCiyff48ic7L", ["Name", "Account Size"]),
+      fetchTable("tbljLby6v0o6fydOw", ["Name", "Account Type", "Stage Number", "Stage Target", "On Completion Go To"]),
+    ]).then(([evalTypeRecords, perfTypeRecords, strategyRecords]) => {
       const map = {};
-      records.forEach(r => {
+      evalTypeRecords.forEach(r => {
         const pt = r.fields["Performance Account Type"];
         if (Array.isArray(pt) && pt.length > 0) map[r.id] = pt[0].id || pt[0];
       });
       setEvalToPerfMap(map);
+      setPerfTypes(perfTypeRecords.map(r => ({
+        id: r.id,
+        name: r.fields["Name"] || "",
+        accountSize: r.fields["Account Size"] || 0,
+      })));
+      setPayoutStrategies(strategyRecords.map(r => {
+        const at = r.fields["Account Type"];
+        return {
+          id: r.id,
+          name: r.fields["Name"] || "",
+          perfTypeId: Array.isArray(at) && at.length > 0 ? (at[0].id || at[0]) : null,
+          stage: r.fields["Stage Number"] || 1,
+          target: r.fields["Stage Target"] || 0,
+          next: r.fields["On Completion Go To"] || "",
+        };
+      }));
     });
   }, []);
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -1775,17 +1669,17 @@ function AccountManagementTab() {
         ? selectedEval.fields["Evaluation Account Type"][0] : null)
     : null;
   const perfTypeId = evalToPerfMap?.[evalTypeId] ?? null;
-  const perfType = perfTypeId ? PERF_TYPES.find(t => t.id === perfTypeId) : null;
+  const perfType = perfTypeId ? perfTypes.find(t => t.id === perfTypeId) : null;
 
   // Stage info for selected perf
   const currentStageId = selectedPerf
     ? (Array.isArray(selectedPerf.fields["Current Stage"]) ? selectedPerf.fields["Current Stage"][0] : null)
     : null;
-  const currentStage = PAYOUT_STRATEGIES.find(s => s.id === currentStageId);
+  const currentStage = payoutStrategies.find(s => s.id === currentStageId);
   const perfTypeForStages = selectedPerf
     ? (Array.isArray(selectedPerf.fields["Performance Account Type"]) ? selectedPerf.fields["Performance Account Type"][0] : null)
     : null;
-  const availableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === perfTypeForStages).sort((a, b) => a.stage - b.stage);
+  const availableStages = payoutStrategies.filter(s => s.perfTypeId === perfTypeForStages).sort((a, b) => a.stage - b.stage);
   const nextStage = currentStage ? availableStages.find(s => s.stage === currentStage.stage + 1) : availableStages[0];
 
   // Stage info for post-payout perf account
@@ -1796,7 +1690,7 @@ function AccountManagementTab() {
   const payoutPerfTypeId = payoutPerf
     ? (Array.isArray(payoutPerf.fields["Performance Account Type"]) ? payoutPerf.fields["Performance Account Type"][0] : null)
     : null;
-  const payoutAvailableStages = PAYOUT_STRATEGIES.filter(s => s.perfTypeId === payoutPerfTypeId).sort((a, b) => a.stage - b.stage);
+  const payoutAvailableStages = payoutStrategies.filter(s => s.perfTypeId === payoutPerfTypeId).sort((a, b) => a.stage - b.stage);
 
   async function handleConvertEval() {
     if (!perfTypeId) {
@@ -1807,8 +1701,8 @@ function AccountManagementTab() {
     setSubmitting(true); setErr(null);
     try {
       const trader = traderList.find(t => t.id === traderId);
-      const pt = PERF_TYPES.find(t => t.id === perfTypeId);
-      const firstStage = PAYOUT_STRATEGIES.find(s => s.perfTypeId === perfTypeId && s.stage === 1);
+      const pt = perfTypes.find(t => t.id === perfTypeId);
+      const firstStage = payoutStrategies.find(s => s.perfTypeId === perfTypeId && s.stage === 1);
       await updateRecord(EVAL_TABLE, selectedEvalId, { "Status": "Passed" });
       const perfFields = {
         "Name": `${trader?.name?.split(" ")[0]} - ${pt?.name}`,
@@ -1925,7 +1819,7 @@ function AccountManagementTab() {
       });
       // Update perf account: new balance, stage, back to Active
       if (payoutPerfId) {
-        const stage = PAYOUT_STRATEGIES.find(s => s.id === postPayoutStageId);
+        const stage = payoutStrategies.find(s => s.id === postPayoutStageId);
         await updateRecord(PERF_TABLE, payoutPerfId, {
           "Status": "Active",
           "Current Balance": parseFloat(postPayoutBalance),
@@ -1997,7 +1891,7 @@ function AccountManagementTab() {
                   : evalAccounts.map(r => {
                       const etId = Array.isArray(r.fields["Evaluation Account Type"]) ? r.fields["Evaluation Account Type"][0] : null;
                       const ptId = etId ? evalToPerfMap?.[etId] : null;
-                      const pt = ptId ? PERF_TYPES.find(t => t.id === ptId) : null;
+                      const pt = ptId ? perfTypes.find(t => t.id === ptId) : null;
                       return (
                         <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
                           style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#1f2937", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
@@ -2066,7 +1960,7 @@ function AccountManagementTab() {
                   ? <div style={{ color: "#6b7280", fontSize: 12 }}>No active performance accounts{traderId ? " for this trader" : ""}.</div>
                   : perfAccounts.filter(r => r.fields["Status"] !== "Waiting on Payout").map(r => {
                       const stageId = Array.isArray(r.fields["Current Stage"]) ? r.fields["Current Stage"][0] : null;
-                      const stage = PAYOUT_STRATEGIES.find(s => s.id === stageId);
+                      const stage = payoutStrategies.find(s => s.id === stageId);
                       return (
                         <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
                           style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
