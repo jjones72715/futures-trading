@@ -1588,6 +1588,7 @@ function AccountManagementTab() {
   const [tradeDown, setTradeDown] = useState(false);
   const [tradeDownFloor, setTradeDownFloor] = useState("");
   const [resetTradingDays, setResetTradingDays] = useState(true);
+  const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
 
   // Payout Management state
   const [selectedPayoutId, setSelectedPayoutId] = useState("");
@@ -1653,7 +1654,7 @@ function AccountManagementTab() {
     setNumAccounts(1); setInvestedPerAccount(""); setActivationFee(""); setContractMultiplier(1);
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
-    setTradeDown(false); setTradeDownFloor("");
+    setTradeDown(false); setTradeDownFloor(""); setAdvancePayoutAmount("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
     setPostPayoutStageId(""); setErr(null);
@@ -1762,7 +1763,24 @@ function AccountManagementTab() {
         if (tradeDownFloor) fields["Trade Down Floor"] = parseFloat(tradeDownFloor);
       }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
-      setSuccess(`✓ Advanced to Stage ${nextStage.stage}!`);
+      // Create a received payout record if an amount was entered
+      if (advancePayoutAmount) {
+        const perf = perfAccounts.find(r => r.id === selectedPerfId);
+        const trader = traderList.find(t => t.id === traderId);
+        const numAccts = perf?.fields["Number of Accounts"] || 1;
+        const amtPerAcct = parseFloat(advancePayoutAmount) / numAccts;
+        await createRecord(PAYOUT_TABLE, {
+          "Name": `${trader?.name?.split(" ")[0]} - ${perf?.fields["Name"]} - ${today}`,
+          "Performance Account": [selectedPerfId],
+          "Date Requested": today,
+          "Date Received": today,
+          "Amount Per Account": amtPerAcct,
+          "Number of Accounts": numAccts,
+          "Status": "Received",
+          "Trader": traderId ? [traderId] : undefined,
+        });
+      }
+      setSuccess(`✓ Advanced to Stage ${nextStage.stage}${advancePayoutAmount ? " + payout logged!" : "!"}`);
       setTimeout(() => setSuccess(""), 4000);
       resetForm(); loadData();
     } catch (e) { setErr("Failed: " + e.message); }
@@ -2012,6 +2030,10 @@ function AccountManagementTab() {
                   <div>
                     {label("Contract Multiplier")}
                     <input type="number" min="1" placeholder="1" value={contractMultiplier} onChange={e => setContractMultiplier(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    {label("Payout Amount Received (optional)")}
+                    <input type="number" placeholder="Enter total payout received..." value={advancePayoutAmount} onChange={e => setAdvancePayoutAmount(e.target.value)} style={inp} />
                   </div>
                   <div style={{ gridColumn: "1/-1" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
