@@ -45,7 +45,9 @@ async function createRecord(tableId, fields) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  return data;
 }
 
 async function updateRecord(tableId, recordId, fields) {
@@ -1777,7 +1779,7 @@ function AccountManagementTab() {
           "Amount Per Account": amtPerAcct,
           "Number of Accounts": numAccts,
           "Status": "Received",
-          "Trader": traderId ? [traderId] : undefined,
+          ...(traderId ? { "Trader": [traderId] } : {}),
         });
       }
       setSuccess(`✓ Advanced to Stage ${nextStage.stage}${advancePayoutAmount ? " + payout logged!" : "!"}`);
@@ -1795,14 +1797,15 @@ function AccountManagementTab() {
       const trader = traderList.find(t => t.id === traderId);
       await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
       // Create payout record
-      await createRecord(PAYOUT_TABLE, {
-        "Name": `${trader?.name?.split(" ")[0]} - ${perf?.fields["Name"]} - ${today}`,
+      const payoutFields = {
+        "Name": `${trader?.name?.split(" ")[0] ?? "Unknown"} - ${perf?.fields["Name"]} - ${today}`,
         "Performance Account": [selectedPerfId],
         "Date Requested": today,
         "Status": "Requested",
         "Number of Accounts": perf?.fields["Number of Accounts"] || 1,
-        "Trader": [traderId],
-      });
+      };
+      if (traderId) payoutFields["Trader"] = [traderId];
+      await createRecord(PAYOUT_TABLE, payoutFields);
       setSuccess("✓ Payout requested and logged!");
       setTimeout(() => setSuccess(""), 4000);
       resetForm(); loadData();
