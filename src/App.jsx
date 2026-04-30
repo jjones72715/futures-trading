@@ -109,151 +109,7 @@ function SafetyBar({ safety }) {
   );
 }
 
-const RedistTab = React.memo(function RedistTab({ history }) {
-  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  if (history.length === 0) return (
-    <div style={{ textAlign: "center", padding: "50px 0", color: "#6b7280" }}>
-      <p style={{ fontSize: 15 }}>No redistributions yet today</p>
-      <p style={{ fontSize: 13 }}>Redistributions happen inline when you enter a losing balance</p>
-    </div>
-  );
-  return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 16 }}>
-        💸 Today's Redistributions ({history.length})
-      </div>
-      {history.map((r, i) => (
-        <div key={i} style={{ background: C.card, border: "1px solid #1f2937", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#f87171" }}>From: {r.from}</span>
-            <span style={{ fontSize: 11, color: "#6b7280" }}>{r.time}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Total moved: <span style={{ color: "#4ade80", fontWeight: 700 }}>${r.amount.toFixed(2)}</span></div>
-          {r.destinations.map((d, j) => (
-            <div key={j} style={{ fontSize: 12, color: "#9ca3af", paddingLeft: 8 }}>
-              → {d.name}: +${d.share}
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-});
-
-const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
-  const activeEvals = evalAccounts.filter(a => !dones[a.id]);
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount);
-  const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status === "Active");
-  const livePerf = perfAccounts.filter(a => a.payoutAccount && a.status === "Live");
-  const waitingPayout = perfAccounts.filter(a => a.payoutAccount && a.status === "Waiting on Payout");
-  const allAccounts = [...evalAccounts, ...perfAccounts];
-  const doneAccounts = allAccounts.filter(a => dones[a.id]);
-
-  function getFeedColumns(accounts) {
-    const feeds = {};
-    accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
-      const dp = a.dataProvider || "Other";
-      if (!feeds[dp]) feeds[dp] = [];
-      feeds[dp].push(a);
-    });
-    return feeds;
-  }
-
-  function FeedColumns({ accounts }) {
-    if (accounts.length === 0) return null;
-    const feeds = getFeedColumns(accounts);
-    const feedNames = Object.keys(feeds).sort();
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 12 }}>
-        {feedNames.map(feed => (
-          <div key={feed}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid #1f2937" }}>
-              {feed} <span style={{ color: "#374151" }}>({feeds[feed].length})</span>
-            </div>
-            {feeds[feed].map((a, i) => (
-              <AccountRow key={a.id} a={a} i={i}
-                inputVal={inputs[a.id] || ""}
-                noChange={!!noChanges[a.id]}
-                done={!!dones[a.id]}
-                onInput={val => onInput(a.id, val)}
-                onNoChange={() => onNoChange(a.id)}
-                onDone={() => onDone(a.id)}
-                onBreach={() => onBreach(a)}
-                onRedistPopup={onRedistPopup}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function SectionHeader({ title, color, count }) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 0 10px" }}>
-        <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{count}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {activeEvals.length > 0 && <>
-        <SectionHeader title="Evaluation Accounts" color="#8b5cf6" count={activeEvals.length} />
-        <FeedColumns accounts={activeEvals.filter(a => !dones[a.id])} />
-      </>}
-
-      {standardPerf.filter(a => !dones[a.id]).length > 0 && <>
-        <SectionHeader title="Performance Accounts" color="#3b82f6" count={standardPerf.filter(a => !dones[a.id]).length} />
-        <FeedColumns accounts={standardPerf.filter(a => !dones[a.id])} />
-      </>}
-
-      {(payoutAccounts.filter(a => !dones[a.id]).length > 0 || livePerf.filter(a => !dones[a.id]).length > 0) && <>
-        <SectionHeader title="Payout Accounts" color="#f59e0b" count={payoutAccounts.filter(a => !dones[a.id]).length + livePerf.filter(a => !dones[a.id]).length} />
-        <FeedColumns accounts={[...payoutAccounts, ...livePerf].filter(a => !dones[a.id])} />
-      </>}
-
-      {waitingPayout.filter(a => !dones[a.id]).length > 0 && <>
-        <SectionHeader title="Waiting on Payout" color="#6b7280" count={waitingPayout.filter(a => !dones[a.id]).length} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {waitingPayout.filter(a => !dones[a.id]).map((a, i) => (
-            <AccountRow key={a.id} a={a} i={i}
-              inputVal={inputs[a.id] || ""}
-              noChange={!!noChanges[a.id]}
-              done={!!dones[a.id]}
-              onInput={val => onInput(a.id, val)}
-              onNoChange={() => onNoChange(a.id)}
-              onDone={() => onDone(a.id)}
-              onBreach={() => onBreach(a)}
-              onRedistPopup={onRedistPopup}
-            />
-          ))}
-        </div>
-      </>}
-
-      {doneAccounts.length > 0 && <>
-        <SectionHeader title="Done for Today" color="#166534" count={doneAccounts.length} />
-        <div style={{ opacity: 0.5 }}>
-          {doneAccounts.map((a, i) => (
-            <AccountRow key={a.id} a={a} i={i}
-              inputVal={inputs[a.id] || ""}
-              noChange={!!noChanges[a.id]}
-              done={!!dones[a.id]}
-              onInput={val => onInput(a.id, val)}
-              onNoChange={() => onNoChange(a.id)}
-              onDone={() => onDone(a.id)}
-              onBreach={() => onBreach(a)}
-              onRedistPopup={onRedistPopup}
-            />
-          ))}
-        </div>
-      </>}
-    </div>
-  );
-});
-function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
+function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
   const sorted = active.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -265,12 +121,12 @@ function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChang
         <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{sorted.length}</span>
       </div>
       {sorted.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} onRedistPopup={onRedistPopup} />
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} />
       ))}
     </div>
   );
 }
-const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
+const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
   const [localVal, setLocalVal] = React.useState(inputVal);
   React.useEffect(() => { setLocalVal(inputVal); }, [inputVal]);
   const v = parseFloat(localVal);
@@ -351,10 +207,6 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             {noChange ? "✓ No Change" : "No Change"}
           </button>
           <input type="number" placeholder={String(a.bal)} value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={e => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val) && val < a.bal && a.invested > 0) {
-                onRedistPopup(a, val, false);
-              }
               onInput(e.target.value);
             }} disabled={noChange}
             style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
@@ -367,12 +219,6 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             💥
           </button>
-          {a.invested > 0 && (
-            <button onClick={e => { e.stopPropagation(); onRedistPopup(a, a.invested, true); }} title="Redistribute invested funds"
-              style={{ background: "#1c1f26", border: "1px solid #374151", borderRadius: 6, padding: "3px 7px", fontSize: 13, color: "#fbbf24", cursor: "pointer" }}>
-              💰
-            </button>
-          )}
           <button onClick={e => { e.stopPropagation(); onDone(); }} title={done ? "Mark as active" : "Done for today"}
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             {done ? "✓" : "☐"}
@@ -389,7 +235,7 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
   );
 });
 
-function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup, startIndex }) {
+function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, startIndex }) {
   if (accounts.length === 0) return null;
   return (
     <div style={{ marginBottom: 10 }}>
@@ -398,13 +244,13 @@ function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNo
         <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
       </div>
       {accounts.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} onRedistPopup={onRedistPopup} />
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} />
       ))}
     </div>
   );
 }
 
-function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup, color }) {
+function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, color }) {
   if (accounts.length === 0) return null;
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
@@ -428,7 +274,7 @@ function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChang
       {sorted.map(([dp, accs]) => {
         const start = idx;
         idx += accs.length;
-      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} onRedistPopup={onRedistPopup} startIndex={start} />;
+      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} startIndex={start} />;
       })}
     </div>
   );
@@ -452,147 +298,6 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
 }
 
 // ── Purchase Tab ──────────────────────────────────────────────────────────────
-
-function RedistPopupModal({ account, value, manual, allAccounts, onConfirm, onDismiss }) {
-  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const ddRef = account.ddLeft || account.ddToFloor || 1;
-  const balanceLoss = manual ? 0 : (account.bal - parseFloat(value));
-  const pctLost = manual ? 1 : Math.min(1, balanceLoss / ddRef);
-  const defaultAmount = manual
-    ? account.invested * account.n
-    : Math.max(0, parseFloat((pctLost * account.invested * account.n).toFixed(2)));
-  const [amount, setAmount] = React.useState(defaultAmount);
-  const [selected, setSelected] = React.useState([]);
-  const [percentages, setPercentages] = React.useState({});
-  const [search, setSearch] = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-  const MAX = 4;
-
-  const available = allAccounts.filter(a =>
-    a.id !== account.id &&
-    a.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  function toggle(a) {
-    if (selected.find(s => s.id === a.id)) {
-      const next = selected.filter(s => s.id !== a.id);
-      setSelected(next);
-      splitEvenly(next);
-    } else if (selected.length < MAX) {
-      const next = [...selected, a];
-      setSelected(next);
-      splitEvenly(next);
-    }
-  }
-
-  function splitEvenly(accts) {
-    if (!accts.length) { setPercentages({}); return; }
-    const even = Math.floor(100 / accts.length);
-    const rem = 100 - even * accts.length;
-    const p = {};
-    accts.forEach((a, i) => { p[a.id] = even + (i === 0 ? rem : 0); });
-    setPercentages(p);
-  }
-
-  function updatePct(id, val) {
-    setPercentages(prev => ({ ...prev, [id]: Math.min(100, Math.max(0, parseInt(val) || 0)) }));
-  }
-
-  const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
-  const pctValid = totalPct === 100 && selected.length > 0;
-  const totalToMove = amount;
-
-  const destinations = selected.map(a => ({
-    ...a,
-    pct: percentages[a.id] || 0,
-    share: Math.ceil(totalToMove * (percentages[a.id] || 0) / 100),
-  }));
-
-  async function handleConfirm() {
-    setSubmitting(true);
-    await onConfirm(destinations);
-    setSubmitting(false);
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: C.card, border: "1px solid #374151", borderRadius: 14, padding: 24, width: 480, maxHeight: "80vh", overflowY: "auto" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }}>💸 Redistribute Invested Funds</div>
-        <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 12 }}>
-          Redistributing from <span style={{ color: "#f87171" }}>{account.name}</span>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>Total amount to redistribute</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#f87171" }}>$</span>
-            <input type="number" value={amount} onChange={e => setAmount(parseFloat(e.target.value) || 0)}
-              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 10px", fontSize: 14, color: "#fff", outline: "none", width: 120 }} />
-            <span style={{ fontSize: 12, color: "#6b7280" }}>÷ {account.n} acct{account.n > 1 ? "s" : ""} = <span style={{ color: "#f87171" }}>${(amount / account.n).toFixed(2)}</span>/acct</span>
-          </div>
-        </div>
-
-        <input
-          placeholder="Search accounts..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", marginBottom: 12, boxSizing: "border-box" }}
-        />
-
-        <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 16 }}>
-          {available.map(a => {
-            const isSel = !!selected.find(s => s.id === a.id);
-            const disabled = selected.length >= MAX && !isSel;
-            return (
-              <div key={a.id} onClick={() => !disabled && toggle(a)}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isSel ? "#052e16" : "#1f2937", border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 8, padding: "8px 12px", marginBottom: 6, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }}>
-                <div>
-                  <div style={{ fontSize: 13, color: "#fff", fontWeight: isSel ? 600 : 400 }}>{a.name}</div>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>{a.type === "perf" ? "Perf" : "Eval"} • ${a.invested}/acct • {a.n} acct{a.n > 1 ? "s" : ""}</div>
-                </div>
-                {isSel && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <input type="number" min="0" max="100" value={percentages[a.id] || 0}
-                      onChange={e => updatePct(a.id, e.target.value)}
-                      style={{ width: 48, background: "#0d1f0d", border: `1px solid ${pctValid ? "#22c55e" : "#f87171"}`, borderRadius: 6, padding: "3px 6px", fontSize: 12, color: "#fff", outline: "none", textAlign: "center" }} />
-                    <span style={{ fontSize: 12, color: "#4ade80" }}>%</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {selected.length > 0 && (
-          <div style={{ background: "#0d1f0d", border: "1px solid #166534", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>Summary</span>
-              <span style={{ fontSize: 12, color: pctValid ? "#4ade80" : "#f87171", fontWeight: 700 }}>
-                {totalPct}% {!pctValid && `— need ${100 - totalPct}% more`}
-              </span>
-            </div>
-            {destinations.map(d => (
-              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#d1fae5", marginBottom: 3 }}>
-                <span>{d.name} ({d.pct}%)</span>
-                <span>+${Math.ceil(d.share / d.n)}/acct × {d.n} = +${d.share}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onDismiss}
-            style={{ flex: 1, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: 10, fontSize: 13, color: "#9ca3af", cursor: "pointer" }}>
-            Skip
-          </button>
-          <button onClick={handleConfirm} disabled={!pctValid || submitting}
-            style={{ flex: 2, background: pctValid ? "#16a34a" : "#1f2937", border: "none", borderRadius: 8, padding: 10, fontSize: 14, fontWeight: 700, color: pctValid ? "#fff" : "#4b5563", cursor: pctValid ? "pointer" : "not-allowed" }}>
-            {submitting ? "Updating..." : `Redistribute $${totalToMove.toFixed(2)}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function PurchaseTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -1848,7 +1553,6 @@ function AccountManagementTab() {
           "Cycle Start Balance": parseFloat(postPayoutBalance),
           "Current Stage": [postPayoutStageId],
           "Trading Days this Cycle": 0,
-          "Invested Per Account": 0,
           "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
         });
       }
@@ -2335,8 +2039,6 @@ export default function App() {
   const [breachAccount, setBreachAccount] = useState(null);
   const [breachCount, setBreachCount] = useState("");
   const [breachSubmitting, setBreachSubmitting] = useState(false);
-  const [redistPopup, setRedistPopup] = useState(null);
-  const [redistHistory, setRedistHistory] = useState([]);
   const [showAdvanceDayModal, setShowAdvanceDayModal] = useState(false);
   const [advanceDayAccounts, setAdvanceDayAccounts] = useState([]);
   const [saved, setSaved] = useState(false);
@@ -2404,7 +2106,6 @@ export default function App() {
           ddToFloor: f["Drawdown to Floor"] || 0,
           prog: f["Progress to Stage Target"] || 0,
           limit: f["Max Trade Size"] || 0,
-          invested: f["Invested Per Account"] || 0,
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
           tradeDown: f["Trade Down Account"] || false,
@@ -2435,7 +2136,6 @@ export default function App() {
           ddToFloor: 0,
           prog: f["Progress to Target"] || 0,
           limit: f["Max Trade Size"] || 0,
-          invested: 0,
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
           hwm: f["High Water Mark"] || 0,
@@ -2499,10 +2199,6 @@ export default function App() {
   const onBreach = useCallback((a) => {
     setBreachAccount(a);
     setBreachCount("");
-  }, []);
-
-  const onRedistPopup = useCallback((account, value, manual = false) => {
-    setRedistPopup({ account, value, manual });
   }, []);
 
   async function handleBreach(a) {
@@ -2651,38 +2347,6 @@ export default function App() {
               }}
             />
           )}
-          {redistPopup && (
-          <RedistPopupModal
-            account={redistPopup.account}
-            value={redistPopup.value}
-            manual={redistPopup.manual}
-            allAccounts={[...evalAccounts, ...perfAccounts]}
-            onConfirm={async (destinations) => {
-              try {
-                await Promise.all(destinations.map(d => {
-                  const table = d.type === "perf" ? PERF_TABLE : EVAL_TABLE;
-                  const investedField = d.type === "perf" ? "fldAWWar1WK3I9BVi" : "fldAplR2R67gEWPh1";
-                  const sharePerAccount = Math.ceil(d.share / d.n);
-                  return updateRecord(table, d.id, { [investedField]: d.invested + sharePerAccount });
-                }));
-                const loserTable = redistPopup.account.type === "perf" ? PERF_TABLE : EVAL_TABLE;
-                const loserField = redistPopup.account.type === "perf" ? "fldAWWar1WK3I9BVi" : "fldAplR2R67gEWPh1";
-                const totalMoved = destinations.reduce((s, d) => s + d.share, 0);
-                const loserNewInvested = Math.max(0, redistPopup.account.invested - (totalMoved / redistPopup.account.n));
-                await updateRecord(loserTable, redistPopup.account.id, { [loserField]: loserNewInvested });
-                setRedistHistory(prev => [...prev, {
-                  time: new Date().toLocaleTimeString(),
-                  from: redistPopup.account.name,
-                  amount: totalMoved,
-                  destinations: destinations.map(d => ({ name: d.name, share: d.share }))
-                }]);
-                setRedistPopup(null);
-                await load();
-              } catch(e) { console.error("redist error:", e); }
-            }}
-            onDismiss={() => setRedistPopup(null)}
-          />
-        )}
         {tab === "gameplan" && (
             <button onClick={save} disabled={saving || filledCount === 0}
               style={{ background: saved ? "#065f46" : "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: filledCount === 0 ? "not-allowed" : "pointer", opacity: filledCount === 0 ? 0.4 : 1 }}>
@@ -2713,8 +2377,6 @@ export default function App() {
                 ["accounts", "📋 All Accounts"],
                 ["purchases", "🛒 Purchases"],
                 ["mgmt", "🔄 Account Management"],
-                ["gameplan", "📊 Reconciliation"],
-                ["redist", `💸 Redistribution${redistHistory.length > 0 ? ` (${redistHistory.length})` : ""}`],
                 ["pl", "📈 P&L"],
                 ["firms", "🏢 Firm Usage"],
               ].map(([key, label]) => (
@@ -2725,22 +2387,6 @@ export default function App() {
           ))}
         </div>
 
-        {tab === "gameplan" && (
-          <ReconciliationTab
-            evalAccounts={evalAccounts}
-            perfAccounts={perfAccounts}
-            inputs={inputs}
-            noChanges={noChanges}
-            dones={dones}
-            onInput={onInput}
-            onNoChange={onNoChange}
-            onDone={onDone}
-            onBreach={onBreach}
-            onRedistPopup={onRedistPopup}
-          />
-        )}
-
-              {tab === "redist" && <RedistTab history={redistHistory} />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
