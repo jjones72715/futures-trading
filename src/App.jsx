@@ -1080,7 +1080,7 @@ function FirmUsageTab() {
 
 function PLTab({ evalAccounts, perfAccounts }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const [startingLiq, setStartingLiq] = useState("");
+  const [startingLiquidation, setStartingLiquidation] = useState("");
   const [purchases, setPurchases] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1099,17 +1099,44 @@ function PLTab({ evalAccounts, perfAccounts }) {
   async function loadPLData() {
     setLoading(true);
     try {
-      const [purchaseRes, payoutRes] = await Promise.all([
-        fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=500`),
-        fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=500`),
+      const [purchaseRecords, payoutRecords] = await Promise.all([
+        fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "$ Invested Per Account before Payout", "Number of Accounts"]),
       ]);
-      const purchaseData = await purchaseRes.json();
-      const payoutData = await payoutRes.json();
-      setPurchases((purchaseData.records || []).filter(r => r.fields["Date Purchased"] === selectedDate));
-      setPayouts((payoutData.records || []).filter(r => r.fields["Date Received"] === selectedDate));
+      setPurchases(purchaseRecords.map(r => ({
+        id: r.id,
+        datePurchased: r.fields["Date Purchased"] || "",
+        status: r.fields["Status"] || "",
+        totalCost: r.fields["Total Cost"] || 0,
+        purchaseType: r.fields["Purchase Type"]?.name || r.fields["Purchase Type"] || "",
+      })));
+      setPayouts(payoutRecords.map(r => ({
+        id: r.id,
+        name: r.fields["Name"] || "",
+        totalAmount: r.fields["Total Amount"] || 0,
+        dateReceived: r.fields["Date Received"] || "",
+        trader: Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : (r.fields["Trader"] || ""),
+        investedPerAcct: r.fields["$ Invested Per Account before Payout"] || 0,
+        numAccounts: r.fields["Number of Accounts"] || 1,
+      })));
     } catch (e) {}
     setLoading(false);
   }
+
+  // Filter purchases by date
+  const dayPurchases = purchases.filter(p => p.datePurchased === selectedDate && p.status === "Active");
+  const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+
+  // Filter payouts by Date Received
+  const dayPayouts = payouts.filter(p => p.dateReceived === selectedDate);
+
+  // Liquidation calc
+  const startLiq = parseFloat(startingLiquidation) || 0;
+  const totalLiq = startLiq + dayPurchaseCost;
+  const tier = totalLiq <= 5000 ? 0.40 : totalLiq <= 10000 ? 0.50 : totalLiq <= 20000 ? 0.60 : 0.70;
+  const tierPct = Math.round(tier * 100);
+  const liqReduction = dayPayouts.reduce((sum, p) => sum + (p.totalAmount || 0) * tier, 0);
+  const endingLiq = totalLiq - liqReduction;
 
   const activeEvals = evalAccounts;
   const nonPayoutPerf = perfAccounts.filter(a => !a.payoutAccount);
@@ -1119,49 +1146,25 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const tdvEvals = activeEvals.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
   const xEvals = activeEvals.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
   const totalActiveEvals = rmcEvals + tdvEvals + xEvals;
-  const investedEvals = activeEvals.reduce((s, a) => s + (a.invested * a.n || 0), 0);
 
   const rmcPerf = nonPayoutPerf.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
   const tdvPerf = nonPayoutPerf.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
   const xPerf = nonPayoutPerf.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
   const totalActivePerf = rmcPerf + tdvPerf + xPerf;
-  const investedPerf = nonPayoutPerf.reduce((s, a) => s + (a.invested * a.n || 0), 0);
 
   const rmcLive = payoutPerf.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
   const tdvLive = payoutPerf.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
   const xLive = payoutPerf.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
   const totalActiveLive = rmcLive + tdvLive + xLive;
-  const profitInActive = payoutPerf.reduce((s, a) => s + (a.invested * a.n || 0), 0);
 
-  const cashedOut = payouts.reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
+  const cashedOut = dayPayouts.reduce((s, p) => s + (p.totalAmount || 0), 0);
 
-  const profitFromOthers = payouts
-    .filter(r => {
-      const trader = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
-      return trader && OTHER_TRADERS.includes(trader);
-    })
-    .reduce((s, r) => {
-      const total = r.fields["Total Amount"] || 0;
-      const investedPerAcct = r.fields["$ Invested Per Account before Payout"] || 0;
-      const n = r.fields["Number of Accounts"] || 1;
-      const invested = investedPerAcct * n;
-      return s + Math.max(0, total - invested) * 0.5;
+  const profitFromOthers = dayPayouts
+    .filter(p => OTHER_TRADERS.includes(p.trader))
+    .reduce((s, p) => {
+      const invested = p.investedPerAcct * p.numAccounts;
+      return s + Math.max(0, p.totalAmount - invested) * 0.5;
     }, 0);
-
-  const todayEvalSpend = purchases
-    .filter(r => ["New", "Reset", "Monthly Billing"].includes(r.fields["Purchase Type"]?.name || r.fields["Purchase Type"]))
-    .reduce((s, r) => s + (r.fields["Total Cost"] || 0), 0);
-
-  const startLiq = parseFloat(startingLiq) || 0;
-  const payoutProfits50 = payouts.reduce((s, r) => {
-    const total = r.fields["Total Amount"] || 0;
-    const investedPerAcct = r.fields["$ Invested Per Account before Payout"] || 0;
-    const n = r.fields["Number of Accounts"] || 1;
-    const invested = investedPerAcct * n;
-    const profit = Math.max(0, total - invested);
-    return s + (profit * 0.5);
-  }, 0);
-  const endLiq = startLiq + todayEvalSpend - payoutProfits50;
 
   function StatBox({ label, value, color = "#fff", sub }) {
     return (
@@ -1192,32 +1195,81 @@ function PLTab({ evalAccounts, perfAccounts }) {
           <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
             style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", outline: "none", colorScheme: "dark" }} />
         </div>
-        <div>
-          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Starting Liquidation $</div>
-          <input type="number" placeholder="Enter yesterday's ending Liq $..." value={startingLiq} onChange={e => setStartingLiq(e.target.value)}
-            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", width: 260, outline: "none" }} />
-        </div>
         <button onClick={loadPLData} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#9ca3af", cursor: "pointer", marginTop: 18 }}>
           🔄 Refresh
         </button>
       </div>
 
+      {/* Liquidation Section */}
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>💧 Liquidation</div>
+
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Starting Liquidation</div>
+            <input type="number" value={startingLiquidation} onChange={e => setStartingLiquidation(e.target.value)}
+              placeholder="0.00"
+              style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Purchases Today</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#f59e0b" }}>
+              ${dayPurchaseCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Total Liquidation</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#fff", fontWeight: 600 }}>
+              ${totalLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div style={{ flex: 0.5 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Tier</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#6366f1", fontWeight: 700 }}>
+              {tierPct}%
+            </div>
+          </div>
+        </div>
+
+        {dayPayouts.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8 }}>Payouts Received Today</div>
+            {dayPayouts.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#1f2937", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: 12 }}>
+                <span style={{ color: "#d1d5db" }}>{p.name}</span>
+                <span style={{ color: "#4ade80" }}>${p.totalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ color: "#9ca3af" }}>× {tierPct}% = <span style={{ color: "#f87171" }}>-${(p.totalAmount * tier).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {dayPayouts.length === 0 && (
+          <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 14 }}>No payouts received on this date.</div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1f2937", paddingTop: 12 }}>
+          <div style={{ fontSize: 13, color: "#9ca3af" }}>Ending Liquidation</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: endingLiq <= 0 ? "#4ade80" : endingLiq < 5000 ? "#f59e0b" : "#f87171" }}>
+            ${endingLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+
       <SectionHeader title="Evaluation Accounts" color="#8b5cf6" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         <StatBox label="RMC Evals" value={rmcEvals} color="#a78bfa" />
         <StatBox label="TDV Evals" value={tdvEvals} color="#a78bfa" />
         <StatBox label="X Evals" value={xEvals} color="#a78bfa" />
         <StatBox label="Active Evals" value={totalActiveEvals} color="#fff" />
-        <StatBox label="$ Invested Evals" value={$$(investedEvals)} color="#c4b5fd" />
       </div>
 
       <SectionHeader title="Performance Accounts" color="#3b82f6" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         <StatBox label="RMC Perf" value={rmcPerf} color="#93c5fd" />
         <StatBox label="TDV Perf" value={tdvPerf} color="#93c5fd" />
         <StatBox label="X Perf" value={xPerf} color="#93c5fd" />
         <StatBox label="Active Perf" value={totalActivePerf} color="#fff" />
-        <StatBox label="$ Invested Perf" value={$$(investedPerf)} color="#93c5fd" />
       </div>
 
       <SectionHeader title="Live & Payout Accounts" color="#f59e0b" />
@@ -1229,9 +1281,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
       </div>
 
       <SectionHeader title="Financials" color="#10b981" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-        <StatBox label="Profit in Active" value={$$(profitInActive)} color="#4ade80" />
-        <StatBox label="Liquidation $" value={$$(endLiq)} color="#f87171" sub={`Start: ${$$(startLiq)} + Spend: ${$$(todayEvalSpend)} − Profits: ${$$(payoutProfits50)}`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
         <StatBox label="Cashed Out Today" value={$$(cashedOut)} color="#4ade80" />
         <StatBox label="Profit from Others" value={$$(profitFromOthers)} color="#4ade80" />
       </div>
