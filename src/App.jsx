@@ -794,8 +794,9 @@ function PurchaseTab() {
 }
 function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Live");
-  const livePerf = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
+  const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
   function getFeeds(accounts) {
     const feeds = {};
     accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
@@ -850,6 +851,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
       <FeedGrid accounts={evalAccounts} color="#8b5cf6" title="Evaluation Accounts" />
       <FeedGrid accounts={standardPerf} color="#3b82f6" title="Performance Accounts" />
       <FeedGrid accounts={livePerf} color="#f59e0b" title="Live & Payout Accounts" />
+      <FeedGrid accounts={waitingPerf} color="#6b7280" title="Waiting on Payout" />
     </div>
   );
 }
