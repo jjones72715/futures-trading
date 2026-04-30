@@ -912,22 +912,22 @@ function FirmUsageTab() {
 
         const allAccounts = [
           ...evalRecords
-            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]))
+            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]?.name || r.fields["Status"]))
             .map(r => ({
               type: "eval",
               name: r.fields["Name"],
-              status: r.fields["Status"],
+              status: r.fields["Status"]?.name || r.fields["Status"],
               trader: traderIdMap[r.fields["Trader"]?.[0]] || r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
               firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
               payoutAccount: false,
             })),
           ...perfRecords
-            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]))
+            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]?.name || r.fields["Status"]))
             .map(r => ({
               type: "perf",
               name: r.fields["Name"],
-              status: r.fields["Status"],
+              status: r.fields["Status"]?.name || r.fields["Status"],
               trader: traderIdMap[r.fields["Trader"]?.[0]] || r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
               firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
