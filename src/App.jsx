@@ -943,6 +943,7 @@ function FirmUsageTab() {
     { key: "Amanda Seratt", label: "Amanda" },
     { key: "Jefferies Parker", label: "Troy" },
     { key: "Judy Jones", label: "Judy" },
+    { key: "Rolly Omas Obial", label: "Rolly" },
   ];
 
   // Build usageMap: firmName → traderLabel → [label]
@@ -1083,7 +1084,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
   };
   const [selectedDate, setSelectedDate] = useState(localToday());
 
-  const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ"];
+  const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ", "recvSEg1nPtZCKujB"];
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
 
   useEffect(() => { loadPLData(); }, [selectedDate]);
