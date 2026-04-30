@@ -2136,12 +2136,19 @@ export default function App() {
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
     try {
-      const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]),
-      ]);
-      console.log("raw perf records:", pr?.length, pr?.[0]);
-      console.log("raw eval records:", er?.length, er?.[0]);
+      let pr = [], er = [];
+      try {
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]);
+        console.log("raw perf records:", pr?.length, pr?.[0]);
+      } catch(perfErr) {
+        console.error("PERF FETCH ERROR:", perfErr);
+      }
+      try {
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]);
+        console.log("raw eval records:", er?.length, er?.[0]);
+      } catch(evalErr) {
+        console.error("EVAL FETCH ERROR:", evalErr);
+      }
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
