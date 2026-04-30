@@ -1293,7 +1293,6 @@ function AccountManagementTab() {
   const [newBalance, setNewBalance] = useState("");
   const [tradingDays, setTradingDays] = useState("");
   const [tradeDown, setTradeDown] = useState(false);
-  const [tradeDownFloor, setTradeDownFloor] = useState("");
   const [resetTradingDays, setResetTradingDays] = useState(true);
   const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
 
@@ -1467,7 +1466,6 @@ function AccountManagementTab() {
       }
       if (tradeDown) {
         fields["Trade Down Account"] = true;
-        if (tradeDownFloor) fields["Trade Down Floor"] = parseFloat(tradeDownFloor);
       }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
       // Create a received payout record if an amount was entered
@@ -1758,14 +1756,6 @@ function AccountManagementTab() {
                     <span style={{ fontSize: 13, color: "#d1d5db" }}>Trade Down Account</span>
                   </label>
                 </div>
-                {tradeDown && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4 }}>Trade Down Floor ($)</div>
-                    <input type="number" value={tradeDownFloor} onChange={e => setTradeDownFloor(e.target.value)}
-                      placeholder="e.g. 48000"
-                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", width: "100%" }} />
-                  </div>
-                )}
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#16a34a" : "#1f2937", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
@@ -2087,7 +2077,7 @@ export default function App() {
     setLoading(true); setErr(null); setSaved(false);
     try {
       const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]),
+        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]),
         fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]),
       ]);
 
@@ -2109,7 +2099,6 @@ export default function App() {
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
           tradeDown: f["Trade Down Account"] || false,
-          tradeDownFloor: f["Trade Down Floor"] || 0,
           contractMultiplier: f["Contract Multiplier"] || 1,
           payoutAccount: f["Payout Account"] || false,
           dataProvider: dp,
@@ -2140,7 +2129,6 @@ export default function App() {
           ddSafety: f["Drawdown Safety"] || 0,
           hwm: f["High Water Mark"] || 0,
           tradeDown: false,
-          tradeDownFloor: 0,
           contractMultiplier: 1,
           payoutAccount: false,
           dataProvider: dp,
