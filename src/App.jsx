@@ -2209,6 +2209,8 @@ export default function App() {
       });
       const evals = allEvals.map(mapEval);
       const perfs = allPerfs.map(mapPerf);
+      console.log("perfAccounts loaded:", perfs.length, perfs[0]);
+      console.log("evalAccounts loaded:", evals.length, evals[0]);
       setEvalAccounts(evals);
       setPerfAccounts(perfs);
       const inp = {};
