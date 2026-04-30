@@ -34,9 +34,16 @@ const EVAL_ACCOUNTS_BY_TRADER = {
 
 async function fetchTable(tableId, fields) {
   const params = fields.map(f => `fields[]=${encodeURIComponent(f)}`).join("&");
-  const res = await fetch(`/.netlify/functions/airtable/${BASE}/${tableId}?${params}&maxRecords=100`);
-  const data = await res.json();
-  return data.records || [];
+  const allRecords = [];
+  let offset = null;
+  do {
+    const url = `/.netlify/functions/airtable/${BASE}/${tableId}?${params}${offset ? `&offset=${offset}` : ""}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    allRecords.push(...(data.records || []));
+    offset = data.offset || null;
+  } while (offset);
+  return allRecords;
 }
 
 async function createRecord(tableId, fields) {
@@ -2034,7 +2041,7 @@ export default function App() {
   const [advanceDayAccounts, setAdvanceDayAccounts] = useState([]);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
-  const [tab, setTab] = useState("gameplan");
+  const [tab, setTab] = useState("accounts");
 
   useEffect(() => { load(); }, []);
 
@@ -2336,30 +2343,14 @@ export default function App() {
               }}
             />
           )}
-        {tab === "gameplan" && (
-            <button onClick={save} disabled={saving || filledCount === 0}
-              style={{ background: saved ? "#065f46" : "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: filledCount === 0 ? "not-allowed" : "pointer", opacity: filledCount === 0 ? 0.4 : 1 }}>
-              {saving ? "Saving..." : saved ? "✓ Saved!" : `Save (${filledCount}) to Airtable`}
-            </button>
-          )}
-          {tab === "gameplan" && <button onClick={load} style={{ background: "transparent", color: "#9ca3af", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>}
-          {tab === "gameplan" && <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>}
+          <button onClick={load} style={{ background: "transparent", color: "#9ca3af", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>
+          <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
 
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 20px" }}>
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>⚠ {err}</div>}
 
-        {tab === "gameplan" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
-            {[["Profit Today", gain, "#22c55e"], ["Loss Today", loss, "#ef4444"], ["Net P&L", net, net >= 0 ? "#3b82f6" : "#f97316"]].map(([label, val, color]) => (
-              <div key={label} style={{ background: `${color}15`, border: `1px solid ${color}40`, borderRadius: 10, padding: "11px 14px" }}>
-                <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color, marginBottom: 3 }}>{label}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color }}>{$$(val)}</div>
-              </div>
-            ))}
-          </div>
-        )}
 
         <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
               {[
