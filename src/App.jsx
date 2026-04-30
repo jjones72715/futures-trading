@@ -2194,7 +2194,6 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: f["Daily Target"] || 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
-          dailyTarget: f["Daily Target"] || 0,
           accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
           tradingDays: f["Trading Days Completed"] || 0,
         };
