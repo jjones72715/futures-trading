@@ -1096,6 +1096,14 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const yRef = useRef(null);
 
   const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ", "recvSEg1nPtZCKujB"];
+  const TRADER_NAMES = {
+    "recmziqSnANAPjtuH": "Jonathan Jones",
+    "recG04aHVI38R6HnR": "Cherelyn Jones",
+    "rec0jB7J1Ir1ZspvM": "Amanda Seratt",
+    "reccHyxv7emOGQJsQ": "Jefferies Parker (Troy)",
+    "rec4l8EM9peAdyin4": "Judy Jones",
+    "recvSEg1nPtZCKujB": "Rolly Omas Obial",
+  };
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
 
   useEffect(() => { loadPLData(); }, []);
@@ -1149,6 +1157,17 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const liqReduction = dayPayouts.reduce((sum, p) => sum + (p.totalAmount || 0) * tier, 0);
   const endingLiq = totalLiq - liqReduction;
 
+  const payoutRows = dayPayouts.map(p => {
+    const traderId = typeof p.trader === "object" ? p.trader?.id : p.trader;
+    const traderName = TRADER_NAMES[traderId] ?? p.trader ?? "—";
+    const totalPayout = p.totalAmount || 0;
+    const liqRepayment = totalPayout * tier;
+    const afterLiq = totalPayout - liqRepayment;
+    const taxSet = totalPayout * 0.10;
+    const traderProfit = afterLiq * 0.65 - taxSet;
+    return { traderName, totalPayout, liqRepayment, afterLiq, taxSet, traderProfit };
+  });
+
   const activeEvals = evalAccounts;
   const nonPayoutPerf = perfAccounts.filter(a => !a.payoutAccount);
   const payoutPerf = perfAccounts.filter(a => a.payoutAccount);
@@ -1171,11 +1190,8 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const cashedOut = dayPayouts.reduce((s, p) => s + (p.totalAmount || 0), 0);
 
   const profitFromOthers = dayPayouts
-    .filter(p => OTHER_TRADERS.includes(p.trader))
-    .reduce((s, p) => {
-      const invested = p.investedPerAcct * p.numAccounts;
-      return s + Math.max(0, p.totalAmount - invested) * 0.5;
-    }, 0);
+    .filter(p => OTHER_TRADERS.includes(typeof p.trader === "object" ? p.trader?.id : p.trader))
+    .reduce((s, p) => s + (p.totalAmount || 0) * 0.5, 0);
 
   function StatBox({ label, value, color = "#fff", sub }) {
     return (
@@ -1320,43 +1336,44 @@ function PLTab({ evalAccounts, perfAccounts }) {
 
       {/* Payouts Received Section */}
       <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>💰 Payouts Received</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span>💰</span>
+          <span style={{ color: "#fff", fontWeight: 600, fontSize: 15 }}>Payouts Received</span>
+        </div>
 
-        {dayPayouts.length === 0 ? (
+        {payoutRows.length === 0 ? (
           <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>No payouts received on this date.</div>
         ) : (
           <>
-            {dayPayouts.slice(0, 3).map((p, i) => {
-              const traderName = p.trader?.name ?? p.trader ?? "—";
-              const acctName = p.account?.name ?? "—";
-              const amount = p.totalAmount ?? 0;
-              const status = p.status ?? "";
-              return (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 6 }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{traderName}</span>
-                    <span style={{ color: "#9ca3af", fontSize: 11 }}>{acctName}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span style={{ color: "#4ade80", fontWeight: 700, fontSize: 13 }}>${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                    {status && <span style={{ color: "#6b7280", fontSize: 11 }}>{status}</span>}
-                  </div>
-                </div>
-              );
-            })}
+            {/* Header Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, padding: "0 10px", marginBottom: 6 }}>
+              <span>Trader</span>
+              <span style={{ textAlign: "right" }}>Payout</span>
+              <span style={{ textAlign: "right" }}>After Liq Repayment</span>
+              <span style={{ textAlign: "right" }}>Put Away for Taxes</span>
+              <span style={{ textAlign: "right" }}>Trader's Profit</span>
+            </div>
 
-            {dayPayouts.length > 3 && (
-              <div style={{ fontSize: 11, color: "#6b7280", textAlign: "right", marginTop: 4 }}>
-                +{dayPayouts.length - 3} more payout{dayPayouts.length - 3 > 1 ? "s" : ""} this day
+            {payoutRows.map((row, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, background: "#1f2937", borderRadius: 8, padding: "10px", marginBottom: 6, fontSize: 13, alignItems: "center" }}>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{row.traderName}</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${row.totalPayout.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${row.afterLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${row.taxSet.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", fontWeight: 700, color: row.traderProfit >= 0 ? "#4ade80" : "#f87171" }}>${row.traderProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              </div>
+            ))}
+
+            {/* Totals Row */}
+            {payoutRows.length > 1 && (
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, borderTop: "1px solid #374151", paddingTop: 10, marginTop: 4, fontSize: 13, fontWeight: 600, padding: "10px" }}>
+                <span style={{ color: "#9ca3af" }}>Total</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${payoutRows.reduce((s, r) => s + r.totalPayout, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${payoutRows.reduce((s, r) => s + r.afterLiq, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${payoutRows.reduce((s, r) => s + r.taxSet, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#4ade80" }}>${payoutRows.reduce((s, r) => s + r.traderProfit, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
               </div>
             )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #1f2937", paddingTop: 12, marginTop: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#d1d5db" }}>Total Received</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: "#4ade80" }}>
-                ${dayPayouts.reduce((sum, p) => sum + (p.totalAmount ?? 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
           </>
         )}
       </div>
