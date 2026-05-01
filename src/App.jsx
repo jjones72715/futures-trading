@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
@@ -1086,27 +1086,23 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const [purchases, setPurchases] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dateInput, setDateInput] = useState("");
+  const [dateM, setDateM] = useState("");
+  const [dateD, setDateD] = useState("");
+  const [dateY, setDateY] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+
+  const mRef = useRef(null);
+  const dRef = useRef(null);
+  const yRef = useRef(null);
 
   const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ", "recvSEg1nPtZCKujB"];
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
 
   useEffect(() => { loadPLData(); }, []);
 
-  function toYMD(str) {
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
-      const [m, d, y] = str.split("/");
-      return `${y}-${m}-${d}`;
-    }
-    return str;
-  }
-
   const handleDateSubmit = () => {
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateInput) || /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-      setSelectedDate(dateInput);
-    } else {
-      alert("Please enter a date in MM/DD/YYYY or YYYY-MM-DD format");
+    if (dateM.length === 2 && dateD.length === 2 && dateY.length === 4) {
+      setSelectedDate(`${dateY}-${dateM}-${dateD}`);
     }
   };
 
@@ -1139,13 +1135,12 @@ function PLTab({ evalAccounts, perfAccounts }) {
     setLoading(false);
   }
 
-  // Filter purchases by date
-  const compareDateYMD = toYMD(selectedDate);
-  const dayPurchases = purchases.filter(p => p.datePurchased === compareDateYMD && p.status === "Active");
+  // Filter purchases by date (selectedDate is always YYYY-MM-DD)
+  const dayPurchases = purchases.filter(p => p.datePurchased === selectedDate && p.status === "Active");
   const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
 
   // Filter payouts by Date Received
-  const dayPayouts = payouts.filter(p => p.dateReceived === compareDateYMD);
+  const dayPayouts = payouts.filter(p => p.dateReceived === selectedDate);
 
   // Liquidation calc
   const startLiq = parseFloat(startingLiquidation) || 0;
@@ -1209,14 +1204,56 @@ function PLTab({ evalAccounts, perfAccounts }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Date</div>
-          <input
-            type="text"
-            placeholder="MM/DD/YYYY"
-            value={dateInput}
-            onChange={e => setDateInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleDateSubmit()}
-            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", outline: "none", width: 130 }}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px" }}>
+            <input
+              ref={mRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="MM"
+              value={dateM}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateM(v);
+                if (v.length === 2) dRef.current?.focus();
+              }}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }}
+            />
+            <span style={{ color: "#6b7280" }}>/</span>
+            <input
+              ref={dRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="DD"
+              value={dateD}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateD(v);
+                if (v.length === 2) yRef.current?.focus();
+              }}
+              onKeyDown={e => e.key === "Backspace" && dateD === "" && mRef.current?.focus()}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }}
+            />
+            <span style={{ color: "#6b7280" }}>/</span>
+            <input
+              ref={yRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={dateY}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateY(v);
+              }}
+              onKeyDown={e => {
+                if (e.key === "Backspace" && dateY === "") dRef.current?.focus();
+                if (e.key === "Enter" && dateY.length === 4) handleDateSubmit();
+              }}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 38, textAlign: "center", outline: "none", border: "none" }}
+            />
+          </div>
         </div>
         <button onClick={handleDateSubmit} style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#fff", cursor: "pointer", marginTop: 18, fontWeight: 600 }}>
           Submit
