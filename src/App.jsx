@@ -1086,17 +1086,29 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const [purchases, setPurchases] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const localToday = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-  const [selectedDate, setSelectedDate] = useState(localToday());
+  const [dateInput, setDateInput] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
 
   const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ", "recvSEg1nPtZCKujB"];
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
 
-  useEffect(() => { loadPLData(); }, [selectedDate]);
+  useEffect(() => { loadPLData(); }, []);
+
+  function toYMD(str) {
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+      const [m, d, y] = str.split("/");
+      return `${y}-${m}-${d}`;
+    }
+    return str;
+  }
+
+  const handleDateSubmit = () => {
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateInput) || /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      setSelectedDate(dateInput);
+    } else {
+      alert("Please enter a date in MM/DD/YYYY or YYYY-MM-DD format");
+    }
+  };
 
   async function loadPLData() {
     setLoading(true);
@@ -1128,11 +1140,12 @@ function PLTab({ evalAccounts, perfAccounts }) {
   }
 
   // Filter purchases by date
-  const dayPurchases = purchases.filter(p => p.datePurchased === selectedDate && p.status === "Active");
+  const compareDateYMD = toYMD(selectedDate);
+  const dayPurchases = purchases.filter(p => p.datePurchased === compareDateYMD && p.status === "Active");
   const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
 
   // Filter payouts by Date Received
-  const dayPayouts = payouts.filter(p => p.dateReceived === selectedDate);
+  const dayPayouts = payouts.filter(p => p.dateReceived === compareDateYMD);
 
   // Liquidation calc
   const startLiq = parseFloat(startingLiquidation) || 0;
@@ -1196,9 +1209,18 @@ function PLTab({ evalAccounts, perfAccounts }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Date</div>
-          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", outline: "none", colorScheme: "dark" }} />
+          <input
+            type="text"
+            placeholder="MM/DD/YYYY"
+            value={dateInput}
+            onChange={e => setDateInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleDateSubmit()}
+            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", outline: "none", width: 130 }}
+          />
         </div>
+        <button onClick={handleDateSubmit} style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#fff", cursor: "pointer", marginTop: 18, fontWeight: 600 }}>
+          Submit
+        </button>
         <button onClick={loadPLData} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#9ca3af", cursor: "pointer", marginTop: 18 }}>
           🔄 Refresh
         </button>
