@@ -1103,7 +1103,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
     try {
       const [purchaseRecords, payoutRecords] = await Promise.all([
         fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
-        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "$ Invested Per Account before Payout", "Number of Accounts"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Account", "Status", "$ Invested Per Account before Payout", "Number of Accounts"]),
       ]);
       setPurchases(purchaseRecords.map(r => ({
         id: r.id,
@@ -1118,6 +1118,8 @@ function PLTab({ evalAccounts, perfAccounts }) {
         totalAmount: r.fields["Total Amount"] || 0,
         dateReceived: r.fields["Date Received"] || "",
         trader: Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : (r.fields["Trader"] || ""),
+        account: Array.isArray(r.fields["Account"]) ? r.fields["Account"][0] : (r.fields["Account"] || null),
+        status: r.fields["Status"]?.name || r.fields["Status"] || "",
         investedPerAcct: r.fields["$ Invested Per Account before Payout"] || 0,
         numAccounts: r.fields["Number of Accounts"] || 1,
       })));
@@ -1256,6 +1258,49 @@ function PLTab({ evalAccounts, perfAccounts }) {
             ${endingLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
           </div>
         </div>
+      </div>
+
+      {/* Payouts Received Section */}
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>💰 Payouts Received</div>
+
+        {dayPayouts.length === 0 ? (
+          <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>No payouts received on this date.</div>
+        ) : (
+          <>
+            {dayPayouts.slice(0, 3).map((p, i) => {
+              const traderName = p.trader?.name ?? p.trader ?? "—";
+              const acctName = p.account?.name ?? "—";
+              const amount = p.totalAmount ?? 0;
+              const status = p.status ?? "";
+              return (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 6 }}>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{traderName}</span>
+                    <span style={{ color: "#9ca3af", fontSize: 11 }}>{acctName}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <span style={{ color: "#4ade80", fontWeight: 700, fontSize: 13 }}>${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                    {status && <span style={{ color: "#6b7280", fontSize: 11 }}>{status}</span>}
+                  </div>
+                </div>
+              );
+            })}
+
+            {dayPayouts.length > 3 && (
+              <div style={{ fontSize: 11, color: "#6b7280", textAlign: "right", marginTop: 4 }}>
+                +{dayPayouts.length - 3} more payout{dayPayouts.length - 3 > 1 ? "s" : ""} this day
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #1f2937", paddingTop: 12, marginTop: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#d1d5db" }}>Total Received</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#4ade80" }}>
+                ${dayPayouts.reduce((sum, p) => sum + (p.totalAmount ?? 0), 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       <SectionHeader title="Evaluation Accounts" color="#8b5cf6" />
