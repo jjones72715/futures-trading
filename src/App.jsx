@@ -166,10 +166,12 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
         </div>
       </div>
 
-      <div style={{ width: 105, flexShrink: 0 }}>
-        <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Progress</div>
-        <Bar prog={a.prog} />
-      </div>
+      {a.prog > 0 && (
+        <div style={{ width: 105, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Progress</div>
+          <Bar prog={a.prog} />
+        </div>
+      )}
 
       <div style={{ width: 95, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Balance</div>
@@ -816,7 +818,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
           <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>
+          {a.prog > 0 && <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>}
           <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
           {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
           {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
@@ -2258,7 +2260,7 @@ export default function App() {
     try {
       let pr = [], er = [];
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
