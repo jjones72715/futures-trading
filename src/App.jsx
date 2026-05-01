@@ -1160,11 +1160,11 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const payoutRows = dayPayouts.map(p => {
     const traderId = typeof p.trader === "object" ? p.trader?.id : p.trader;
     const traderName = TRADER_NAMES[traderId] ?? p.trader ?? "—";
-    const totalPayout = p.totalAmount || 0;
-    const liqRepayment = totalPayout * tier;
-    const afterLiq = totalPayout - liqRepayment;
-    const taxSet = totalPayout * 0.10;
-    const traderProfit = afterLiq * 0.65 - taxSet;
+    const totalPayout  = Math.round(p.totalAmount || 0);
+    const liqRepayment = Math.round(totalPayout * tier);
+    const afterLiq     = Math.round(totalPayout - liqRepayment);
+    const taxSet       = Math.round(totalPayout * 0.10);
+    const traderProfit = Math.round(afterLiq * 0.65 - taxSet);
     return { traderName, totalPayout, liqRepayment, afterLiq, taxSet, traderProfit };
   });
 
@@ -1357,10 +1357,10 @@ function PLTab({ evalAccounts, perfAccounts }) {
             {payoutRows.map((row, i) => (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, background: "#1f2937", borderRadius: 8, padding: "10px", marginBottom: 6, fontSize: 13, alignItems: "center" }}>
                 <span style={{ color: "#fff", fontWeight: 600 }}>{row.traderName}</span>
-                <span style={{ textAlign: "right", color: "#93c5fd" }}>${row.totalPayout.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ textAlign: "right", color: "#fcd34d" }}>${row.afterLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ textAlign: "right", color: "#f87171" }}>${row.taxSet.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ textAlign: "right", fontWeight: 700, color: row.traderProfit >= 0 ? "#4ade80" : "#f87171" }}>${row.traderProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${row.totalPayout.toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${row.afterLiq.toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${row.taxSet.toLocaleString()}</span>
+                <span style={{ textAlign: "right", fontWeight: 700, color: row.traderProfit >= 0 ? "#4ade80" : "#f87171" }}>${row.traderProfit.toLocaleString()}</span>
               </div>
             ))}
 
@@ -1368,10 +1368,10 @@ function PLTab({ evalAccounts, perfAccounts }) {
             {payoutRows.length > 1 && (
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, borderTop: "1px solid #374151", paddingTop: 10, marginTop: 4, fontSize: 13, fontWeight: 600, padding: "10px" }}>
                 <span style={{ color: "#9ca3af" }}>Total</span>
-                <span style={{ textAlign: "right", color: "#93c5fd" }}>${payoutRows.reduce((s, r) => s + r.totalPayout, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ textAlign: "right", color: "#fcd34d" }}>${payoutRows.reduce((s, r) => s + r.afterLiq, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ textAlign: "right", color: "#f87171" }}>${payoutRows.reduce((s, r) => s + r.taxSet, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ textAlign: "right", color: "#4ade80" }}>${payoutRows.reduce((s, r) => s + r.traderProfit, 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${payoutRows.reduce((s, r) => s + r.totalPayout, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${payoutRows.reduce((s, r) => s + r.afterLiq, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${payoutRows.reduce((s, r) => s + r.taxSet, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#4ade80" }}>${payoutRows.reduce((s, r) => s + r.traderProfit, 0).toLocaleString()}</span>
               </div>
             )}
           </>
