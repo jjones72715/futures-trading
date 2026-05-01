@@ -1113,6 +1113,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
         fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
         fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Account", "Status", "$ Invested Per Account before Payout", "Number of Accounts"]),
       ]);
+      console.log("RAW PAYOUT RECORDS:", JSON.stringify(payoutRecords.slice(0, 3), null, 2));
       setPurchases(purchaseRecords.map(r => ({
         id: r.id,
         datePurchased: r.fields["Date Purchased"] || "",
@@ -1140,7 +1141,12 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
 
   // Filter payouts by Date Received
-  const dayPayouts = payouts.filter(p => p.dateReceived === selectedDate);
+  console.log("PAYOUTS IN PLTAB:", payouts.length, "| SELECTED DATE:", selectedDate);
+  const dayPayouts = payouts.filter(p => {
+    const receivedClean = String(p.dateReceived ?? "").trim().slice(0, 10);
+    if (selectedDate) console.log("Comparing payout date:", JSON.stringify(receivedClean), "===", JSON.stringify(selectedDate));
+    return receivedClean === selectedDate;
+  });
 
   // Liquidation calc
   const startLiq = parseFloat(startingLiquidation) || 0;
