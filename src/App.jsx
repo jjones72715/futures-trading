@@ -1111,9 +1111,8 @@ function PLTab({ evalAccounts, perfAccounts }) {
     try {
       const [purchaseRecords, payoutRecords] = await Promise.all([
         fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
-        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Account", "Status", "$ Invested Per Account before Payout", "Number of Accounts"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts"]),
       ]);
-      console.log("RAW PAYOUT RECORDS:", JSON.stringify(payoutRecords.slice(0, 3), null, 2));
       setPurchases(purchaseRecords.map(r => ({
         id: r.id,
         datePurchased: r.fields["Date Purchased"] || "",
@@ -1127,9 +1126,8 @@ function PLTab({ evalAccounts, perfAccounts }) {
         totalAmount: r.fields["Total Amount"] || 0,
         dateReceived: r.fields["Date Received"] || "",
         trader: Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : (r.fields["Trader"] || ""),
-        account: Array.isArray(r.fields["Account"]) ? r.fields["Account"][0] : (r.fields["Account"] || null),
+        account: Array.isArray(r.fields["Performance Account"]) ? r.fields["Performance Account"][0] : (r.fields["Performance Account"] || null),
         status: r.fields["Status"]?.name || r.fields["Status"] || "",
-        investedPerAcct: r.fields["$ Invested Per Account before Payout"] || 0,
         numAccounts: r.fields["Number of Accounts"] || 1,
       })));
     } catch (e) {}
@@ -1141,12 +1139,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
 
   // Filter payouts by Date Received
-  console.log("PAYOUTS IN PLTAB:", payouts.length, "| SELECTED DATE:", selectedDate);
-  const dayPayouts = payouts.filter(p => {
-    const receivedClean = String(p.dateReceived ?? "").trim().slice(0, 10);
-    if (selectedDate) console.log("Comparing payout date:", JSON.stringify(receivedClean), "===", JSON.stringify(selectedDate));
-    return receivedClean === selectedDate;
-  });
+  const dayPayouts = payouts.filter(p => String(p.dateReceived ?? "").trim().slice(0, 10) === selectedDate);
 
   // Liquidation calc
   const startLiq = parseFloat(startingLiquidation) || 0;
