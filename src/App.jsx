@@ -794,14 +794,16 @@ function PurchaseTab() {
     </div>
   );
 }
-function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
+function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
   const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
+  const allShown = [...evalAccounts, ...standardPerf, ...livePerf, ...waitingPerf];
+  const doneAccounts = allShown.filter(a => dones[a.id]);
   function getFeeds(accounts) {
     const feeds = {};
-    accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
+    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => a.prog - b.prog).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
       feeds[dp].push(a);
@@ -809,20 +811,29 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     return feeds;
   }
   function AccountMiniCard({ a }) {
+    const isDone = !!dones[a.id];
     return (
-      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 7, padding: "5px 8px", marginBottom: 4, opacity: dones[a.id] ? 0.5 : 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-          {a.status === "Live" && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+      <div style={{ background: C.card, border: `1px solid ${isDone ? "#1a2030" : "#1f2937"}`, borderRadius: 7, padding: "5px 8px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: isDone ? "#4b5563" : "#fff", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{a.name}</span>
+          {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+          {onDone && (
+            <button onClick={() => onDone(a.id)} title={isDone ? "Mark active" : "Day completed"}
+              style={{ background: isDone ? "#166534" : "#1f2937", border: `1px solid ${isDone ? "#22c55e" : "#374151"}`, borderRadius: 4, width: 18, height: 18, fontSize: 10, cursor: "pointer", color: isDone ? "#4ade80" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>
+              {isDone ? "✓" : "☐"}
+            </button>
+          )}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
-          {a.prog > 0 && <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>}
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
-          {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
-          {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
-        </div>
+        {!isDone && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
+            <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
+            {a.prog > 0 && <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>}
+            <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
+            {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
+            {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
+          </div>
+        )}
       </div>
     );
   }
@@ -830,12 +841,13 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     if (accounts.length === 0) return null;
     const feeds = getFeeds(accounts);
     const feedNames = Object.keys(feeds).sort();
+    if (feedNames.length === 0) return null;
     return (
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
           <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.filter(a => !dones[a.id]).length}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 8 }}>
           {feedNames.map(feed => (
@@ -854,6 +866,18 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
       <FeedGrid accounts={standardPerf} color="#3b82f6" title="Performance Accounts" />
       <FeedGrid accounts={livePerf} color="#f59e0b" title="Live & Payout Accounts" />
       <FeedGrid accounts={waitingPerf} color="#6b7280" title="Waiting on Payout" />
+      {doneAccounts.length > 0 && (
+        <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ width: 3, height: 16, background: "#374151", borderRadius: 99 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#4b5563" }}>Done Today</span>
+            <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{doneAccounts.length}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
+            {doneAccounts.map(a => <AccountMiniCard key={a.id} a={a} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2527,8 +2551,8 @@ export default function App() {
               }}
             />
           )}
-          <button onClick={load} style={{ background: "transparent", color: "#9ca3af", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>
-          <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
+          <button onClick={load} style={{ background: "transparent", color: "#4ade80", border: "1px solid #166534", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>
+          <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
 
@@ -2553,7 +2577,7 @@ export default function App() {
 
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
-              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
               {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
