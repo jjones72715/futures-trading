@@ -1658,9 +1658,15 @@ function AccountManagementTab() {
       }));
     });
   }, []);
-  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
-  const inp = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
+  const C = { bg: "#0d1117", card: "#1f2a37", border: "#2d3f50" };
+  const sel = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
+  const inp = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
+  const subTabStyle = (active) => ({
+    background: active ? "#2563eb" : "#1f2a37",
+    color: active ? "#fff" : "#aaa",
+    border: `1px solid ${active ? "#3b82f6" : "#2f3b4a"}`,
+    borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+  });
   const today = new Date().toISOString().split("T")[0];
 
   const [activeTab, setActiveTab] = useState("passed_evals");
@@ -1958,9 +1964,8 @@ function AccountManagementTab() {
     <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>{text}</div>
   );
 
-  const TabBtn = ({ id, color, children }) => (
-    <button onClick={() => { setActiveTab(id); resetForm(); }}
-      style={{ background: "none", border: "none", borderBottom: activeTab === id ? `2px solid ${color}` : "2px solid transparent", color: activeTab === id ? color : "#6b7280", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: -1, whiteSpace: "nowrap" }}>
+  const TabBtn = ({ id, children }) => (
+    <button onClick={() => { setActiveTab(id); resetForm(); }} style={subTabStyle(activeTab === id)}>
       {children}
     </button>
   );
@@ -1975,14 +1980,15 @@ function AccountManagementTab() {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "440px 1fr", gap: 20, alignItems: "start" }}>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-
+      <div>
         {/* Sub tabs */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 18, gap: 0 }}>
-          <TabBtn id="passed_evals" color="#8b5cf6">📈 Passed Evals</TabBtn>
-          <TabBtn id="stage_mgmt" color="#3b82f6">🎯 Stages</TabBtn>
-          <TabBtn id="payouts" color="#f59e0b">💰 Payouts</TabBtn>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <TabBtn id="passed_evals">📈 Passed Evals</TabBtn>
+          <TabBtn id="stage_mgmt">🎯 Stages</TabBtn>
+          <TabBtn id="payouts">💰 Payouts</TabBtn>
         </div>
+
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
 
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
         {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
@@ -2010,7 +2016,7 @@ function AccountManagementTab() {
                       const pt = ptId ? perfTypes.find(t => t.id === ptId) : null;
                       return (
                         <div key={r.id} onClick={() => { setSelectedEvalId(r.id); if (pt) setStartingBalance(pt.accountSize.toString()); setNumAccounts(r.fields["Number of Accounts"] || 1); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
-                          style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#1f2937", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                          style={{ background: selectedEvalId === r.id ? "#2d1b69" : "#111827", border: `1px solid ${selectedEvalId === r.id ? "#8b5cf6" : "#2d3f50"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
                           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
                             → {pt?.name || "Unknown perf type"} · ×{r.fields["Number of Accounts"]}
@@ -2024,7 +2030,7 @@ function AccountManagementTab() {
 
             {selectedEvalId && perfType && (
               <>
-                <div style={{ background: "#1a1a2e", border: "1px solid #8b5cf6", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                <div style={{ background: "#111827", border: "1px solid #8b5cf6", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
                   <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 700, marginBottom: 4 }}>Will create:</div>
                   <div style={{ fontSize: 12, color: "#e5e7eb" }}>{perfType.name}</div>
                   <div style={{ fontSize: 11, color: "#6b7280" }}>Account Size: {$$(perfType.accountSize)}</div>
@@ -2058,7 +2064,7 @@ function AccountManagementTab() {
                 </div>
 
                 <button onClick={handleConvertEval} disabled={!startingBalance || submitting}
-                  style={{ width: "100%", background: startingBalance ? "#7c3aed" : "#1f2937", color: startingBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: startingBalance ? "pointer" : "not-allowed" }}>
+                  style={{ width: "100%", background: startingBalance ? "#7c3aed" : "#111827", color: startingBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: startingBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Converting..." : "✓ Convert to Performance Account"}
                 </button>
               </>
@@ -2079,7 +2085,7 @@ function AccountManagementTab() {
                       const stage = payoutStrategies.find(s => s.id === stageId);
                       return (
                         <div key={r.id} onClick={() => { setSelectedPerfId(r.id); setStageAction(""); setContractMultiplier(r.fields["Contract Multiplier"] || 1); }}
-                          style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#1f2937", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                          style={{ background: selectedPerfId === r.id ? "#1e3a5f" : "#111827", border: `1px solid ${selectedPerfId === r.id ? "#3b82f6" : "#2d3f50"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
                           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
                             {stage ? `Stage ${stage.stage} · Target ${$$(stage.target)}` : "No stage"} · {$$(r.fields["Current Balance"])}
@@ -2095,7 +2101,7 @@ function AccountManagementTab() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {nextStage && (
                   <div onClick={() => setStageAction("advance")}
-                    style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                     <span style={{ fontSize: 22 }}>⬆️</span>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>Advance to Stage {nextStage.stage}</div>
@@ -2104,7 +2110,7 @@ function AccountManagementTab() {
                   </div>
                 )}
                 <div onClick={() => setStageAction("payout")}
-                  style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                  style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 22 }}>💰</span>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Request Payout</div>
@@ -2150,7 +2156,7 @@ function AccountManagementTab() {
                   </label>
                 </div>
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
-                  style={{ width: "100%", background: newBalance ? "#16a34a" : "#1f2937", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
+                  style={{ width: "100%", background: newBalance ? "#16a34a" : "#111827", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
                 </button>
               </>
@@ -2192,7 +2198,7 @@ function AccountManagementTab() {
                       </div>
                       {items.map(p => (
                         <div key={p.id} onClick={() => { setSelectedPayoutId(p.id); setPayoutAction(""); setNewPayoutStatus(""); }}
-                          style={{ background: selectedPayoutId === p.id ? "#1c1c2e" : "#1f2937", border: `1px solid ${selectedPayoutId === p.id ? statusColor[status] : "#374151"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer", marginBottom: 8 }}>
+                          style={{ background: selectedPayoutId === p.id ? "#1e3a5f" : "#111827", border: `1px solid ${selectedPayoutId === p.id ? statusColor[status] : "#2d3f50"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer", marginBottom: 8 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{p.fields["Name"]}</div>
                           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
                             Requested: {p.fields["Date Requested"] || "—"} · Accounts: ×{p.fields["Number of Accounts"] || 1}
@@ -2206,7 +2212,7 @@ function AccountManagementTab() {
                 {selectedPayoutId && !payoutAction && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
                     <div onClick={() => setPayoutAction("status")}
-                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                      style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ fontSize: 20 }}>🔄</span>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#93c5fd" }}>Update Status</div>
@@ -2214,7 +2220,7 @@ function AccountManagementTab() {
                       </div>
                     </div>
                     <div onClick={() => setPayoutAction("receive")}
-                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                      style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ fontSize: 20 }}>✅</span>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>Mark as Received</div>
@@ -2234,13 +2240,13 @@ function AccountManagementTab() {
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                       {["Requested", "Processing", "Approved"].map(s => (
                         <button key={s} onClick={() => setNewPayoutStatus(s)}
-                          style={{ background: newPayoutStatus === s ? statusColor[s] : "#1f2937", color: newPayoutStatus === s ? "#fff" : "#9ca3af", border: `1px solid ${newPayoutStatus === s ? statusColor[s] : "#374151"}`, borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                          style={{ background: newPayoutStatus === s ? statusColor[s] : "#111827", color: newPayoutStatus === s ? "#fff" : "#9ca3af", border: `1px solid ${newPayoutStatus === s ? statusColor[s] : "#2d3f50"}`, borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                           {s}
                         </button>
                       ))}
                     </div>
                     <button onClick={handleUpdatePayoutStatus} disabled={!newPayoutStatus || submitting}
-                      style={{ width: "100%", background: newPayoutStatus ? "#1d4ed8" : "#1f2937", color: newPayoutStatus ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newPayoutStatus ? "pointer" : "not-allowed" }}>
+                      style={{ width: "100%", background: newPayoutStatus ? "#1d4ed8" : "#111827", color: newPayoutStatus ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newPayoutStatus ? "pointer" : "not-allowed" }}>
                       {submitting ? "Saving..." : "Update Status"}
                     </button>
                   </>
@@ -2276,7 +2282,7 @@ function AccountManagementTab() {
                       </div>
                     </div>
                     <button onClick={handleReceivePayout} disabled={!receivedAmount || !postPayoutBalance || !postPayoutStageId || submitting}
-                      style={{ width: "100%", background: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#16a34a" : "#1f2937", color: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                      style={{ width: "100%", background: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#16a34a" : "#111827", color: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                       {submitting ? "Saving..." : "✓ Mark Received & Advance Stage"}
                     </button>
                   </>
@@ -2285,6 +2291,7 @@ function AccountManagementTab() {
             )}
           </>
         )}
+      </div>
       </div>
 
       {/* Right info panel */}
@@ -2299,7 +2306,7 @@ function AccountManagementTab() {
               ["Accounts", `×${selectedEval.fields["Number of Accounts"]}`],
               ["→ Perf Type", perfType?.name || "Unknown"],
             ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d3f50" }}>
                 <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
               </div>
@@ -2321,7 +2328,7 @@ function AccountManagementTab() {
               ["Trading Days", selectedPerf.fields["Trading Days this Cycle"] || 0],
               ["Accounts", `×${selectedPerf.fields["Number of Accounts"]}`],
             ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d3f50" }}>
                 <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
               </div>
@@ -2330,7 +2337,7 @@ function AccountManagementTab() {
         )}
 
         {activeTab === "payouts" && selectedPayout && (
-          <div style={{ background: C.card, border: `1px solid ${statusColor[selectedPayout.fields["Status"]] || "#374151"}`, borderRadius: 12, padding: 20 }}>
+          <div style={{ background: C.card, border: `1px solid ${statusColor[selectedPayout.fields["Status"]] || "#2d3f50"}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: statusColor[selectedPayout.fields["Status"]] || "#fff", marginBottom: 12 }}>Payout Details</div>
             {[
               ["Name", selectedPayout.fields["Name"]],
@@ -2340,7 +2347,7 @@ function AccountManagementTab() {
               ["Perf Account", payoutPerf?.fields["Name"] || "—"],
               ["Current Balance", payoutPerf ? $$(payoutPerf.fields["Current Balance"]) : "—"],
             ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1f2937" }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d3f50" }}>
                 <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
               </div>
