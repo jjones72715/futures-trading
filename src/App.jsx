@@ -2655,7 +2655,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
-          accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
+          accountTypeId: (() => { const v = (f["Evaluation Account Type"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })(),
           tradingDays: f["Trading Days Completed"] || 0,
           tradingDaysLeft: f["Trading Days Left"] ?? null,
           score: f["Score"] ?? null,
