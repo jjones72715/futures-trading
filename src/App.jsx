@@ -807,6 +807,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     return init;
   });
   const [blowns, setBlowns] = React.useState({});
+  const [countTradingDays, setCountTradingDays] = React.useState({});
   const [scoreSaving, setScoreSaving] = React.useState(false);
   const [scoreSaved, setScoreSaved] = React.useState(false);
   async function saveScore(a, val) {
@@ -818,11 +819,19 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   async function submitAllScores() {
     setScoreSaving(true);
     try {
-      const updates = allShown.filter(a => {
+      const scoreUpdates = allShown.filter(a => {
         const v = scoreInputs[a.id];
         return v !== "" && v !== undefined && !isNaN(parseFloat(v));
       });
-      await Promise.all(updates.map(a => saveScore(a, scoreInputs[a.id])));
+      const tdUpdates = allShown.filter(a => countTradingDays[a.id]);
+      await Promise.all([
+        ...scoreUpdates.map(a => saveScore(a, scoreInputs[a.id])),
+        ...tdUpdates.map(a => {
+          const table = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+          const field = a.type === "perf" ? "Trading Days this Cycle" : "Trading Days Completed";
+          return updateRecord(table, a.id, { [field]: (a.tradingDays || 0) + 1 });
+        }),
+      ]);
       setScoreSaved(true);
       setTimeout(() => setScoreSaved(false), 3000);
     } catch (e) {}
@@ -841,12 +850,13 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     });
     return feeds;
   }
-  function AccountMiniCard({ a }) {
+  function AccountMiniCard(a) {
     const isDone = !!dones[a.id];
     const isBlown = !!blowns[a.id];
+    const isCountTD = !!countTradingDays[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
     return (
-      <div style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+      <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
         {/* Trader — Firm — Score badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
@@ -857,10 +867,11 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
         </div>
-        {/* Stats: Target | Trading Days | Days Left | Weight | New Score */}
+        {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
           {[
             ["Target", $$(a.limit)],
+            ["Acct #", a.accountNumber ?? "—"],
             ["Trading Days", a.tradingDays ?? 0],
             ["Days Left", a.tradingDaysLeft ?? "—"],
             ["Weight", a.accountWeight ?? "—"],
@@ -870,30 +881,36 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
               <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
             </div>
           ))}
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>New Score</div>
+        </div>
+        {/* 2x2 action grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+          {/* Row 1: Done Today | Blown */}
+          {onDone ? (
+            <button onClick={() => onDone(a.id)}
+              style={{ background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+              {isDone ? "✓ Done Today" : "☐ Done Today"}
+            </button>
+          ) : <div />}
+          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+            style={{ background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+            {isBlown ? "✓ Blown" : "☐ Blown"}
+          </button>
+          {/* Row 2: Count as Trading Day | New Score */}
+          <button onClick={() => setCountTradingDays(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+            style={{ background: isCountTD ? "#1d4ed8" : "#1e3a5f", border: `1px solid ${isCountTD ? "#60a5fa" : "#2563eb"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+            {isCountTD ? "✓ Count Trading Day" : "☐ Count Trading Day"}
+          </button>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2, textAlign: "center" }}>New Score</div>
             <input
               type="number"
               value={scoreInputs[a.id] ?? ""}
-              onChange={e => setScoreInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
+              onChange={e => { const v = e.target.value; setScoreInputs(prev => ({ ...prev, [a.id]: v })); }}
               onBlur={e => saveScore(a, e.target.value)}
               placeholder="—"
               style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: "100%", padding: "2px 4px", outline: "none", textAlign: "center", boxSizing: "border-box" }}
             />
           </div>
-        </div>
-        {/* Checkboxes */}
-        <div style={{ display: "flex", gap: 6 }}>
-          {onDone && (
-            <button onClick={() => onDone(a.id)}
-              style={{ flex: 1, background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isDone ? "#fff" : "#86efac", fontWeight: 700 }}>
-              {isDone ? "✓ Done Today" : "☐ Done Today"}
-            </button>
-          )}
-          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
-            style={{ flex: 1, background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isBlown ? "#fff" : "#fca5a5", fontWeight: 700 }}>
-            {isBlown ? "✓ Blown" : "☐ Blown"}
-          </button>
         </div>
       </div>
     );
@@ -914,7 +931,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           {feedNames.map(feed => (
             <div key={feed}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, paddingBottom: 3, borderBottom: "1px solid #1f2937" }}>{feed}</div>
-              {feeds[feed].map(a => <AccountMiniCard key={a.id} a={a} />)}
+              {feeds[feed].map(a => AccountMiniCard(a))}
             </div>
           ))}
         </div>
@@ -941,7 +958,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{doneAccounts.length}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
-            {doneAccounts.map(a => <AccountMiniCard key={a.id} a={a} />)}
+            {doneAccounts.map(a => AccountMiniCard(a))}
           </div>
         </div>
       )}
@@ -2416,6 +2433,7 @@ export default function App() {
           tradingDaysLeft: f["Trading Days Left"] ?? null,
           cycleStartBal: f["Cycle Start Balance"] || 0,
           score: f["Score"] ?? null,
+          accountNumber: f["Account Number"] || null,
         };
       };
 
@@ -2448,6 +2466,7 @@ export default function App() {
           tradingDays: f["Trading Days Completed"] || 0,
           tradingDaysLeft: f["Trading Days Left"] ?? null,
           score: f["Score"] ?? null,
+          accountNumber: f["Account Number"] || null,
         };
       };
 
