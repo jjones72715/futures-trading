@@ -946,10 +946,10 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
         </button>
       </div>
-      <FeedGrid accounts={evalAccounts} color="#8b5cf6" title="Evaluation Accounts" />
-      <FeedGrid accounts={standardPerf} color="#3b82f6" title="Performance Accounts" />
-      <FeedGrid accounts={livePerf} color="#f59e0b" title="Live & Payout Accounts" />
-      <FeedGrid accounts={waitingPerf} color="#6b7280" title="Waiting on Payout" />
+      {FeedGrid({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
+      {FeedGrid({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
+      {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts" })}
+      {FeedGrid({ accounts: waitingPerf, color: "#6b7280", title: "Waiting on Payout" })}
       {doneAccounts.length > 0 && (
         <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
