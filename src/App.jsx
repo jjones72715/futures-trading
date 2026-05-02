@@ -862,7 +862,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
             {header}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 800, background: a.score != null ? "#78350f" : "#1f2937", color: a.score != null ? "#ffd700" : "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${a.score != null ? "#ffd700" : "#374151"}` }}>
+          <span style={(() => { const sc = a.score; const c = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444"; return { fontSize: 12, fontWeight: 800, background: c ? `${c}22` : "#1f2937", color: c ?? "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${c ?? "#374151"}` }; })()}>
             {a.score != null ? a.score : "—"}
           </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
