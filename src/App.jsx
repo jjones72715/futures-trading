@@ -794,6 +794,178 @@ function PurchaseTab() {
     </div>
   );
 }
+
+function BreachModal({ account, onClose, onBreached }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [step, setStep] = React.useState("choice"); // "choice" | "reset"
+  const [evalTypeList, setEvalTypeList] = React.useState([]);
+  const [traderList, setTraderList] = React.useState([]);
+  const [evalTypeId, setEvalTypeId] = React.useState(account.accountTypeId || "");
+  const [date, setDate] = React.useState(today);
+  const [numAccounts, setNumAccounts] = React.useState(1);
+  const [costPer, setCostPer] = React.useState("");
+  const [notes, setNotes] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]).then(rows => {
+      const list = rows.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name));
+      setEvalTypeList(list);
+      const pre = list.find(t => t.id === account.accountTypeId);
+      if (pre) setCostPer(pre.cost.toString());
+    }).catch(() => {});
+    fetchTable(TRADERS_TABLE, ["Name"]).then(rows => {
+      setTraderList(rows.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
+    }).catch(() => {});
+  }, []);
+
+  function handleEvalTypeChange(id) {
+    setEvalTypeId(id);
+    const et = evalTypeList.find(t => t.id === id);
+    if (et) setCostPer(et.cost.toString());
+  }
+
+  async function handleBreach() {
+    setSubmitting(true); setErr(null);
+    try {
+      await updateRecord(EVAL_TABLE, account.id, { "Status": "Failed" });
+      onBreached(account.id);
+      onClose();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSubmitting(false);
+  }
+
+  async function handleReset() {
+    const evalType = evalTypeList.find(t => t.id === evalTypeId);
+    if (!evalType || !costPer || !date) { setErr("Fill in all required fields."); return; }
+    setSubmitting(true); setErr(null);
+    try {
+      // Fail the current eval account
+      await updateRecord(EVAL_TABLE, account.id, { "Status": "Failed" });
+      // Create new eval account
+      const traderName = account.traderName || account.name || "Unknown";
+      const newEvalFields = {
+        "Name": `${traderName.split(" ")[0]} - ${evalType.name}`,
+        "Status": "Active",
+        "Current Balance": evalType.accountSize,
+        "High Water Mark": evalType.accountSize,
+        "Date Purchased": date,
+        "Date Started": date,
+        "Number of Accounts": parseInt(numAccounts),
+      };
+      if (evalTypeId) newEvalFields["Evaluation Account Type"] = [evalTypeId];
+      // Carry over trader link if available
+      const newEvalRecord = await createRecord(EVAL_TABLE, newEvalFields);
+      const newEvalId = newEvalRecord?.id;
+      // Create purchase log
+      const purchaseFields = {
+        "Name": `${traderName.split(" ")[0]} - ${evalType.name} - ${date}`,
+        "Date Purchased": date,
+        "Number of Accounts": parseInt(numAccounts),
+        "Cost Per Account": parseFloat(costPer),
+        "Purchase Type": "Reset",
+        "Status": "Active",
+        "Notes": notes || undefined,
+      };
+      if (evalTypeId) purchaseFields["Evaluation Account Type"] = [evalTypeId];
+      if (newEvalId) purchaseFields["Evaluation Account"] = [newEvalId];
+      await createRecord(PURCHASE_TABLE, purchaseFields);
+      onBreached(account.id);
+      onClose();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSubmitting(false);
+  }
+
+  const evalType = evalTypeList.find(t => t.id === evalTypeId);
+  const totalCost = (parseFloat(costPer) || 0) * numAccounts;
+  const inp = { background: "#0f172a", border: "1px solid #374151", borderRadius: 6, color: "#fff", fontSize: 13, padding: "7px 10px", width: "100%", outline: "none", boxSizing: "border-box" };
+  const lbl = text => <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>{text}</div>;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div style={{ background: "#1f2a37", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 400, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+          Account Breached — {account.traderName || account.name}
+        </div>
+        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 20 }}>{account.firmName} · {account.accountNumber || ""}</div>
+
+        {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
+
+        {step === "choice" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div onClick={() => setStep("reset")} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 22 }}>🔄</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Reset Account</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Fail this account and create a new one</div>
+              </div>
+            </div>
+            <div onClick={handleBreach} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: submitting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 22 }}>❌</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>Breach Account</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>Mark as Failed, no new account</div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "1px solid #374151", borderRadius: 8, color: "#6b7280", fontSize: 12, padding: "8px", cursor: "pointer", marginTop: 4 }}>Cancel</button>
+          </div>
+        )}
+
+        {step === "reset" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <button onClick={() => setStep("choice")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Reset Account</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                {lbl("Evaluation Type")}
+                <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={{ ...inp, cursor: "pointer" }}>
+                  <option value="">Choose type...</option>
+                  {evalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                {lbl("Date")}
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {lbl("# of Accounts")}
+                <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                {lbl("Cost Per Account")}
+                <input type="number" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              {lbl("Notes (optional)")}
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
+            </div>
+            {evalType && (
+              <div style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12 }}>
+                <div style={{ color: "#fca5a5" }}>• This account → <strong>Failed</strong></div>
+                <div style={{ color: "#4ade80" }}>• New eval account → <strong>Active</strong> at {evalType ? `$${evalType.accountSize.toLocaleString()}` : "—"}</div>
+              </div>
+            )}
+            {totalCost > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#f87171" }}>${totalCost.toLocaleString()}</span>
+              </div>
+            )}
+            <button onClick={handleReset} disabled={submitting || !evalTypeId || !costPer || !date}
+              style={{ width: "100%", background: evalTypeId && costPer && date ? "#d97706" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer" }}>
+              {submitting ? "Saving..." : `Reset Account${totalCost > 0 ? ` — $${totalCost.toLocaleString()}` : ""}`}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
@@ -808,6 +980,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   });
   const [blowns, setBlowns] = React.useState({});
   const [countTradingDays, setCountTradingDays] = React.useState({});
+  const [breachModalAccount, setBreachModalAccount] = React.useState(null);
   const [scoreSaving, setScoreSaving] = React.useState(false);
   const [scoreSaved, setScoreSaved] = React.useState(false);
   async function saveScore(a, val) {
@@ -898,7 +1071,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
               {isDone ? "✓ Done Today" : "☐ Done Today"}
             </button>
           ) : <div />}
-          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+          <button onClick={() => isBlown ? setBlowns(prev => ({ ...prev, [a.id]: false })) : setBreachModalAccount(a)}
             style={{ background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
             {isBlown ? "✓ Breached" : "☐ Breached"}
           </button>
@@ -952,6 +1125,13 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   }
   return (
     <div>
+      {breachModalAccount && (
+        <BreachModal
+          account={breachModalAccount}
+          onClose={() => setBreachModalAccount(null)}
+          onBreached={id => setBlowns(prev => ({ ...prev, [id]: true }))}
+        />
+      )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <button onClick={submitAllScores} disabled={scoreSaving}
           style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: scoreSaving ? "not-allowed" : "pointer" }}>
