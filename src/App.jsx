@@ -806,6 +806,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     allShown.forEach(a => { init[a.id] = a.score != null ? String(a.score) : ""; });
     return init;
   });
+  const [blowns, setBlowns] = React.useState({});
   const [scoreSaving, setScoreSaving] = React.useState(false);
   const [scoreSaved, setScoreSaved] = React.useState(false);
   async function saveScore(a, val) {
@@ -830,12 +831,11 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   function getFeeds(accounts) {
     const feeds = {};
     accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
-      const sa = parseFloat(scoreInputs[a.id]) ?? a.score ?? Infinity;
-      const sb = parseFloat(scoreInputs[b.id]) ?? b.score ?? Infinity;
-      if (sa === Infinity && sb === Infinity) return 0;
-      if (sa === Infinity) return 1;
-      if (sb === Infinity) return -1;
-      return sa - sb;
+      const rawA = parseFloat(scoreInputs[a.id]);
+      const rawB = parseFloat(scoreInputs[b.id]);
+      const va = isNaN(rawA) ? (a.score != null ? a.score : 99) : rawA;
+      const vb = isNaN(rawB) ? (b.score != null ? b.score : 99) : rawB;
+      return va - vb;
     }).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
@@ -845,39 +845,49 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   }
   function AccountMiniCard({ a }) {
     const isDone = !!dones[a.id];
+    const isBlown = !!blowns[a.id];
+    const displayScore = scoreInputs[a.id] !== "" && scoreInputs[a.id] !== undefined
+      ? scoreInputs[a.id]
+      : (a.score != null ? a.score : "—");
     return (
-      <div style={{ background: C.card, border: `1px solid ${isDone ? "#1a2030" : "#1f2937"}`, borderRadius: 7, padding: "5px 8px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: isDone ? "#4b5563" : "#fff", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{a.name}</span>
+      <div style={{ background: C.card, border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+        {/* Name — Firm */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+            {a.name} — {a.dataProvider || "—"}
+          </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+        </div>
+        {/* Score · Target · Weight · New Score input */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: "#6b7280" }}>Score <span style={{ color: "#fff", fontWeight: 700 }}>{displayScore}</span></span>
+          <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80", fontWeight: 700 }}>{$$(a.dailyTarget)}</span></span>
+          {a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af", fontWeight: 700 }}>{a.accountWeight}</span></span>}
+          <span style={{ fontSize: 10, color: "#6b7280", display: "flex", alignItems: "center", gap: 3 }}>
+            New Score
+            <input
+              type="number"
+              value={scoreInputs[a.id] ?? ""}
+              onChange={e => setScoreInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
+              onBlur={e => saveScore(a, e.target.value)}
+              placeholder="—"
+              style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: 40, padding: "1px 4px", outline: "none", textAlign: "center" }}
+            />
+          </span>
+        </div>
+        {/* Checkboxes */}
+        <div style={{ display: "flex", gap: 6 }}>
           {onDone && (
             <button onClick={() => onDone(a.id)} title={isDone ? "Mark active" : "Day completed"}
-              style={{ background: isDone ? "#166534" : "#1f2937", border: `1px solid ${isDone ? "#22c55e" : "#374151"}`, borderRadius: 4, width: 18, height: 18, fontSize: 10, cursor: "pointer", color: isDone ? "#4ade80" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>
-              {isDone ? "✓" : "☐"}
+              style={{ flex: 1, background: isDone ? "#166534" : "#1f2937", border: `1px solid ${isDone ? "#22c55e" : "#374151"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isDone ? "#4ade80" : "#6b7280", fontWeight: 600 }}>
+              {isDone ? "✓ Done Today" : "☐ Done Today"}
             </button>
           )}
+          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))} title={isBlown ? "Mark not blown" : "Mark blown"}
+            style={{ flex: 1, background: isBlown ? "#7f1d1d" : "#1f2937", border: `1px solid ${isBlown ? "#dc2626" : "#374151"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isBlown ? "#fca5a5" : "#6b7280", fontWeight: 600 }}>
+            {isBlown ? "✓ Blown" : "☐ Blown"}
+          </button>
         </div>
-        {!isDone && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
-            <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
-            {a.prog > 0 && <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>}
-            <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
-            {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
-            {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
-            <span style={{ fontSize: 10, color: "#6b7280", display: "flex", alignItems: "center", gap: 3 }}>
-              Score
-              <input
-                type="number"
-                value={scoreInputs[a.id] ?? ""}
-                onChange={e => setScoreInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
-                onBlur={e => saveScore(a, e.target.value)}
-                placeholder="—"
-                style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: 40, padding: "1px 4px", outline: "none", textAlign: "center" }}
-              />
-            </span>
-          </div>
-        )}
       </div>
     );
   }
