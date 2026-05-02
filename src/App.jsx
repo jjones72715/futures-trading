@@ -806,11 +806,26 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     allShown.forEach(a => { init[a.id] = a.score != null ? String(a.score) : ""; });
     return init;
   });
+  const [scoreSaving, setScoreSaving] = React.useState(false);
+  const [scoreSaved, setScoreSaved] = React.useState(false);
   async function saveScore(a, val) {
     const num = parseFloat(val);
     if (isNaN(num)) return;
     const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
     await updateRecord(tableId, a.id, { "Score": num });
+  }
+  async function submitAllScores() {
+    setScoreSaving(true);
+    try {
+      const updates = allShown.filter(a => {
+        const v = scoreInputs[a.id];
+        return v !== "" && v !== undefined && !isNaN(parseFloat(v));
+      });
+      await Promise.all(updates.map(a => saveScore(a, scoreInputs[a.id])));
+      setScoreSaved(true);
+      setTimeout(() => setScoreSaved(false), 3000);
+    } catch (e) {}
+    setScoreSaving(false);
   }
   function getFeeds(accounts) {
     const feeds = {};
@@ -891,6 +906,12 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   }
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button onClick={submitAllScores} disabled={scoreSaving}
+          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: scoreSaving ? "not-allowed" : "pointer" }}>
+          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
+        </button>
+      </div>
       <FeedGrid accounts={evalAccounts} color="#8b5cf6" title="Evaluation Accounts" />
       <FeedGrid accounts={standardPerf} color="#3b82f6" title="Performance Accounts" />
       <FeedGrid accounts={livePerf} color="#f59e0b" title="Live & Payout Accounts" />
@@ -2580,7 +2601,7 @@ export default function App() {
               }}
             />
           )}
-          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "transparent", color: "#4ade80", border: "1px solid #166534", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>
+          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "#166534", color: "#fff", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>↻ Refresh</button>
           <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
