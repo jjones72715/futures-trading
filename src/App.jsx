@@ -922,7 +922,7 @@ function BreachModal({ account, onClose, onBreached }) {
               <div style={{ gridColumn: "1 / -1" }}>
                 {lbl("Evaluation Type")}
                 <div style={{ ...inp, color: "#d1d5db", background: "#1f2937", cursor: "default" }}>
-                  {evalTypeList.find(t => t.id === evalTypeId)?.name || "Loading..."}
+                  {account.accountTypeName || evalTypeList.find(t => t.id === evalTypeId)?.name || "—"}
                 </div>
               </div>
               <div>
@@ -2656,6 +2656,7 @@ export default function App() {
           dailyTarget: 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           accountTypeId: (() => { const v = (f["Evaluation Account Type"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })(),
+          accountTypeName: (() => { const v = (f["Evaluation Account Type"] || [])[0]; return typeof v === "object" ? v?.name || null : null; })(),
           tradingDays: f["Trading Days Completed"] || 0,
           tradingDaysLeft: f["Trading Days Left"] ?? null,
           score: f["Score"] ?? null,
