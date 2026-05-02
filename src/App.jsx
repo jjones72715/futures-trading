@@ -798,7 +798,8 @@ function PurchaseTab() {
 function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   const today = new Date().toISOString().slice(0, 10);
   const [step, setStep] = React.useState("choice");
-  const [evalTypeId] = React.useState(account.accountTypeId || "");
+  const [evalTypeId, setEvalTypeId] = React.useState(account.accountTypeId || "");
+  console.log("BreachModal opened — accountTypeId:", account.accountTypeId, "evalTypeList:", evalTypeList.map(t => t.id + "=" + t.name));
   const [date, setDate] = React.useState(today);
   const [numAccounts, setNumAccounts] = React.useState(1);
   const [costPer, setCostPer] = React.useState(() => {
@@ -904,9 +905,10 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <div style={{ gridColumn: "1 / -1" }}>
                 {lbl("Evaluation Type")}
-                <div style={{ ...inp, color: "#d1d5db", background: "#1f2937", cursor: "default" }}>
-                  {account.accountTypeName || evalTypeList.find(t => t.id === evalTypeId)?.name || "—"}
-                </div>
+                <select value={evalTypeId} onChange={e => { setEvalTypeId(e.target.value); const et = evalTypeList.find(t => t.id === e.target.value); if (et) setCostPer(et.cost.toString()); }} style={{ ...inp, cursor: "pointer" }}>
+                  <option value="">Choose type...</option>
+                  {evalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
               </div>
               <div>
                 {lbl("Date")}
@@ -2573,8 +2575,10 @@ export default function App() {
 
       try {
         const etRecs = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]);
-        setEvalTypeList(etRecs.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
-      } catch(e) {}
+        const etList = etRecs.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name));
+        console.log("evalTypeList loaded:", etList.length, etList.map(t => t.id + " = " + t.name));
+        setEvalTypeList(etList);
+      } catch(e) { console.error("evalTypeList fetch failed:", e); }
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
