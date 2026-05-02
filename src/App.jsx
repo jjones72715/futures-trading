@@ -921,10 +921,9 @@ function BreachModal({ account, onClose, onBreached }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <div style={{ gridColumn: "1 / -1" }}>
                 {lbl("Evaluation Type")}
-                <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={{ ...inp, cursor: "pointer" }}>
-                  <option value="">Choose type...</option>
-                  {evalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+                <div style={{ ...inp, color: "#d1d5db", background: "#1f2937", cursor: "default" }}>
+                  {evalTypeList.find(t => t.id === evalTypeId)?.name || "Loading..."}
+                </div>
               </div>
               <div>
                 {lbl("Date")}
