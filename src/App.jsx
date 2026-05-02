@@ -846,44 +846,52 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   function AccountMiniCard({ a }) {
     const isDone = !!dones[a.id];
     const isBlown = !!blowns[a.id];
-    const displayScore = scoreInputs[a.id] !== "" && scoreInputs[a.id] !== undefined
-      ? scoreInputs[a.id]
-      : (a.score != null ? a.score : "—");
+    const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
     return (
       <div style={{ background: C.card, border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
-        {/* Name — Firm */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        {/* Trader — Firm — Score badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-            {a.name} — {a.dataProvider || "—"}
+            {header}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 800, background: a.score != null ? "#1e3a5f" : "#1f2937", color: a.score != null ? "#60a5fa" : "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${a.score != null ? "#2563eb" : "#374151"}` }}>
+            {a.score != null ? a.score : "—"}
           </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
         </div>
-        {/* Score · Target · Weight · New Score input */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Score <span style={{ color: "#fff", fontWeight: 700 }}>{displayScore}</span></span>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80", fontWeight: 700 }}>{$$(a.dailyTarget)}</span></span>
-          {a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af", fontWeight: 700 }}>{a.accountWeight}</span></span>}
-          <span style={{ fontSize: 10, color: "#6b7280", display: "flex", alignItems: "center", gap: 3 }}>
-            New Score
+        {/* Stats: Target | Trading Days | Days Left | New Score */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
+          {[
+            ["Target", $$(a.dailyTarget)],
+            ["Trading Days", a.tradingDays ?? 0],
+            ["Days Left", a.tradingDaysLeft ?? "—"],
+          ].map(([label, val]) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
+            </div>
+          ))}
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>New Score</div>
             <input
               type="number"
               value={scoreInputs[a.id] ?? ""}
               onChange={e => setScoreInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
               onBlur={e => saveScore(a, e.target.value)}
               placeholder="—"
-              style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: 40, padding: "1px 4px", outline: "none", textAlign: "center" }}
+              style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: "100%", padding: "2px 4px", outline: "none", textAlign: "center", boxSizing: "border-box" }}
             />
-          </span>
+          </div>
         </div>
         {/* Checkboxes */}
         <div style={{ display: "flex", gap: 6 }}>
           {onDone && (
-            <button onClick={() => onDone(a.id)} title={isDone ? "Mark active" : "Day completed"}
+            <button onClick={() => onDone(a.id)}
               style={{ flex: 1, background: isDone ? "#166534" : "#1f2937", border: `1px solid ${isDone ? "#22c55e" : "#374151"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isDone ? "#4ade80" : "#6b7280", fontWeight: 600 }}>
               {isDone ? "✓ Done Today" : "☐ Done Today"}
             </button>
           )}
-          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))} title={isBlown ? "Mark not blown" : "Mark blown"}
+          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
             style={{ flex: 1, background: isBlown ? "#7f1d1d" : "#1f2937", border: `1px solid ${isBlown ? "#dc2626" : "#374151"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isBlown ? "#fca5a5" : "#6b7280", fontWeight: 600 }}>
             {isBlown ? "✓ Blown" : "☐ Blown"}
           </button>
@@ -2342,15 +2350,21 @@ export default function App() {
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
     try {
-      let pr = [], er = [];
+      let pr = [], er = [], traderRecs = [];
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader", "Score"]);
+        traderRecs = await fetchTable("tbla0lbJ9z1PAhNy7", ["Name"]);
+      } catch(e) {}
+      const traderMap = {};
+      traderRecs.forEach(r => { traderMap[r.id] = r.fields["Name"] || ""; });
+
+      try {
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Score"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -2361,10 +2375,13 @@ export default function App() {
       const mapPerf = r => {
         const f = r.fields;
         const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        const traderId = Array.isArray(f["Trader"]) ? f["Trader"][0] : (f["Trader"] || "");
         return {
           id: r.id, type: "perf",
           name: f["Name"] || "?",
-          trader: (Array.isArray(f["Trader"]) ? f["Trader"][0] : f["Trader"]) || "",
+          traderName: traderMap[traderId] || "",
+          firmName: (Array.isArray(f["Firm Name"]) ? f["Firm Name"][0] : f["Firm Name"]) || "",
+          trader: traderId,
           status: f["Status"]?.name || f["Status"] || "",
           bal: f["Current Balance"] || 0,
           ddLeft: f["Current Drawdown Left"] || 0,
@@ -2383,6 +2400,7 @@ export default function App() {
           tradingDayType: (f["Trading Day Type"] || [])[0] || null,
           minProfitDay: (f["Min Profitable Day Amount"] || [])[0] || 0,
           tradingDays: f["Trading Days this Cycle"] || 0,
+          tradingDaysLeft: f["Trading Days Left"] ?? null,
           cycleStartBal: f["Cycle Start Balance"] || 0,
           score: f["Score"] ?? null,
         };
@@ -2391,10 +2409,13 @@ export default function App() {
       const mapEval = r => {
         const f = r.fields;
         const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        const traderId = Array.isArray(f["Trader"]) ? f["Trader"][0] : (f["Trader"] || "");
         return {
           id: r.id, type: "eval",
           name: f["Name"] || "?",
-          trader: "",
+          traderName: traderMap[traderId] || "",
+          firmName: (Array.isArray(f["Firm Name"]) ? f["Firm Name"][0] : f["Firm Name"]) || "",
+          trader: traderId,
           status: f["Status"]?.name || f["Status"] || "",
           bal: f["Current Balance"] || 0,
           ddLeft: f["Current Drawdown Left"] || 0,
@@ -2412,6 +2433,7 @@ export default function App() {
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
           tradingDays: f["Trading Days Completed"] || 0,
+          tradingDaysLeft: f["Trading Days Left"] ?? null,
           score: f["Score"] ?? null,
         };
       };
