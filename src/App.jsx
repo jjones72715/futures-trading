@@ -323,6 +323,7 @@ function PurchaseTab() {
   const [selectedEvalId, setSelectedEvalId] = useState("");
   const [evalTypeId, setEvalTypeId] = useState("");
   const [date, setDate] = useState(today);
+  const [dateStarted, setDateStarted] = useState(today);
   const [numAccounts, setNumAccounts] = useState(1);
   const [costPer, setCostPer] = useState("");
   const [notes, setNotes] = useState("");
@@ -355,7 +356,7 @@ function PurchaseTab() {
 
   async function loadEvalAccounts() {
     try {
-      const records = await fetchTable(EVAL_TABLE, ["Name", "Status", "Evaluation Account Type", "Number of Accounts"]);
+      const records = await fetchTable(EVAL_TABLE, ["Name", "Status", "Evaluation Account Type", "Number of Accounts", "Date Started"]);
       setEvalAccounts(records.filter(r => r.fields["Status"] === "Active"));
     } catch (e) {}
   }
@@ -400,7 +401,12 @@ function PurchaseTab() {
         if (et) setCostPer(et.cost.toString());
       }
       const evalArr = p.fields["Evaluation Account"];
-      if (Array.isArray(evalArr)) setSelectedEvalId(typeof evalArr[0] === "string" ? evalArr[0] : evalArr[0]?.id || "");
+      if (Array.isArray(evalArr)) {
+        const evalId = typeof evalArr[0] === "string" ? evalArr[0] : evalArr[0]?.id || "";
+        setSelectedEvalId(evalId);
+        const evalRec = evalAccounts.find(r => r.id === evalId);
+        if (evalRec?.fields?.["Date Started"]) setDateStarted(evalRec.fields["Date Started"]);
+      }
       setNumAccounts(p.fields["Number of Accounts"] || 1);
     }
   }
@@ -420,6 +426,7 @@ function PurchaseTab() {
     setNotes("");
     setNumAccounts(1);
     setDate(today);
+    setDateStarted(today);
     setTraderId("");
   }
 
@@ -442,8 +449,9 @@ function PurchaseTab() {
           await updateRecord(EVAL_TABLE, selectedEvalId, {
             "Current Balance": accountSize,
             "High Water Mark": accountSize,
-            "Date Started": date,
             "Date Purchased": date,
+            "Date Started": dateStarted,
+            "Trading Days Completed": 0,
           });
         }
         const purchaseName = `${selectedPurchase?.fields["Name"]?.split(" - ")[0]} - ${evalType?.name} - ${date}`;
@@ -590,8 +598,12 @@ function PurchaseTab() {
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                   <div>
-                    {label("Date")}
+                    {label("Purchase Date")}
                     <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Date Started")}
+                    <input type="date" value={dateStarted} onChange={e => setDateStarted(e.target.value)} style={inp} />
                   </div>
                   <div>
                     {label("# of Accounts")}
@@ -614,7 +626,8 @@ function PurchaseTab() {
                     <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>On submit:</div>
                     <div style={{ fontSize: 12, color: "#fca5a5" }}>• Old purchase → <strong>Failed</strong></div>
                     <div style={{ fontSize: 12, color: "#4ade80" }}>• New Reset purchase → <strong>Active</strong></div>
-                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Eval account balance & HWM reset to <strong>{$$(selectedEvalType.accountSize)}</strong></div>
+                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Balance & HWM reset to <strong>{$$(selectedEvalType.accountSize)}</strong></div>
+                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Trading days reset to <strong>0</strong></div>
                   </div>
                 )}
 
@@ -800,6 +813,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   const [step, setStep] = React.useState("choice");
   const [evalTypeId, setEvalTypeId] = React.useState(account.accountTypeId || "");
   const [date, setDate] = React.useState(today);
+  const [dateStarted, setDateStarted] = React.useState(account.datePurchased || today);
   const [numAccounts, setNumAccounts] = React.useState(1);
   const [costPer, setCostPer] = React.useState(() => {
     const pre = evalTypeList.find(t => t.id === (account.accountTypeId || ""));
@@ -834,7 +848,8 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
         "Current Balance": evalType.accountSize,
         "High Water Mark": evalType.accountSize,
         "Date Purchased": date,
-        "Date Started": date,
+        "Date Started": dateStarted,
+        "Trading Days Completed": 0,
         "Number of Accounts": parseInt(numAccounts),
       };
       if (evalTypeId) newEvalFields["Evaluation Account Type"] = [evalTypeId];
@@ -910,8 +925,12 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
                 </select>
               </div>
               <div>
-                {lbl("Date")}
+                {lbl("Purchase Date")}
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {lbl("Date Started")}
+                <input type="date" value={dateStarted} onChange={e => setDateStarted(e.target.value)} style={inp} />
               </div>
               <div>
                 {lbl("# of Accounts")}
@@ -930,6 +949,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
               <div style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12 }}>
                 <div style={{ color: "#fca5a5" }}>• This account → <strong>Failed</strong></div>
                 <div style={{ color: "#4ade80" }}>• New eval account → <strong>Active</strong> at {evalType ? `$${evalType.accountSize.toLocaleString()}` : "—"}</div>
+                <div style={{ color: "#93c5fd" }}>• Trading days → <strong>0</strong></div>
               </div>
             )}
             {totalCost > 0 && (
