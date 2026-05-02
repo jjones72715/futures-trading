@@ -799,7 +799,6 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   const today = new Date().toISOString().slice(0, 10);
   const [step, setStep] = React.useState("choice");
   const [evalTypeId, setEvalTypeId] = React.useState(account.accountTypeId || "");
-  console.log("BreachModal opened — accountTypeId:", account.accountTypeId, "evalTypeList:", evalTypeList.map(t => t.id + "=" + t.name));
   const [date, setDate] = React.useState(today);
   const [numAccounts, setNumAccounts] = React.useState(1);
   const [costPer, setCostPer] = React.useState(() => {
@@ -950,7 +949,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   );
 }
 
-function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, evalTypeList = [] }) {
+function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
   const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
@@ -965,6 +964,12 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, evalTypeLis
   const [blowns, setBlowns] = React.useState({});
   const [countTradingDays, setCountTradingDays] = React.useState({});
   const [breachModalAccount, setBreachModalAccount] = React.useState(null);
+  const [evalTypeList, setEvalTypeList] = React.useState([]);
+  React.useEffect(() => {
+    fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts"]).then(rows => {
+      setEvalTypeList(rows.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
+    }).catch(() => {});
+  }, []);
   const [scoreSaving, setScoreSaving] = React.useState(false);
   const [scoreSaved, setScoreSaved] = React.useState(false);
   async function saveScore(a, val) {
@@ -2501,8 +2506,6 @@ export default function App() {
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("accounts");
-  const [evalTypeList, setEvalTypeList] = useState([]);
-
   useEffect(() => { load(); }, []);
 
   function advanceDay() {
@@ -2572,13 +2575,6 @@ export default function App() {
         console.error("EVAL FETCH ERROR:", evalErr);
       }
 
-
-      try {
-        const etRecs = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]);
-        const etList = etRecs.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name));
-        console.log("evalTypeList loaded:", etList.length, etList.map(t => t.id + " = " + t.name));
-        setEvalTypeList(etList);
-      } catch(e) { console.error("evalTypeList fetch failed:", e); }
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
@@ -2881,7 +2877,7 @@ export default function App() {
 
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
-              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} evalTypeList={evalTypeList} />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
               {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
