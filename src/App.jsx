@@ -803,7 +803,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const doneAccounts = allShown.filter(a => dones[a.id]);
   function getFeeds(accounts) {
     const feeds = {};
-    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => a.prog - b.prog).forEach(a => {
+    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => (a.ddSafety || 0) - (b.ddSafety || 0)).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
       feeds[dp].push(a);
@@ -2542,16 +2542,14 @@ export default function App() {
                     });
                   }
                 }));
-                setDones({});
                 setNoChanges({});
                 setInputs({});
-                localStorage.removeItem("tradingDones");
                 localStorage.removeItem("tradingNoChanges");
                 await load();
               }}
             />
           )}
-          <button onClick={load} style={{ background: "transparent", color: "#4ade80", border: "1px solid #166534", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>
+          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "transparent", color: "#4ade80", border: "1px solid #166534", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>
           <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
