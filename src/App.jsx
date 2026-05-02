@@ -801,9 +801,27 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
   const allShown = [...evalAccounts, ...standardPerf, ...livePerf, ...waitingPerf];
   const doneAccounts = allShown.filter(a => dones[a.id]);
+  const [scoreInputs, setScoreInputs] = React.useState(() => {
+    const init = {};
+    allShown.forEach(a => { init[a.id] = a.score != null ? String(a.score) : ""; });
+    return init;
+  });
+  async function saveScore(a, val) {
+    const num = parseFloat(val);
+    if (isNaN(num)) return;
+    const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+    await updateRecord(tableId, a.id, { "Score": num });
+  }
   function getFeeds(accounts) {
     const feeds = {};
-    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => (a.ddSafety || 0) - (b.ddSafety || 0)).forEach(a => {
+    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
+      const sa = parseFloat(scoreInputs[a.id]) ?? a.score ?? Infinity;
+      const sb = parseFloat(scoreInputs[b.id]) ?? b.score ?? Infinity;
+      if (sa === Infinity && sb === Infinity) return 0;
+      if (sa === Infinity) return 1;
+      if (sb === Infinity) return -1;
+      return sa - sb;
+    }).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
       feeds[dp].push(a);
@@ -825,13 +843,24 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           )}
         </div>
         {!isDone && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
             <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
             {a.prog > 0 && <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>}
             <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
             {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
             {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
+            <span style={{ fontSize: 10, color: "#6b7280", display: "flex", alignItems: "center", gap: 3 }}>
+              Score
+              <input
+                type="number"
+                value={scoreInputs[a.id] ?? ""}
+                onChange={e => setScoreInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
+                onBlur={e => saveScore(a, e.target.value)}
+                placeholder="—"
+                style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: 40, padding: "1px 4px", outline: "none", textAlign: "center" }}
+              />
+            </span>
           </div>
         )}
       </div>
@@ -2284,13 +2313,13 @@ export default function App() {
     try {
       let pr = [], er = [];
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader", "Score"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Score"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -2324,6 +2353,7 @@ export default function App() {
           minProfitDay: (f["Min Profitable Day Amount"] || [])[0] || 0,
           tradingDays: f["Trading Days this Cycle"] || 0,
           cycleStartBal: f["Cycle Start Balance"] || 0,
+          score: f["Score"] ?? null,
         };
       };
 
@@ -2351,6 +2381,7 @@ export default function App() {
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
           tradingDays: f["Trading Days Completed"] || 0,
+          score: f["Score"] ?? null,
         };
       };
 
