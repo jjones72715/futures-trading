@@ -898,7 +898,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           {/* Row 2: Count as Trading Day | New Score */}
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             {a.tradingDayDefinition && (
-              <div style={{ fontSize: 9, color: "#94a3b8", fontStyle: "italic", lineHeight: 1.3 }}>{a.tradingDayDefinition}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", textAlign: "center", textTransform: "uppercase", lineHeight: 1.3 }}>{a.tradingDayDefinition}</div>
             )}
             <button onClick={() => setCountTradingDays(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
               style={{ background: isCountTD ? "#1d4ed8" : "#1e3a5f", border: `1px solid ${isCountTD ? "#60a5fa" : "#2563eb"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
