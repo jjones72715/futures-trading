@@ -1,2 +1,260 @@
-main {
+:root {
+  --bg: #000000;
+  --card: #111111;
+  --card-raised: #161616;
+  --border: #222222;
+  --yellow: #ffd700;
+  --profit: #00ff88;
+  --profit-alt: #22c55e;
+  --loss: #ff4d4f;
+  --text: #ffffff;
+  --muted: #aaaaaa;
+  --muted-2: #888888;
+  --shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  background: var(--bg);
+}
+
+body {
+  color: var(--text);
+  background: var(--bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+#root > div,
+.app-shell {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+#root > div > div[style*="justify-content: space-between"],
+.app-header {
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  background: var(--card) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: var(--shadow);
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:first-child,
+.app-header-title {
+  grid-column: 2;
+  text-align: center;
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:first-child div:last-child,
+.app-header-title div:last-child {
+  color: var(--muted) !important;
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:last-child,
+.app-header-actions {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:last-child > span {
+  display: none !important;
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:last-child > button:last-child:not(:first-child) {
+  display: none !important;
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:last-child button,
+.app-header-actions button {
+  border-color: var(--border) !important;
+  color: var(--yellow) !important;
+  background: #151515 !important;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+#root > div > div[style*="justify-content: space-between"] > div:last-child button:hover,
+.app-header-actions button:hover {
+  border-color: var(--yellow) !important;
+  background: #1b1b1b !important;
+}
+
+#root > div > div[style*="max-width: 1400px"],
+.app-content {
+  padding-top: 24px !important;
+  padding-bottom: 32px !important;
+  background: var(--bg);
+}
+
+#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button),
+.top-tabs {
+  display: flex !important;
+  align-items: flex-end;
+  gap: 4px !important;
+  border-bottom: 1px solid var(--border) !important;
+  margin-bottom: 28px !important;
+  padding-top: 4px;
+  overflow-x: auto;
+}
+
+#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button,
+.top-tab {
+  position: relative;
+  z-index: 1;
+  top: 0;
+  margin-bottom: 0 !important;
+  white-space: nowrap;
+  background: #e5e5e5 !important;
+  border: 1px solid #cfcfcf !important;
+  border-bottom-color: #cfcfcf !important;
+  border-radius: 10px 10px 0 0 !important;
+  color: #000000 !important;
+  padding: 9px 18px !important;
+  font-weight: 600 !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button[style*="rgb(96, 165, 250)"],
+#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button[style*="#60a5fa"],
+.top-tab.active {
+  top: -2px !important;
+  z-index: 2 !important;
+  margin-bottom: -1px !important;
+  background: var(--yellow) !important;
+  border-color: var(--yellow) !important;
+  border-bottom-color: var(--yellow) !important;
+  color: #000000 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 -2px 10px rgba(255, 215, 0, 0.24);
+}
+
+#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button:hover,
+.top-tab:hover {
+  transform: translateY(-1px);
+}
+
+#root > div > div[style*="max-width: 1400px"] div[style*="background: #111827"][style*="padding"],
+#root > div > div[style*="max-width: 1400px"] div[style*="background: rgb(17, 24, 39)"][style*="padding"],
+#root > div > div[style*="max-width: 1400px"] div[style*="background: #1f2937"][style*="padding"],
+#root > div > div[style*="max-width: 1400px"] div[style*="background: rgb(31, 41, 55)"][style*="padding"],
+.app-content div[style*="background: #111827"][style*="padding"],
+.app-content div[style*="background: rgb(17, 24, 39)"][style*="padding"] {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow);
+}
+
+#root > div > div[style*="max-width: 1400px"] > div:not(:has(> button)) {
+  margin-bottom: 28px;
+}
+
+#root > div > div[style*="max-width: 1400px"] div[style*="flex-wrap: wrap"][style*="padding: 10px 14px"],
+.account-card {
+  background: var(--card-raised) !important;
+  border-color: var(--border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+#root > div > div[style*="max-width: 1400px"] div[style*="flex-wrap: wrap"][style*="padding: 10px 14px"]:hover,
+.account-card:hover {
+  border-color: var(--yellow) !important;
+  transform: scale(1.02);
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.18), var(--shadow);
+}
+
+.account-card.is-profit,
+#root > div > div[style*="max-width: 1400px"] div[style*="border: 1px solid rgb(22, 101, 52)"],
+#root > div > div[style*="max-width: 1400px"] div[style*="border: 1px solid #166534"] {
+  border-color: rgba(0, 255, 136, 0.35) !important;
+}
+
+.account-card.is-loss,
+#root > div > div[style*="max-width: 1400px"] div[style*="border: 1px solid rgb(127, 29, 29)"],
+#root > div > div[style*="max-width: 1400px"] div[style*="border: 1px solid #7f1d1d"] {
+  border-color: rgba(255, 77, 79, 0.42) !important;
+}
+
+#root [style*="#4ade80"],
+#root [style*="rgb(74, 222, 128)"],
+#root [style*="#22c55e"],
+#root [style*="rgb(34, 197, 94)"],
+.account-card.is-profit span {
+  color: var(--profit) !important;
+}
+
+#root [style*="#f87171"],
+#root [style*="rgb(248, 113, 113)"],
+#root [style*="#ef4444"],
+#root [style*="rgb(239, 68, 68)"],
+.account-card.is-loss span {
+  color: var(--loss) !important;
+}
+
+#root [style*="#f59e0b"],
+#root [style*="rgb(245, 158, 11)"],
+#root [style*="#fde68a"] {
+  color: var(--yellow) !important;
+}
+
+#root [style*="#6b7280"],
+#root [style*="rgb(107, 114, 128)"],
+#root [style*="#9ca3af"],
+#root [style*="rgb(156, 163, 175)"],
+#root [style*="#4b5563"],
+#root [style*="rgb(75, 85, 99)"] {
+  color: var(--muted) !important;
+}
+
+#root [style*="#e5e7eb"],
+#root [style*="rgb(229, 231, 235)"],
+#root [style*="#fff"],
+#root [style*="rgb(255, 255, 255)"] {
+  color: var(--text) !important;
+}
+
+#root input,
+#root select,
+#root textarea {
+  background: #151515 !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+#root button {
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+#root button:hover {
+  border-color: var(--yellow) !important;
+}
+
+#root > div > div[style*="max-width: 1400px"] div[style*="font-size: 11"][style*="font-weight: 600"][style*="display: flex"] > span + span {
+  background: #ff4d4f !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  border-radius: 999px !important;
+  margin-left: 6px !important;
+  vertical-align: middle;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
 }

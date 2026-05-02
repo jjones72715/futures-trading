@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 const BASE = "app5RPYcCy7hqCu41";
 const PERF_TABLE = "tblhM1DWRiWXnhSKb";
@@ -34,9 +34,16 @@ const EVAL_ACCOUNTS_BY_TRADER = {
 
 async function fetchTable(tableId, fields) {
   const params = fields.map(f => `fields[]=${encodeURIComponent(f)}`).join("&");
-  const res = await fetch(`/.netlify/functions/airtable/${BASE}/${tableId}?${params}&maxRecords=100`);
-  const data = await res.json();
-  return data.records || [];
+  const allRecords = [];
+  let offset = null;
+  do {
+    const url = `/.netlify/functions/airtable/${BASE}/${tableId}?${params}${offset ? `&offset=${offset}` : ""}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    allRecords.push(...(data.records || []));
+    offset = data.offset || null;
+  } while (offset);
+  return allRecords;
 }
 
 async function createRecord(tableId, fields) {
@@ -45,7 +52,9 @@ async function createRecord(tableId, fields) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  return data;
 }
 
 async function updateRecord(tableId, recordId, fields) {
@@ -107,151 +116,7 @@ function SafetyBar({ safety }) {
   );
 }
 
-const RedistTab = React.memo(function RedistTab({ history }) {
-  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  if (history.length === 0) return (
-    <div style={{ textAlign: "center", padding: "50px 0", color: "#6b7280" }}>
-      <p style={{ fontSize: 15 }}>No redistributions yet today</p>
-      <p style={{ fontSize: 13 }}>Redistributions happen inline when you enter a losing balance</p>
-    </div>
-  );
-  return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 16 }}>
-        💸 Today's Redistributions ({history.length})
-      </div>
-      {history.map((r, i) => (
-        <div key={i} style={{ background: C.card, border: "1px solid #1f2937", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#f87171" }}>From: {r.from}</span>
-            <span style={{ fontSize: 11, color: "#6b7280" }}>{r.time}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Total moved: <span style={{ color: "#4ade80", fontWeight: 700 }}>${r.amount.toFixed(2)}</span></div>
-          {r.destinations.map((d, j) => (
-            <div key={j} style={{ fontSize: 12, color: "#9ca3af", paddingLeft: 8 }}>
-              → {d.name}: +${d.share}
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-});
-
-const ReconciliationTab = React.memo(function ReconciliationTab({ evalAccounts, perfAccounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
-  const activeEvals = evalAccounts.filter(a => !dones[a.id]);
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount);
-  const payoutAccounts = perfAccounts.filter(a => a.payoutAccount && a.status === "Active");
-  const livePerf = perfAccounts.filter(a => a.payoutAccount && a.status === "Live");
-  const waitingPayout = perfAccounts.filter(a => a.payoutAccount && a.status === "Waiting on Payout");
-  const allAccounts = [...evalAccounts, ...perfAccounts];
-  const doneAccounts = allAccounts.filter(a => dones[a.id]);
-
-  function getFeedColumns(accounts) {
-    const feeds = {};
-    accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
-      const dp = a.dataProvider || "Other";
-      if (!feeds[dp]) feeds[dp] = [];
-      feeds[dp].push(a);
-    });
-    return feeds;
-  }
-
-  function FeedColumns({ accounts }) {
-    if (accounts.length === 0) return null;
-    const feeds = getFeedColumns(accounts);
-    const feedNames = Object.keys(feeds).sort();
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 12 }}>
-        {feedNames.map(feed => (
-          <div key={feed}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, paddingBottom: 4, borderBottom: "1px solid #1f2937" }}>
-              {feed} <span style={{ color: "#374151" }}>({feeds[feed].length})</span>
-            </div>
-            {feeds[feed].map((a, i) => (
-              <AccountRow key={a.id} a={a} i={i}
-                inputVal={inputs[a.id] || ""}
-                noChange={!!noChanges[a.id]}
-                done={!!dones[a.id]}
-                onInput={val => onInput(a.id, val)}
-                onNoChange={() => onNoChange(a.id)}
-                onDone={() => onDone(a.id)}
-                onBreach={() => onBreach(a)}
-                onRedistPopup={onRedistPopup}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function SectionHeader({ title, color, count }) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 0 10px" }}>
-        <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-        <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{count}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {activeEvals.length > 0 && <>
-        <SectionHeader title="Evaluation Accounts" color="#8b5cf6" count={activeEvals.length} />
-        <FeedColumns accounts={activeEvals.filter(a => !dones[a.id])} />
-      </>}
-
-      {standardPerf.filter(a => !dones[a.id]).length > 0 && <>
-        <SectionHeader title="Performance Accounts" color="#3b82f6" count={standardPerf.filter(a => !dones[a.id]).length} />
-        <FeedColumns accounts={standardPerf.filter(a => !dones[a.id])} />
-      </>}
-
-      {(payoutAccounts.filter(a => !dones[a.id]).length > 0 || livePerf.filter(a => !dones[a.id]).length > 0) && <>
-        <SectionHeader title="Payout Accounts" color="#f59e0b" count={payoutAccounts.filter(a => !dones[a.id]).length + livePerf.filter(a => !dones[a.id]).length} />
-        <FeedColumns accounts={[...payoutAccounts, ...livePerf].filter(a => !dones[a.id])} />
-      </>}
-
-      {waitingPayout.filter(a => !dones[a.id]).length > 0 && <>
-        <SectionHeader title="Waiting on Payout" color="#6b7280" count={waitingPayout.filter(a => !dones[a.id]).length} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {waitingPayout.filter(a => !dones[a.id]).map((a, i) => (
-            <AccountRow key={a.id} a={a} i={i}
-              inputVal={inputs[a.id] || ""}
-              noChange={!!noChanges[a.id]}
-              done={!!dones[a.id]}
-              onInput={val => onInput(a.id, val)}
-              onNoChange={() => onNoChange(a.id)}
-              onDone={() => onDone(a.id)}
-              onBreach={() => onBreach(a)}
-              onRedistPopup={onRedistPopup}
-            />
-          ))}
-        </div>
-      </>}
-
-      {doneAccounts.length > 0 && <>
-        <SectionHeader title="Done for Today" color="#166534" count={doneAccounts.length} />
-        <div style={{ opacity: 0.5 }}>
-          {doneAccounts.map((a, i) => (
-            <AccountRow key={a.id} a={a} i={i}
-              inputVal={inputs[a.id] || ""}
-              noChange={!!noChanges[a.id]}
-              done={!!dones[a.id]}
-              onInput={val => onInput(a.id, val)}
-              onNoChange={() => onNoChange(a.id)}
-              onDone={() => onDone(a.id)}
-              onBreach={() => onBreach(a)}
-              onRedistPopup={onRedistPopup}
-            />
-          ))}
-        </div>
-      </>}
-    </div>
-  );
-});
-function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
+function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach }) {
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
   const sorted = active.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -263,12 +128,12 @@ function WaitingSection({ accounts, inputs, noChanges, dones, onInput, onNoChang
         <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 11, padding: "1px 7px", borderRadius: 99 }}>{sorted.length}</span>
       </div>
       {sorted.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} onRedistPopup={onRedistPopup} />
+        <AccountRow key={a.id} a={a} i={i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} />
       ))}
     </div>
   );
 }
-const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach, onRedistPopup }) {
+const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, done, onInput, onNoChange, onDone, onBreach }) {
   const [localVal, setLocalVal] = React.useState(inputVal);
   React.useEffect(() => { setLocalVal(inputVal); }, [inputVal]);
   const v = parseFloat(localVal);
@@ -301,10 +166,12 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
         </div>
       </div>
 
-      <div style={{ width: 105, flexShrink: 0 }}>
-        <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Progress</div>
-        <Bar prog={a.prog} />
-      </div>
+      {a.prog > 0 && (
+        <div style={{ width: 105, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 3 }}>Progress</div>
+          <Bar prog={a.prog} />
+        </div>
+      )}
 
       <div style={{ width: 95, flexShrink: 0 }}>
         <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Balance</div>
@@ -349,10 +216,6 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             {noChange ? "✓ No Change" : "No Change"}
           </button>
           <input type="number" placeholder={String(a.bal)} value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={e => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val) && val < a.bal && a.invested > 0) {
-                onRedistPopup(a, val, false);
-              }
               onInput(e.target.value);
             }} disabled={noChange}
             style={{ background: noChange ? "#0d1117" : "#1f2937", border: "1px solid #1f2937", borderRadius: 7, padding: "6px 10px", fontSize: 13, color: noChange ? "#4b5563" : "#fff", width: 125, outline: "none", MozAppearance: "textfield", WebkitAppearance: "none" }} />
@@ -365,12 +228,6 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
             style={{ background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             💥
           </button>
-          {a.invested > 0 && (
-            <button onClick={e => { e.stopPropagation(); onRedistPopup(a, a.invested, true); }} title="Redistribute invested funds"
-              style={{ background: "#1c1f26", border: "1px solid #374151", borderRadius: 6, padding: "3px 7px", fontSize: 13, color: "#fbbf24", cursor: "pointer" }}>
-              💰
-            </button>
-          )}
           <button onClick={e => { e.stopPropagation(); onDone(); }} title={done ? "Mark as active" : "Done for today"}
             style={{ background: done ? "#166534" : "#1f2937", border: `1px solid ${done ? "#22c55e" : "#374151"}`, borderRadius: 7, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 15, flexShrink: 0 }}>
             {done ? "✓" : "☐"}
@@ -387,7 +244,7 @@ const AccountRow = React.memo(function AccountRow({ a, i, inputVal, noChange, do
   );
 });
 
-function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup, startIndex }) {
+function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, startIndex }) {
   if (accounts.length === 0) return null;
   return (
     <div style={{ marginBottom: 10 }}>
@@ -396,13 +253,13 @@ function SectionGroup({ title, accounts, inputs, noChanges, dones, onInput, onNo
         <span style={{ background: "#1f2937", color: "#6b7280", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
       </div>
       {accounts.map((a, i) => (
-        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} onRedistPopup={onRedistPopup} />
+        <AccountRow key={a.id} a={a} i={startIndex + i} inputVal={inputs[a.id] || ""} noChange={!!noChanges[a.id]} done={!!dones[a.id]} onInput={val => onInput(a.id, val)} onNoChange={() => onNoChange(a.id)} onDone={() => onDone(a.id)} onBreach={() => onBreach(a)} />
       ))}
     </div>
   );
 }
 
-function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, onRedistPopup, color }) {
+function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChange, onDone, onBreach, color }) {
   if (accounts.length === 0) return null;
   const active = accounts.filter(a => !dones[a.id]);
   if (active.length === 0) return null;
@@ -426,7 +283,7 @@ function Section({ title, accounts, inputs, noChanges, dones, onInput, onNoChang
       {sorted.map(([dp, accs]) => {
         const start = idx;
         idx += accs.length;
-      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} onRedistPopup={onRedistPopup} startIndex={start} />;
+      return <SectionGroup key={dp} title={dp} accounts={accs} inputs={inputs} noChanges={noChanges} dones={dones} onInput={onInput} onNoChange={onNoChange} onDone={onDone} onBreach={onBreach} startIndex={start} />;
       })}
     </div>
   );
@@ -450,147 +307,6 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
 }
 
 // ── Purchase Tab ──────────────────────────────────────────────────────────────
-
-function RedistPopupModal({ account, value, manual, allAccounts, onConfirm, onDismiss }) {
-  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const ddRef = account.ddLeft || account.ddToFloor || 1;
-  const balanceLoss = manual ? 0 : (account.bal - parseFloat(value));
-  const pctLost = manual ? 1 : Math.min(1, balanceLoss / ddRef);
-  const defaultAmount = manual
-    ? account.invested * account.n
-    : Math.max(0, parseFloat((pctLost * account.invested * account.n).toFixed(2)));
-  const [amount, setAmount] = React.useState(defaultAmount);
-  const [selected, setSelected] = React.useState([]);
-  const [percentages, setPercentages] = React.useState({});
-  const [search, setSearch] = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-  const MAX = 4;
-
-  const available = allAccounts.filter(a =>
-    a.id !== account.id &&
-    a.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  function toggle(a) {
-    if (selected.find(s => s.id === a.id)) {
-      const next = selected.filter(s => s.id !== a.id);
-      setSelected(next);
-      splitEvenly(next);
-    } else if (selected.length < MAX) {
-      const next = [...selected, a];
-      setSelected(next);
-      splitEvenly(next);
-    }
-  }
-
-  function splitEvenly(accts) {
-    if (!accts.length) { setPercentages({}); return; }
-    const even = Math.floor(100 / accts.length);
-    const rem = 100 - even * accts.length;
-    const p = {};
-    accts.forEach((a, i) => { p[a.id] = even + (i === 0 ? rem : 0); });
-    setPercentages(p);
-  }
-
-  function updatePct(id, val) {
-    setPercentages(prev => ({ ...prev, [id]: Math.min(100, Math.max(0, parseInt(val) || 0)) }));
-  }
-
-  const totalPct = Object.values(percentages).reduce((s, v) => s + v, 0);
-  const pctValid = totalPct === 100 && selected.length > 0;
-  const totalToMove = amount;
-
-  const destinations = selected.map(a => ({
-    ...a,
-    pct: percentages[a.id] || 0,
-    share: Math.ceil(totalToMove * (percentages[a.id] || 0) / 100),
-  }));
-
-  async function handleConfirm() {
-    setSubmitting(true);
-    await onConfirm(destinations);
-    setSubmitting(false);
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: C.card, border: "1px solid #374151", borderRadius: 14, padding: 24, width: 480, maxHeight: "80vh", overflowY: "auto" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 4 }}>💸 Redistribute Invested Funds</div>
-        <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 12 }}>
-          Redistributing from <span style={{ color: "#f87171" }}>{account.name}</span>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 6 }}>Total amount to redistribute</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#f87171" }}>$</span>
-            <input type="number" value={amount} onChange={e => setAmount(parseFloat(e.target.value) || 0)}
-              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 10px", fontSize: 14, color: "#fff", outline: "none", width: 120 }} />
-            <span style={{ fontSize: 12, color: "#6b7280" }}>÷ {account.n} acct{account.n > 1 ? "s" : ""} = <span style={{ color: "#f87171" }}>${(amount / account.n).toFixed(2)}</span>/acct</span>
-          </div>
-        </div>
-
-        <input
-          placeholder="Search accounts..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", marginBottom: 12, boxSizing: "border-box" }}
-        />
-
-        <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 16 }}>
-          {available.map(a => {
-            const isSel = !!selected.find(s => s.id === a.id);
-            const disabled = selected.length >= MAX && !isSel;
-            return (
-              <div key={a.id} onClick={() => !disabled && toggle(a)}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: isSel ? "#052e16" : "#1f2937", border: `1px solid ${isSel ? "#22c55e" : "#374151"}`, borderRadius: 8, padding: "8px 12px", marginBottom: 6, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }}>
-                <div>
-                  <div style={{ fontSize: 13, color: "#fff", fontWeight: isSel ? 600 : 400 }}>{a.name}</div>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>{a.type === "perf" ? "Perf" : "Eval"} • ${a.invested}/acct • {a.n} acct{a.n > 1 ? "s" : ""}</div>
-                </div>
-                {isSel && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <input type="number" min="0" max="100" value={percentages[a.id] || 0}
-                      onChange={e => updatePct(a.id, e.target.value)}
-                      style={{ width: 48, background: "#0d1f0d", border: `1px solid ${pctValid ? "#22c55e" : "#f87171"}`, borderRadius: 6, padding: "3px 6px", fontSize: 12, color: "#fff", outline: "none", textAlign: "center" }} />
-                    <span style={{ fontSize: 12, color: "#4ade80" }}>%</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {selected.length > 0 && (
-          <div style={{ background: "#0d1f0d", border: "1px solid #166534", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>Summary</span>
-              <span style={{ fontSize: 12, color: pctValid ? "#4ade80" : "#f87171", fontWeight: 700 }}>
-                {totalPct}% {!pctValid && `— need ${100 - totalPct}% more`}
-              </span>
-            </div>
-            {destinations.map(d => (
-              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#d1fae5", marginBottom: 3 }}>
-                <span>{d.name} ({d.pct}%)</span>
-                <span>+${Math.ceil(d.share / d.n)}/acct × {d.n} = +${d.share}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onDismiss}
-            style={{ flex: 1, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: 10, fontSize: 13, color: "#9ca3af", cursor: "pointer" }}>
-            Skip
-          </button>
-          <button onClick={handleConfirm} disabled={!pctValid || submitting}
-            style={{ flex: 2, background: pctValid ? "#16a34a" : "#1f2937", border: "none", borderRadius: 8, padding: 10, fontSize: 14, fontWeight: 700, color: pctValid ? "#fff" : "#4b5563", cursor: pctValid ? "pointer" : "not-allowed" }}>
-            {submitting ? "Updating..." : `Redistribute $${totalToMove.toFixed(2)}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function PurchaseTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -1078,13 +794,47 @@ function PurchaseTab() {
     </div>
   );
 }
-function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
+function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status !== "Live");
-  const livePerf = perfAccounts.filter(a => a.status === "Live" || a.payoutAccount);
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
+  const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
+  const allShown = [...evalAccounts, ...standardPerf, ...livePerf, ...waitingPerf];
+  const doneAccounts = allShown.filter(a => dones[a.id]);
+  const [scoreInputs, setScoreInputs] = React.useState(() => {
+    const init = {};
+    allShown.forEach(a => { init[a.id] = ""; });
+    return init;
+  });
+  const [blowns, setBlowns] = React.useState({});
+  const [scoreSaving, setScoreSaving] = React.useState(false);
+  const [scoreSaved, setScoreSaved] = React.useState(false);
+  async function saveScore(a, val) {
+    const num = parseFloat(val);
+    if (isNaN(num)) return;
+    const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+    await updateRecord(tableId, a.id, { "Score": num });
+  }
+  async function submitAllScores() {
+    setScoreSaving(true);
+    try {
+      const updates = allShown.filter(a => {
+        const v = scoreInputs[a.id];
+        return v !== "" && v !== undefined && !isNaN(parseFloat(v));
+      });
+      await Promise.all(updates.map(a => saveScore(a, scoreInputs[a.id])));
+      setScoreSaved(true);
+      setTimeout(() => setScoreSaved(false), 3000);
+    } catch (e) {}
+    setScoreSaving(false);
+  }
   function getFeeds(accounts) {
     const feeds = {};
-    accounts.slice().sort((a, b) => a.prog - b.prog).forEach(a => {
+    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
+      const va = a.score != null ? a.score : 99;
+      const vb = b.score != null ? b.score : 99;
+      return va - vb;
+    }).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
       feeds[dp].push(a);
@@ -1092,19 +842,58 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     return feeds;
   }
   function AccountMiniCard({ a }) {
+    const isDone = !!dones[a.id];
+    const isBlown = !!blowns[a.id];
+    const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
     return (
-      <div style={{ background: C.card, border: `1px solid ${dones[a.id] ? "#1a2030" : "#1f2937"}`, borderRadius: 7, padding: "5px 8px", marginBottom: 4, opacity: dones[a.id] ? 0.5 : 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
-          {a.status === "Live" && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+      <div style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+        {/* Trader — Firm — Score badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+            {header}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 800, background: a.score != null ? "#1e3a5f" : "#1f2937", color: a.score != null ? "#60a5fa" : "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${a.score != null ? "#2563eb" : "#374151"}` }}>
+            {a.score != null ? a.score : "—"}
+          </span>
+          {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Bal <span style={{ color: "#fff" }}>{$$(a.bal)}</span></span>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>DD <span style={{ color: "#fde68a" }}>{$$(a.tradeDown ? a.ddToFloor : a.ddLeft)}</span></span>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Prog <span style={{ color: "#a78bfa" }}>{(a.prog * 100).toFixed(0)}%</span></span>
-          <span style={{ fontSize: 10, color: "#6b7280" }}>Tgt <span style={{ color: "#4ade80" }}>{$$(a.dailyTarget)}</span></span>
-          {a.type === "eval" && a.accountWeight && <span style={{ fontSize: 10, color: "#6b7280" }}>Wt <span style={{ color: "#9ca3af" }}>{a.accountWeight}</span></span>}
-          {a.contractMultiplier > 1 && <span style={{ fontSize: 10, color: "#6b7280" }}>Mx <span style={{ color: "#93c5fd" }}>{a.contractMultiplier}x</span></span>}
+        {/* Stats: Target | Trading Days | Days Left | Weight | New Score */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
+          {[
+            ["Target", $$(a.limit)],
+            ["Trading Days", a.tradingDays ?? 0],
+            ["Days Left", a.tradingDaysLeft ?? "—"],
+            ["Weight", a.accountWeight ?? "—"],
+          ].map(([label, val]) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
+            </div>
+          ))}
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>New Score</div>
+            <input
+              type="number"
+              value={scoreInputs[a.id] ?? ""}
+              onChange={e => setScoreInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
+              onBlur={e => saveScore(a, e.target.value)}
+              placeholder="—"
+              style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: "100%", padding: "2px 4px", outline: "none", textAlign: "center", boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+        {/* Checkboxes */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {onDone && (
+            <button onClick={() => onDone(a.id)}
+              style={{ flex: 1, background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isDone ? "#fff" : "#86efac", fontWeight: 700 }}>
+              {isDone ? "✓ Done Today" : "☐ Done Today"}
+            </button>
+          )}
+          <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+            style={{ flex: 1, background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isBlown ? "#fff" : "#fca5a5", fontWeight: 700 }}>
+            {isBlown ? "✓ Blown" : "☐ Blown"}
+          </button>
         </div>
       </div>
     );
@@ -1113,12 +902,13 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
     if (accounts.length === 0) return null;
     const feeds = getFeeds(accounts);
     const feedNames = Object.keys(feeds).sort();
+    if (feedNames.length === 0) return null;
     return (
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
           <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
-          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.length}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.filter(a => !dones[a.id]).length}</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 8 }}>
           {feedNames.map(feed => (
@@ -1133,9 +923,28 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones }) {
   }
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button onClick={submitAllScores} disabled={scoreSaving}
+          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: scoreSaving ? "not-allowed" : "pointer" }}>
+          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
+        </button>
+      </div>
       <FeedGrid accounts={evalAccounts} color="#8b5cf6" title="Evaluation Accounts" />
       <FeedGrid accounts={standardPerf} color="#3b82f6" title="Performance Accounts" />
       <FeedGrid accounts={livePerf} color="#f59e0b" title="Live & Payout Accounts" />
+      <FeedGrid accounts={waitingPerf} color="#6b7280" title="Waiting on Payout" />
+      {doneAccounts.length > 0 && (
+        <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ width: 3, height: 16, background: "#374151", borderRadius: 99 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#4b5563" }}>Done Today</span>
+            <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{doneAccounts.length}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
+            {doneAccounts.map(a => <AccountMiniCard key={a.id} a={a} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1196,22 +1005,22 @@ function FirmUsageTab() {
 
         const allAccounts = [
           ...evalRecords
-            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]))
+            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]?.name || r.fields["Status"]))
             .map(r => ({
               type: "eval",
               name: r.fields["Name"],
-              status: r.fields["Status"],
+              status: r.fields["Status"]?.name || r.fields["Status"],
               trader: traderIdMap[r.fields["Trader"]?.[0]] || r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
               firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
               payoutAccount: false,
             })),
           ...perfRecords
-            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]))
+            .filter(r => !["Failed", "Passed"].includes(r.fields["Status"]?.name || r.fields["Status"]))
             .map(r => ({
               type: "perf",
               name: r.fields["Name"],
-              status: r.fields["Status"],
+              status: r.fields["Status"]?.name || r.fields["Status"],
               trader: traderIdMap[r.fields["Trader"]?.[0]] || r.fields["Trader"]?.[0] || "",
               n: r.fields["Number of Accounts"] || 1,
               firmName: fMap[r.fields["Firm Name"]?.[0]]?.fields["Name"] || null,
@@ -1236,6 +1045,7 @@ function FirmUsageTab() {
     { key: "Amanda Seratt", label: "Amanda" },
     { key: "Jefferies Parker", label: "Troy" },
     { key: "Judy Jones", label: "Judy" },
+    { key: "Rolly Omas Obial", label: "Rolly" },
   ];
 
   // Build usageMap: firmName → traderLabel → [label]
@@ -1365,36 +1175,91 @@ function FirmUsageTab() {
 
 function PLTab({ evalAccounts, perfAccounts }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const [startingLiq, setStartingLiq] = useState("");
+  const [startingLiquidation, setStartingLiquidation] = useState("");
   const [purchases, setPurchases] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dateM, setDateM] = useState("");
+  const [dateD, setDateD] = useState("");
+  const [dateY, setDateY] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
 
-  const localToday = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const mRef = useRef(null);
+  const dRef = useRef(null);
+  const yRef = useRef(null);
+
+  const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ", "recvSEg1nPtZCKujB"];
+  const TRADER_NAMES = {
+    "recmziqSnANAPjtuH": "Jonathan Jones",
+    "recG04aHVI38R6HnR": "Cherelyn Jones",
+    "rec0jB7J1Ir1ZspvM": "Amanda Seratt",
+    "reccHyxv7emOGQJsQ": "Jefferies Parker (Troy)",
+    "rec4l8EM9peAdyin4": "Judy Jones",
+    "recvSEg1nPtZCKujB": "Rolly Omas Obial",
   };
-  const [selectedDate, setSelectedDate] = useState(localToday());
-
-  const OTHER_TRADERS = ["rec0jB7J1Ir1ZspvM", "rec4l8EM9peAdyin4", "reccHyxv7emOGQJsQ"];
   const RITHMIC_DX = ["Rithmic", "DX Feed"];
 
-  useEffect(() => { loadPLData(); }, [selectedDate]);
+  useEffect(() => { loadPLData(); }, []);
+
+  const handleDateSubmit = () => {
+    if (dateM.length === 2 && dateD.length === 2 && dateY.length === 4) {
+      setSelectedDate(`${dateY}-${dateM}-${dateD}`);
+    }
+  };
 
   async function loadPLData() {
     setLoading(true);
     try {
-      const [purchaseRes, payoutRes] = await Promise.all([
-        fetch(`/.netlify/functions/airtable/${BASE}/${PURCHASE_TABLE}?maxRecords=500`),
-        fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=500`),
+      const [purchaseRecords, payoutRecords] = await Promise.all([
+        fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts"]),
       ]);
-      const purchaseData = await purchaseRes.json();
-      const payoutData = await payoutRes.json();
-      setPurchases((purchaseData.records || []).filter(r => r.fields["Date Purchased"] === selectedDate));
-      setPayouts((payoutData.records || []).filter(r => r.fields["Date Received"] === selectedDate));
+      setPurchases(purchaseRecords.map(r => ({
+        id: r.id,
+        datePurchased: r.fields["Date Purchased"] || "",
+        status: r.fields["Status"] || "",
+        totalCost: r.fields["Total Cost"] || 0,
+        purchaseType: r.fields["Purchase Type"]?.name || r.fields["Purchase Type"] || "",
+      })));
+      setPayouts(payoutRecords.map(r => ({
+        id: r.id,
+        name: r.fields["Name"] || "",
+        totalAmount: r.fields["Total Amount"] || 0,
+        dateReceived: r.fields["Date Received"] || "",
+        trader: Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : (r.fields["Trader"] || ""),
+        account: Array.isArray(r.fields["Performance Account"]) ? r.fields["Performance Account"][0] : (r.fields["Performance Account"] || null),
+        status: r.fields["Status"]?.name || r.fields["Status"] || "",
+        numAccounts: r.fields["Number of Accounts"] || 1,
+      })));
     } catch (e) {}
     setLoading(false);
   }
+
+  // Filter purchases by date (selectedDate is always YYYY-MM-DD)
+  const dayPurchases = purchases.filter(p => p.datePurchased === selectedDate && p.status === "Active");
+  const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+
+  // Filter payouts by Date Received
+  const dayPayouts = payouts.filter(p => String(p.dateReceived ?? "").trim().slice(0, 10) === selectedDate);
+
+  // Liquidation calc
+  const startLiq = parseFloat(startingLiquidation) || 0;
+  const totalLiq = startLiq + dayPurchaseCost;
+  const tier = totalLiq <= 5000 ? 0.40 : totalLiq <= 10000 ? 0.50 : totalLiq <= 20000 ? 0.60 : 0.70;
+  const tierPct = Math.round(tier * 100);
+  const liqReduction = dayPayouts.reduce((sum, p) => sum + (p.totalAmount || 0) * tier, 0);
+  const endingLiq = totalLiq - liqReduction;
+
+  const payoutRows = dayPayouts.map(p => {
+    const traderId = typeof p.trader === "object" ? p.trader?.id : p.trader;
+    const traderName = TRADER_NAMES[traderId] ?? p.trader ?? "—";
+    const totalPayout  = Math.round(p.totalAmount || 0);
+    const liqRepayment = Math.round(totalPayout * tier);
+    const afterLiq     = Math.round(totalPayout - liqRepayment);
+    const taxSet       = Math.round(totalPayout * 0.10);
+    const traderProfit = Math.round(afterLiq * 0.65 - taxSet);
+    return { traderName, totalPayout, liqRepayment, afterLiq, taxSet, traderProfit };
+  });
 
   const activeEvals = evalAccounts;
   const nonPayoutPerf = perfAccounts.filter(a => !a.payoutAccount);
@@ -1404,49 +1269,22 @@ function PLTab({ evalAccounts, perfAccounts }) {
   const tdvEvals = activeEvals.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
   const xEvals = activeEvals.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
   const totalActiveEvals = rmcEvals + tdvEvals + xEvals;
-  const investedEvals = activeEvals.reduce((s, a) => s + (a.invested * a.n || 0), 0);
 
   const rmcPerf = nonPayoutPerf.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
   const tdvPerf = nonPayoutPerf.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
   const xPerf = nonPayoutPerf.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
   const totalActivePerf = rmcPerf + tdvPerf + xPerf;
-  const investedPerf = nonPayoutPerf.reduce((s, a) => s + (a.invested * a.n || 0), 0);
 
   const rmcLive = payoutPerf.filter(a => RITHMIC_DX.includes(a.dataProvider)).reduce((s, a) => s + a.n, 0);
   const tdvLive = payoutPerf.filter(a => a.dataProvider === "Tradovate").reduce((s, a) => s + a.n, 0);
   const xLive = payoutPerf.filter(a => a.dataProvider === "Project X").reduce((s, a) => s + a.n, 0);
   const totalActiveLive = rmcLive + tdvLive + xLive;
-  const profitInActive = payoutPerf.reduce((s, a) => s + (a.invested * a.n || 0), 0);
 
-  const cashedOut = payouts.reduce((s, r) => s + (r.fields["Total Amount"] || 0), 0);
+  const cashedOut = dayPayouts.reduce((s, p) => s + (p.totalAmount || 0), 0);
 
-  const profitFromOthers = payouts
-    .filter(r => {
-      const trader = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
-      return trader && OTHER_TRADERS.includes(trader);
-    })
-    .reduce((s, r) => {
-      const total = r.fields["Total Amount"] || 0;
-      const investedPerAcct = r.fields["$ Invested Per Account before Payout"] || 0;
-      const n = r.fields["Number of Accounts"] || 1;
-      const invested = investedPerAcct * n;
-      return s + Math.max(0, total - invested) * 0.5;
-    }, 0);
-
-  const todayEvalSpend = purchases
-    .filter(r => ["New", "Reset", "Monthly Billing"].includes(r.fields["Purchase Type"]?.name || r.fields["Purchase Type"]))
-    .reduce((s, r) => s + (r.fields["Total Cost"] || 0), 0);
-
-  const startLiq = parseFloat(startingLiq) || 0;
-  const payoutProfits50 = payouts.reduce((s, r) => {
-    const total = r.fields["Total Amount"] || 0;
-    const investedPerAcct = r.fields["$ Invested Per Account before Payout"] || 0;
-    const n = r.fields["Number of Accounts"] || 1;
-    const invested = investedPerAcct * n;
-    const profit = Math.max(0, total - invested);
-    return s + (profit * 0.5);
-  }, 0);
-  const endLiq = startLiq + todayEvalSpend - payoutProfits50;
+  const profitFromOthers = dayPayouts
+    .filter(p => OTHER_TRADERS.includes(typeof p.trader === "object" ? p.trader?.id : p.trader))
+    .reduce((s, p) => s + (p.totalAmount || 0) * 0.5, 0);
 
   function StatBox({ label, value, color = "#fff", sub }) {
     return (
@@ -1474,35 +1312,179 @@ function PLTab({ evalAccounts, perfAccounts }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Date</div>
-          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", outline: "none", colorScheme: "dark" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px" }}>
+            <input
+              ref={mRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="MM"
+              value={dateM}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateM(v);
+                if (v.length === 2) dRef.current?.focus();
+              }}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }}
+            />
+            <span style={{ color: "#6b7280" }}>/</span>
+            <input
+              ref={dRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="DD"
+              value={dateD}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateD(v);
+                if (v.length === 2) yRef.current?.focus();
+              }}
+              onKeyDown={e => e.key === "Backspace" && dateD === "" && mRef.current?.focus()}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }}
+            />
+            <span style={{ color: "#6b7280" }}>/</span>
+            <input
+              ref={yRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={dateY}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateY(v);
+              }}
+              onKeyDown={e => {
+                if (e.key === "Backspace" && dateY === "") dRef.current?.focus();
+                if (e.key === "Enter" && dateY.length === 4) handleDateSubmit();
+              }}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 38, textAlign: "center", outline: "none", border: "none" }}
+            />
+          </div>
         </div>
-        <div>
-          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Starting Liquidation $</div>
-          <input type="number" placeholder="Enter yesterday's ending Liq $..." value={startingLiq} onChange={e => setStartingLiq(e.target.value)}
-            style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 14, color: "#fff", width: 260, outline: "none" }} />
-        </div>
+        <button onClick={handleDateSubmit} style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#fff", cursor: "pointer", marginTop: 18, fontWeight: 600 }}>
+          Submit
+        </button>
         <button onClick={loadPLData} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#9ca3af", cursor: "pointer", marginTop: 18 }}>
           🔄 Refresh
         </button>
       </div>
 
+      {/* Liquidation Section */}
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>💧 Liquidation</div>
+
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Starting Liquidation</div>
+            <input type="number" value={startingLiquidation} onChange={e => setStartingLiquidation(e.target.value)}
+              placeholder="0.00"
+              style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Purchases Today</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#f59e0b" }}>
+              ${dayPurchaseCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Total Liquidation</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#fff", fontWeight: 600 }}>
+              ${totalLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div style={{ flex: 0.5 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Tier</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#6366f1", fontWeight: 700 }}>
+              {tierPct}%
+            </div>
+          </div>
+        </div>
+
+        {dayPayouts.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8 }}>Payouts Received Today</div>
+            {dayPayouts.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#1f2937", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: 12 }}>
+                <span style={{ color: "#d1d5db" }}>{p.name}</span>
+                <span style={{ color: "#4ade80" }}>${p.totalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ color: "#9ca3af" }}>× {tierPct}% = <span style={{ color: "#f87171" }}>-${(p.totalAmount * tier).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {dayPayouts.length === 0 && (
+          <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 14 }}>No payouts received on this date.</div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1f2937", paddingTop: 12 }}>
+          <div style={{ fontSize: 13, color: "#9ca3af" }}>Ending Liquidation</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: endingLiq <= 0 ? "#4ade80" : endingLiq < 5000 ? "#f59e0b" : "#f87171" }}>
+            ${endingLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+
+      {/* Payouts Received Section */}
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span>💰</span>
+          <span style={{ color: "#fff", fontWeight: 600, fontSize: 15 }}>Payouts Received</span>
+        </div>
+
+        {payoutRows.length === 0 ? (
+          <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>No payouts received on this date.</div>
+        ) : (
+          <>
+            {/* Header Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, padding: "0 10px", marginBottom: 6 }}>
+              <span>Trader</span>
+              <span style={{ textAlign: "right" }}>Payout</span>
+              <span style={{ textAlign: "right" }}>After Liq Repayment</span>
+              <span style={{ textAlign: "right" }}>Put Away for Taxes</span>
+              <span style={{ textAlign: "right" }}>Trader's Profit</span>
+            </div>
+
+            {payoutRows.map((row, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, background: "#1f2937", borderRadius: 8, padding: "10px", marginBottom: 6, fontSize: 13, alignItems: "center" }}>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{row.traderName}</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${row.totalPayout.toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${row.afterLiq.toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${row.taxSet.toLocaleString()}</span>
+                <span style={{ textAlign: "right", fontWeight: 700, color: row.traderProfit >= 0 ? "#4ade80" : "#f87171" }}>${row.traderProfit.toLocaleString()}</span>
+              </div>
+            ))}
+
+            {/* Totals Row */}
+            {payoutRows.length > 1 && (
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, borderTop: "1px solid #374151", paddingTop: 10, marginTop: 4, fontSize: 13, fontWeight: 600, padding: "10px" }}>
+                <span style={{ color: "#9ca3af" }}>Total</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${payoutRows.reduce((s, r) => s + r.totalPayout, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${payoutRows.reduce((s, r) => s + r.afterLiq, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${payoutRows.reduce((s, r) => s + r.taxSet, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#4ade80" }}>${payoutRows.reduce((s, r) => s + r.traderProfit, 0).toLocaleString()}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <SectionHeader title="Evaluation Accounts" color="#8b5cf6" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         <StatBox label="RMC Evals" value={rmcEvals} color="#a78bfa" />
         <StatBox label="TDV Evals" value={tdvEvals} color="#a78bfa" />
         <StatBox label="X Evals" value={xEvals} color="#a78bfa" />
         <StatBox label="Active Evals" value={totalActiveEvals} color="#fff" />
-        <StatBox label="$ Invested Evals" value={$$(investedEvals)} color="#c4b5fd" />
       </div>
 
       <SectionHeader title="Performance Accounts" color="#3b82f6" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         <StatBox label="RMC Perf" value={rmcPerf} color="#93c5fd" />
         <StatBox label="TDV Perf" value={tdvPerf} color="#93c5fd" />
         <StatBox label="X Perf" value={xPerf} color="#93c5fd" />
         <StatBox label="Active Perf" value={totalActivePerf} color="#fff" />
-        <StatBox label="$ Invested Perf" value={$$(investedPerf)} color="#93c5fd" />
       </div>
 
       <SectionHeader title="Live & Payout Accounts" color="#f59e0b" />
@@ -1514,9 +1496,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
       </div>
 
       <SectionHeader title="Financials" color="#10b981" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-        <StatBox label="Profit in Active" value={$$(profitInActive)} color="#4ade80" />
-        <StatBox label="Liquidation $" value={$$(endLiq)} color="#f87171" sub={`Start: ${$$(startLiq)} + Spend: ${$$(todayEvalSpend)} − Profits: ${$$(payoutProfits50)}`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
         <StatBox label="Cashed Out Today" value={$$(cashedOut)} color="#4ade80" />
         <StatBox label="Profit from Others" value={$$(profitFromOthers)} color="#4ade80" />
       </div>
@@ -1586,7 +1566,6 @@ function AccountManagementTab() {
   const [newBalance, setNewBalance] = useState("");
   const [tradingDays, setTradingDays] = useState("");
   const [tradeDown, setTradeDown] = useState(false);
-  const [tradeDownFloor, setTradeDownFloor] = useState("");
   const [resetTradingDays, setResetTradingDays] = useState(true);
   const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
 
@@ -1760,7 +1739,6 @@ function AccountManagementTab() {
       }
       if (tradeDown) {
         fields["Trade Down Account"] = true;
-        if (tradeDownFloor) fields["Trade Down Floor"] = parseFloat(tradeDownFloor);
       }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
       // Create a received payout record if an amount was entered
@@ -1777,7 +1755,7 @@ function AccountManagementTab() {
           "Amount Per Account": amtPerAcct,
           "Number of Accounts": numAccts,
           "Status": "Received",
-          "Trader": traderId ? [traderId] : undefined,
+          ...(traderId ? { "Trader": [traderId] } : {}),
         });
       }
       setSuccess(`✓ Advanced to Stage ${nextStage.stage}${advancePayoutAmount ? " + payout logged!" : "!"}`);
@@ -1795,14 +1773,15 @@ function AccountManagementTab() {
       const trader = traderList.find(t => t.id === traderId);
       await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
       // Create payout record
-      await createRecord(PAYOUT_TABLE, {
-        "Name": `${trader?.name?.split(" ")[0]} - ${perf?.fields["Name"]} - ${today}`,
+      const payoutFields = {
+        "Name": `${trader?.name?.split(" ")[0] ?? "Unknown"} - ${perf?.fields["Name"]} - ${today}`,
         "Performance Account": [selectedPerfId],
         "Date Requested": today,
         "Status": "Requested",
         "Number of Accounts": perf?.fields["Number of Accounts"] || 1,
-        "Trader": [traderId],
-      });
+      };
+      if (traderId) payoutFields["Trader"] = [traderId];
+      await createRecord(PAYOUT_TABLE, payoutFields);
       setSuccess("✓ Payout requested and logged!");
       setTimeout(() => setSuccess(""), 4000);
       resetForm(); loadData();
@@ -1845,7 +1824,6 @@ function AccountManagementTab() {
           "Cycle Start Balance": parseFloat(postPayoutBalance),
           "Current Stage": [postPayoutStageId],
           "Trading Days this Cycle": 0,
-          "Invested Per Account": 0,
           "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
         });
       }
@@ -2051,14 +2029,6 @@ function AccountManagementTab() {
                     <span style={{ fontSize: 13, color: "#d1d5db" }}>Trade Down Account</span>
                   </label>
                 </div>
-                {tradeDown && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4 }}>Trade Down Floor ($)</div>
-                    <input type="number" value={tradeDownFloor} onChange={e => setTradeDownFloor(e.target.value)}
-                      placeholder="e.g. 48000"
-                      style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", width: "100%" }} />
-                  </div>
-                )}
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#16a34a" : "#1f2937", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
@@ -2332,13 +2302,11 @@ export default function App() {
   const [breachAccount, setBreachAccount] = useState(null);
   const [breachCount, setBreachCount] = useState("");
   const [breachSubmitting, setBreachSubmitting] = useState(false);
-  const [redistPopup, setRedistPopup] = useState(null);
-  const [redistHistory, setRedistHistory] = useState([]);
   const [showAdvanceDayModal, setShowAdvanceDayModal] = useState(false);
   const [advanceDayAccounts, setAdvanceDayAccounts] = useState([]);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
-  const [tab, setTab] = useState("gameplan");
+  const [tab, setTab] = useState("accounts");
 
   useEffect(() => { load(); }, []);
 
@@ -2381,71 +2349,105 @@ export default function App() {
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
     try {
-      const [pr, er] = await Promise.all([
-        fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Stage Target", "Invested Per Account", "Trade Down Account", "Trade Down Floor", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Cycle Start Balance", "Trader"]),
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed"]),
-      ]);
+      let pr = [], er = [], traderRecs = [], firmRecs = [];
+      try {
+        traderRecs = await fetchTable("tbla0lbJ9z1PAhNy7", ["Name", "Preferred Name"]);
+      } catch(e) {}
+      const traderMap = {};
+      traderRecs.forEach(r => {
+        traderMap[r.id] = r.fields["Preferred Name"] || (r.fields["Name"] || "").split(" ")[0] || "";
+      });
+
+      try {
+        firmRecs = await fetchTable("tblR0iLSQZI1xXYa6", ["Name"]);
+      } catch(e) {}
+      const firmMap = {};
+      firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
+
+      try {
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name"]);
+        console.log("raw perf records:", pr?.length, pr?.[0]);
+      } catch(perfErr) {
+        console.error("PERF FETCH ERROR:", perfErr);
+      }
+      try {
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name"]);
+        console.log("raw eval records:", er?.length, er?.[0]);
+      } catch(evalErr) {
+        console.error("EVAL FETCH ERROR:", evalErr);
+      }
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
+
+      const resolveFirm = raw => {
+        const val = Array.isArray(raw) ? raw[0] : raw;
+        return firmMap[val] || val || "";
+      };
+      const firstName = full => (full || "").split(" ")[0];
 
       const mapPerf = r => {
         const f = r.fields;
         const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        const traderId = Array.isArray(f["Trader"]) ? f["Trader"][0] : (f["Trader"] || "");
         return {
           id: r.id, type: "perf",
           name: f["Name"] || "?",
-          trader: (Array.isArray(f["Trader"]) ? f["Trader"][0] : f["Trader"]) || "",
-          status: f["Status"] || "",
+          traderName: firstName(traderMap[traderId]),
+          firmName: resolveFirm(f["Firm Name"]),
+          trader: traderId,
+          status: f["Status"]?.name || f["Status"] || "",
           bal: f["Current Balance"] || 0,
           ddLeft: f["Current Drawdown Left"] || 0,
           ddToFloor: f["Drawdown to Floor"] || 0,
           prog: f["Progress to Stage Target"] || 0,
           limit: f["Max Trade Size"] || 0,
-          invested: f["Invested Per Account"] || 0,
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
           tradeDown: f["Trade Down Account"] || false,
-          tradeDownFloor: f["Trade Down Floor"] || 0,
           contractMultiplier: f["Contract Multiplier"] || 1,
           payoutAccount: f["Payout Account"] || false,
           dataProvider: dp,
-          dailyTarget: f["Daily Target"] || 0,
+          dailyTarget: 0,
           hwm: f["High Water Mark"] || 0,
           accountTypeId: (f["Performance Account Type"] || [])[0] || null,
           tradingDayType: (f["Trading Day Type"] || [])[0] || null,
           minProfitDay: (f["Min Profitable Day Amount"] || [])[0] || 0,
           tradingDays: f["Trading Days this Cycle"] || 0,
+          tradingDaysLeft: f["Trading Days Left"] ?? null,
           cycleStartBal: f["Cycle Start Balance"] || 0,
+          score: f["Score"] ?? null,
         };
       };
 
       const mapEval = r => {
         const f = r.fields;
         const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        const traderId = Array.isArray(f["Trader"]) ? f["Trader"][0] : (f["Trader"] || "");
         return {
           id: r.id, type: "eval",
           name: f["Name"] || "?",
-          trader: "",
-          status: f["Status"] || "",
+          traderName: firstName(traderMap[traderId]),
+          firmName: resolveFirm(f["Firm Name"]),
+          trader: traderId,
+          status: f["Status"]?.name || f["Status"] || "",
           bal: f["Current Balance"] || 0,
           ddLeft: f["Current Drawdown Left"] || 0,
           ddToFloor: 0,
           prog: f["Progress to Target"] || 0,
           limit: f["Max Trade Size"] || 0,
-          invested: 0,
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
           hwm: f["High Water Mark"] || 0,
           tradeDown: false,
-          tradeDownFloor: 0,
           contractMultiplier: 1,
           payoutAccount: false,
           dataProvider: dp,
-          dailyTarget: f["Daily Target"] || 0,
+          dailyTarget: 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
-          dailyTarget: f["Daily Target"] || 0,
           accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
           tradingDays: f["Trading Days Completed"] || 0,
+          tradingDaysLeft: f["Trading Days Left"] ?? null,
+          score: f["Score"] ?? null,
         };
       };
 
@@ -2459,6 +2461,8 @@ export default function App() {
       });
       const evals = allEvals.map(mapEval);
       const perfs = allPerfs.map(mapPerf);
+      console.log("perfAccounts loaded:", perfs.length, perfs[0]);
+      console.log("evalAccounts loaded:", evals.length, evals[0]);
       setEvalAccounts(evals);
       setPerfAccounts(perfs);
       const inp = {};
@@ -2496,10 +2500,6 @@ export default function App() {
   const onBreach = useCallback((a) => {
     setBreachAccount(a);
     setBreachCount("");
-  }, []);
-
-  const onRedistPopup = useCallback((account, value, manual = false) => {
-    setRedistPopup({ account, value, manual });
   }, []);
 
   async function handleBreach(a) {
@@ -2614,7 +2614,7 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ background: C.card, borderBottom: `1px solid ${C.border}`, padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: "#1f2a37", borderBottom: "1px solid #2d3f50", padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>📈 Daily Trading Dashboard</div>
           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div>
@@ -2639,79 +2639,27 @@ export default function App() {
                     });
                   }
                 }));
-                setDones({});
                 setNoChanges({});
                 setInputs({});
-                localStorage.removeItem("tradingDones");
                 localStorage.removeItem("tradingNoChanges");
                 await load();
               }}
             />
           )}
-          {redistPopup && (
-          <RedistPopupModal
-            account={redistPopup.account}
-            value={redistPopup.value}
-            manual={redistPopup.manual}
-            allAccounts={[...evalAccounts, ...perfAccounts]}
-            onConfirm={async (destinations) => {
-              try {
-                await Promise.all(destinations.map(d => {
-                  const table = d.type === "perf" ? PERF_TABLE : EVAL_TABLE;
-                  const investedField = d.type === "perf" ? "fldAWWar1WK3I9BVi" : "fldAplR2R67gEWPh1";
-                  const sharePerAccount = Math.ceil(d.share / d.n);
-                  return updateRecord(table, d.id, { [investedField]: d.invested + sharePerAccount });
-                }));
-                const loserTable = redistPopup.account.type === "perf" ? PERF_TABLE : EVAL_TABLE;
-                const loserField = redistPopup.account.type === "perf" ? "fldAWWar1WK3I9BVi" : "fldAplR2R67gEWPh1";
-                const totalMoved = destinations.reduce((s, d) => s + d.share, 0);
-                const loserNewInvested = Math.max(0, redistPopup.account.invested - (totalMoved / redistPopup.account.n));
-                await updateRecord(loserTable, redistPopup.account.id, { [loserField]: loserNewInvested });
-                setRedistHistory(prev => [...prev, {
-                  time: new Date().toLocaleTimeString(),
-                  from: redistPopup.account.name,
-                  amount: totalMoved,
-                  destinations: destinations.map(d => ({ name: d.name, share: d.share }))
-                }]);
-                setRedistPopup(null);
-                await load();
-              } catch(e) { console.error("redist error:", e); }
-            }}
-            onDismiss={() => setRedistPopup(null)}
-          />
-        )}
-        {tab === "gameplan" && (
-            <button onClick={save} disabled={saving || filledCount === 0}
-              style={{ background: saved ? "#065f46" : "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: filledCount === 0 ? "not-allowed" : "pointer", opacity: filledCount === 0 ? 0.4 : 1 }}>
-              {saving ? "Saving..." : saved ? "✓ Saved!" : `Save (${filledCount}) to Airtable`}
-            </button>
-          )}
-          {tab === "gameplan" && <button onClick={load} style={{ background: "transparent", color: "#9ca3af", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>↻ Refresh</button>}
-          {tab === "gameplan" && <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#f59e0b", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>}
+          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "#15803d", color: "#fff", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, cursor: "pointer", fontWeight: 700 }}>↻ Refresh</button>
+          <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
 
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 20px" }}>
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>⚠ {err}</div>}
 
-        {tab === "gameplan" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
-            {[["Profit Today", gain, "#22c55e"], ["Loss Today", loss, "#ef4444"], ["Net P&L", net, net >= 0 ? "#3b82f6" : "#f97316"]].map(([label, val, color]) => (
-              <div key={label} style={{ background: `${color}15`, border: `1px solid ${color}40`, borderRadius: 10, padding: "11px 14px" }}>
-                <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, color, marginBottom: 3 }}>{label}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color }}>{$$(val)}</div>
-              </div>
-            ))}
-          </div>
-        )}
 
         <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
               {[
                 ["accounts", "📋 All Accounts"],
                 ["purchases", "🛒 Purchases"],
                 ["mgmt", "🔄 Account Management"],
-                ["gameplan", "📊 Reconciliation"],
-                ["redist", `💸 Redistribution${redistHistory.length > 0 ? ` (${redistHistory.length})` : ""}`],
                 ["pl", "📈 P&L"],
                 ["firms", "🏢 Firm Usage"],
               ].map(([key, label]) => (
@@ -2722,25 +2670,9 @@ export default function App() {
           ))}
         </div>
 
-        {tab === "gameplan" && (
-          <ReconciliationTab
-            evalAccounts={evalAccounts}
-            perfAccounts={perfAccounts}
-            inputs={inputs}
-            noChanges={noChanges}
-            dones={dones}
-            onInput={onInput}
-            onNoChange={onNoChange}
-            onDone={onDone}
-            onBreach={onBreach}
-            onRedistPopup={onRedistPopup}
-          />
-        )}
-
-              {tab === "redist" && <RedistTab history={redistHistory} />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
-              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
               {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
