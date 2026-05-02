@@ -1865,7 +1865,6 @@ function AccountManagementTab() {
   const [startingBalance, setStartingBalance] = useState("");
   const [dateActivated, setDateActivated] = useState(today);
   const [numAccounts, setNumAccounts] = useState(1);
-  const [investedPerAccount, setInvestedPerAccount] = useState("");
   const [activationFee, setActivationFee] = useState("");
   const [contractMultiplier, setContractMultiplier] = useState(1);
 
@@ -1939,10 +1938,10 @@ function AccountManagementTab() {
 
   function resetForm() {
     setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
-    setNumAccounts(1); setInvestedPerAccount(""); setActivationFee(""); setContractMultiplier(1);
+    setNumAccounts(1); setActivationFee(""); setContractMultiplier(1);
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
-    setTradeDown(false); setTradeDownFloor(""); setAdvancePayoutAmount("");
+    setTradeDown(false); setAdvancePayoutAmount("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
     setPostPayoutStageId(""); setErr(null);
@@ -2007,7 +2006,6 @@ function AccountManagementTab() {
         "Evaluation Accounts": [selectedEvalId],
       };
       if (firstStage) perfFields["Current Stage"] = [firstStage.id];
-      if (investedPerAccount) perfFields["Invested Per Account"] = parseFloat(investedPerAccount);
       if (contractMultiplier) perfFields["Contract Multiplier"] = parseFloat(contractMultiplier);
       const newPerfRecord = await createRecord(PERF_TABLE, perfFields);
       const newPerfId = newPerfRecord?.id;
@@ -2231,10 +2229,6 @@ function AccountManagementTab() {
                   <div>
                     {label("Starting Balance")}
                     <input type="number" value={startingBalance} onChange={e => setStartingBalance(e.target.value)} style={inp} />
-                  </div>
-                  <div>
-                    {label("Invested Per Account")}
-                    <input type="number" placeholder="Optional" value={investedPerAccount} onChange={e => setInvestedPerAccount(e.target.value)} style={inp} />
                   </div>
                   <div>
                     {label("Activation Fee Per Account")}
