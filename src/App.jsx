@@ -309,13 +309,14 @@ function DoneSection({ accounts, inputs, noChanges, dones, onInput, onNoChange, 
 // ── Purchase Tab ──────────────────────────────────────────────────────────────
 
 function PurchaseTab() {
-  const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const sel = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
-  const inp = { background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
+  const C = { bg: "#0d1117", card: "#1f2a37", border: "#2d3f50" };
+  const sel = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
+  const inp = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
+  const subTabStyle = (active) => ({ background: active ? "#2563eb" : "#1f2a37", color: active ? "#fff" : "#aaa", border: `1px solid ${active ? "#3b82f6" : "#2f3b4a"}`, borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" });
 
   const today = new Date().toISOString().split("T")[0];
 
-  const [mode, setMode] = useState("");
+  const [mode, setMode] = useState("reset");
   const [activePurchases, setActivePurchases] = useState([]);
   const [loadingActive, setLoadingActive] = useState(true);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState("");
@@ -365,7 +366,7 @@ function PurchaseTab() {
     setLoadingRecent(true);
     try {
       const records = await fetchTable(PURCHASE_TABLE, ["Name", "Date Purchased", "Number of Accounts", "Cost Per Account", "Total Cost", "Purchase Type", "Status"]);
-      const sorted = records.sort((a, b) => new Date(b.fields["Date Purchased"] || 0) - new Date(a.fields["Date Purchased"] || 0)).slice(0, 20);
+      const sorted = records.sort((a, b) => new Date(b.fields["Date Purchased"] || 0) - new Date(a.fields["Date Purchased"] || 0)).slice(0, 10);
       setRecentPurchases(sorted);
     } catch (e) {}
     setLoadingRecent(false);
@@ -417,8 +418,8 @@ function PurchaseTab() {
     if (et) setCostPer(et.cost.toString());
   }
 
-  function resetForm() {
-    setMode("");
+  function resetForm(keepMode) {
+    if (!keepMode) setMode("reset");
     setSelectedPurchaseId("");
     setSelectedEvalId("");
     setEvalTypeId("");
@@ -434,7 +435,7 @@ function PurchaseTab() {
   const selectedEvalType = evalTypeList.find(t => t.id === evalTypeId);
   const trader = selectedPurchase ? traderList.find(t => t.id === selectedPurchase.fields["Trader"]?.[0]?.id) : null;
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
-  const canSubmit = mode && evalTypeId && costPer && date && numAccounts > 0 && (mode === "reset" ? selectedPurchaseId : traderId);
+  const canSubmit = evalTypeId && costPer && date && numAccounts > 0 && (mode === "reset" ? selectedPurchaseId : traderId);
   console.log("canSubmit check:", { mode, evalTypeId, costPer, date, numAccounts, selectedPurchaseId, traderId });
 
   async function handleSubmit() {
@@ -520,53 +521,21 @@ function PurchaseTab() {
   const label = (text) => <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>{text}</div>;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 20, alignItems: "start" }}>
+    <div style={{ maxWidth: 560 }}>
+      {/* Subtabs */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[["reset", "🔄 Reset Account"], ["new", "➕ New Account"], ["recent", "🕐 Recent Purchases"]].map(([m, lbl]) => (
+          <button key={m} onClick={() => { setMode(m); resetForm(true); }} style={subTabStyle(mode === m)}>{lbl}</button>
+        ))}
+      </div>
 
-      {/* Form */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 18 }}>Log a Purchase</div>
-
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
         {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>✓ Purchase logged successfully!</div>}
-
-        {/* Step 1 - Mode */}
-        {!mode && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {label("What type of purchase?")}
-            <div onClick={() => setMode("reset")}
-              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 24 }}>🔄</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b" }}>Reset an Account</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>An existing account breached — reset it</div>
-              </div>
-            </div>
-            <div onClick={() => setMode("new")}
-              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 24 }}>➕</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e" }}>New Account</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Purchase a brand new eval account</div>
-              </div>
-            </div>
-            <div onClick={() => setMode("monthly")}
-              style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 10, padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 24 }}>📅</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa" }}>Monthly Billing</div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>Log a recurring monthly charge</div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Reset Flow */}
         {mode === "reset" && (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Reset an Account</span>
-            </div>
 
             {label("Select the breached account")}
             {loadingActive ? (
@@ -650,10 +619,6 @@ function PurchaseTab() {
         {/* New Account Flow */}
         {mode === "new" && (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#22c55e" }}>New Account</span>
-            </div>
             <div style={{ marginBottom: 16 }}>
               {label("Select Trader")}
               <select value={traderId} onChange={e => setTraderId(e.target.value)} style={sel}>
@@ -707,101 +672,37 @@ function PurchaseTab() {
           </>
         )}
 
-        {/* Monthly Billing Flow */}
-        {mode === "monthly" && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <button onClick={resetForm} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#60a5fa" }}>Monthly Billing</span>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              {label("Link to Evaluation Account")}
-              <select value={selectedEvalId} onChange={e => setSelectedEvalId(e.target.value)} style={sel}>
-                <option value="">Choose eval account...</option>
-                {evalAccounts.sort((a, b) => (a.fields["Name"] || "").localeCompare(b.fields["Name"] || "")).map(r => (
-                  <option key={r.id} value={r.id}>{r.fields["Name"]}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              {label("Evaluation Account Type")}
-              <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
-                <option value="">Choose type...</option>
-                {evalTypeList.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-              <div>
-                {label("Date")}
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
-              </div>
-              <div>
-                {label("# of Accounts")}
-                <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
-              </div>
-              <div>
-                {label("Cost Per Account")}
-                <input type="number" placeholder="0.00" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              {label("Notes (optional)")}
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any notes..." rows={2}
-                style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
-            </div>
-
-            {totalCost > 0 && (
-              <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
-                <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>{$$(totalCost)}</span>
-              </div>
-            )}
-
-            <button onClick={handleSubmit} disabled={!canSubmit || submitting}
-              style={{ width: "100%", background: canSubmit ? "#1d4ed8" : "#1f2937", color: canSubmit ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed" }}>
-              {submitting ? "Saving..." : `Log Billing — ${$$(totalCost)}`}
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Recent Purchases */}
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 14 }}>Recent Purchases</div>
-        {loadingRecent ? (
-          <div style={{ color: "#6b7280", fontSize: 13 }}>Loading...</div>
-        ) : recentPurchases.length === 0 ? (
-          <div style={{ color: "#6b7280", fontSize: 13 }}>No purchases logged yet.</div>
-        ) : (
-          recentPurchases.map(r => {
-            const f = r.fields;
-            const pt = f["Purchase Type"];
-            const st = f["Status"];
-            const ptColor = pt === "New" ? "#22c55e" : pt === "Reset" ? "#f59e0b" : "#60a5fa";
-            const stColor = st === "Active" ? "#22c55e" : st === "Failed" ? "#ef4444" : "#f59e0b";
-            return (
-              <div key={r.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{f["Name"]}</div>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>{f["Date Purchased"]} · ×{f["Number of Accounts"]} accounts</div>
+        {/* Recent Purchases */}
+        {mode === "recent" && (
+          loadingRecent ? (
+            <div style={{ color: "#6b7280", fontSize: 13 }}>Loading...</div>
+          ) : recentPurchases.length === 0 ? (
+            <div style={{ color: "#6b7280", fontSize: 13 }}>No purchases logged yet.</div>
+          ) : (
+            recentPurchases.map(r => {
+              const f = r.fields;
+              const pt = f["Purchase Type"];
+              const st = f["Status"];
+              const ptColor = pt === "New" ? "#22c55e" : pt === "Reset" ? "#f59e0b" : "#60a5fa";
+              const stColor = st === "Active" ? "#22c55e" : st === "Failed" ? "#ef4444" : "#f59e0b";
+              return (
+                <div key={r.id} style={{ background: "#111827", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{f["Name"]}</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>{f["Date Purchased"]} · ×{f["Number of Accounts"]} accounts</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: `${ptColor}20`, color: ptColor, padding: "2px 8px", borderRadius: 99 }}>{pt}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: `${stColor}20`, color: stColor, padding: "2px 8px", borderRadius: 99 }}>{st}</span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171" }}>{$$(f["Total Cost"])}</div>
+                    <div style={{ fontSize: 10, color: "#6b7280" }}>{$$(f["Cost Per Account"])} each</div>
+                  </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, background: `${ptColor}20`, color: ptColor, padding: "2px 8px", borderRadius: 99 }}>{pt}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, background: `${stColor}20`, color: stColor, padding: "2px 8px", borderRadius: 99 }}>{st}</span>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171" }}>{$$(f["Total Cost"])}</div>
-                  <div style={{ fontSize: 10, color: "#6b7280" }}>{$$(f["Cost Per Account"])} each</div>
-                </div>
-              </div>
-            );
-          })
+              );
+            })
+          )
         )}
       </div>
     </div>
