@@ -893,6 +893,62 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   }, []);
   const [scoreSaving, setScoreSaving] = React.useState(false);
   const [scoreSaved, setScoreSaved] = React.useState(false);
+  const [payoutData, setPayoutData] = React.useState({});
+  const [payoutStrategies, setPayoutStrategies] = React.useState([]);
+  const [payoutActionState, setPayoutActionState] = React.useState({});
+  const [payoutFormInputs, setPayoutFormInputs] = React.useState({});
+  const [payoutSubmitting, setPayoutSubmitting] = React.useState({});
+  const today = new Date().toISOString().split("T")[0];
+  React.useEffect(() => {
+    if (waitingPerf.length === 0) return;
+    Promise.all([
+      fetchTable("tbljLby6v0o6fydOw", ["Name", "Account Type", "Stage Number", "Stage Target"]),
+      fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=200`).then(r => r.json()),
+    ]).then(([stratRows, pr]) => {
+      setPayoutStrategies(stratRows.map(r => {
+        const at = r.fields["Account Type"];
+        return { id: r.id, name: r.fields["Name"] || "", perfTypeId: Array.isArray(at) && at.length > 0 ? (at[0].id || at[0]) : null, stage: r.fields["Stage Number"] || 1, target: r.fields["Stage Target"] || 0 };
+      }));
+      const map = {};
+      (pr.records || []).filter(r => r.fields["Status"] !== "Received").forEach(r => {
+        (r.fields["Performance Account"] || []).forEach(pid => { map[pid] = r; });
+      });
+      setPayoutData(map);
+    }).catch(() => {});
+  }, [waitingPerf.length]);
+  async function handlePayoutStatusUpdate(accountId, payoutRecordId, newStatus) {
+    setPayoutSubmitting(prev => ({ ...prev, [accountId]: true }));
+    try {
+      await updateRecord(PAYOUT_TABLE, payoutRecordId, { "Status": newStatus });
+      setPayoutActionState(prev => ({ ...prev, [accountId]: null }));
+      setPayoutFormInputs(prev => ({ ...prev, [accountId]: {} }));
+    } catch (e) {}
+    setPayoutSubmitting(prev => ({ ...prev, [accountId]: false }));
+  }
+  async function handlePayoutReceive(a, payoutRecord, fi) {
+    if (!fi.amount || !fi.newBalance || !fi.stageId || !payoutRecord) return;
+    setPayoutSubmitting(prev => ({ ...prev, [a.id]: true }));
+    try {
+      const numAccts = payoutRecord.fields["Number of Accounts"] || 1;
+      await updateRecord(PAYOUT_TABLE, payoutRecord.id, {
+        "Status": "Received",
+        "Date Received": fi.date || today,
+        "Amount Per Account": parseFloat(fi.amount) / numAccts,
+      });
+      await updateRecord(PERF_TABLE, a.id, {
+        "Status": "Active",
+        "Current Balance": parseFloat(fi.newBalance),
+        "High Water Mark": parseFloat(fi.newBalance),
+        "Cycle Start Balance": parseFloat(fi.newBalance),
+        "Current Stage": [fi.stageId],
+        "Trading Days this Cycle": 0,
+        "Number of Payouts Recieved": a.numPayoutsReceived + 1,
+      });
+      setPayoutActionState(prev => ({ ...prev, [a.id]: null }));
+      setPayoutFormInputs(prev => ({ ...prev, [a.id]: {} }));
+    } catch (e) {}
+    setPayoutSubmitting(prev => ({ ...prev, [a.id]: false }));
+  }
   async function saveScore(a, val) {
     const num = parseFloat(val);
     if (isNaN(num)) return;
@@ -933,11 +989,125 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     });
     return feeds;
   }
+  const payoutStatusColor = { "Requested": "#f59e0b", "Processing": "#3b82f6", "Approved": "#8b5cf6", "Received": "#22c55e" };
   function AccountMiniCard(a) {
     const isDone = !!dones[a.id];
     const isBlown = !!blowns[a.id];
     const isCountTD = !!countTradingDays[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
+
+    if (a.status === "Waiting on Payout") {
+      const payoutRecord = payoutData[a.id];
+      const action = payoutActionState[a.id] || null;
+      const fi = payoutFormInputs[a.id] || {};
+      const isSubmitting = !!payoutSubmitting[a.id];
+      const availableStages = payoutStrategies.filter(s => s.perfTypeId === a.accountTypeId).sort((x, y) => x.stage - y.stage);
+      const setFI = (field, value) => setPayoutFormInputs(prev => ({ ...prev, [a.id]: { ...(prev[a.id] || {}), [field]: value } }));
+      return (
+        <div key={a.id} style={{ background: "#1f2a37", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 10px", marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+            <span style={{ fontSize: 9, fontWeight: 700, background: "#1c3a1c", color: "#4ade80", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>WAITING</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
+            {[["Target", $$(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Trading Days", a.tradingDays ?? 0], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+              <div key={lbl} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{lbl}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          {!action && (
+            <button onClick={() => setPayoutActionState(prev => ({ ...prev, [a.id]: "choice" }))}
+              style={{ width: "100%", background: "#1e3a5f", border: "1px solid #3b82f6", borderRadius: 5, padding: "5px 8px", fontSize: 10, cursor: "pointer", color: "#93c5fd", fontWeight: 700 }}>
+              💰 Update Status
+            </button>
+          )}
+          {action === "choice" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <div onClick={() => setPayoutActionState(prev => ({ ...prev, [a.id]: "status" }))}
+                style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 6, padding: "7px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14 }}>🔄</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#93c5fd" }}>Update Status</div>
+                  <div style={{ fontSize: 10, color: "#6b7280" }}>Requested / Processing / Approved</div>
+                </div>
+              </div>
+              <div onClick={() => setPayoutActionState(prev => ({ ...prev, [a.id]: "receive" }))}
+                style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 6, padding: "7px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14 }}>✅</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>Mark as Received</div>
+                  <div style={{ fontSize: 10, color: "#6b7280" }}>Log amount, set new balance, advance stage</div>
+                </div>
+              </div>
+              <button onClick={() => setPayoutActionState(prev => ({ ...prev, [a.id]: null }))}
+                style={{ background: "none", border: "none", color: "#6b7280", fontSize: 10, cursor: "pointer", padding: "2px 0", textAlign: "left" }}>← Back</button>
+            </div>
+          )}
+          {action === "status" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+                <button onClick={() => setPayoutActionState(prev => ({ ...prev, [a.id]: "choice" }))} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 14, padding: 0 }}>←</button>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#93c5fd" }}>Update Status</span>
+              </div>
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
+                {["Requested", "Processing", "Approved"].map(s => (
+                  <button key={s} onClick={() => setFI("newStatus", s)}
+                    style={{ background: fi.newStatus === s ? payoutStatusColor[s] : "#111827", color: fi.newStatus === s ? "#fff" : "#9ca3af", border: `1px solid ${fi.newStatus === s ? payoutStatusColor[s] : "#2d3f50"}`, borderRadius: 5, padding: "4px 8px", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => fi.newStatus && payoutRecord && handlePayoutStatusUpdate(a.id, payoutRecord.id, fi.newStatus)}
+                disabled={!fi.newStatus || !payoutRecord || isSubmitting}
+                style={{ width: "100%", background: fi.newStatus && payoutRecord ? "#1d4ed8" : "#111827", color: fi.newStatus && payoutRecord ? "#fff" : "#4b5563", border: "none", borderRadius: 5, padding: "5px", fontSize: 10, fontWeight: 700, cursor: fi.newStatus ? "pointer" : "not-allowed" }}>
+                {isSubmitting ? "Saving..." : "Update Status"}
+              </button>
+            </div>
+          )}
+          {action === "receive" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+                <button onClick={() => setPayoutActionState(prev => ({ ...prev, [a.id]: "choice" }))} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 14, padding: 0 }}>←</button>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#4ade80" }}>Mark as Received</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, marginBottom: 7 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>Date Received</div>
+                  <input type="date" value={fi.date || today} onChange={e => setFI("date", e.target.value)}
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>Total Amount</div>
+                  <input type="number" placeholder="e.g. 4500" value={fi.amount || ""} onChange={e => setFI("amount", e.target.value)}
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>New Balance</div>
+                  <input type="number" placeholder="e.g. 101200" value={fi.newBalance || ""} onChange={e => setFI("newBalance", e.target.value)}
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div style={{ gridColumn: "1/-1" }}>
+                  <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>Advance to Stage</div>
+                  <select value={fi.stageId || ""} onChange={e => setFI("stageId", e.target.value)}
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none" }}>
+                    <option value="">Select stage...</option>
+                    {availableStages.map(s => <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>)}
+                  </select>
+                </div>
+              </div>
+              <button onClick={() => handlePayoutReceive(a, payoutRecord, fi)}
+                disabled={!fi.amount || !fi.newBalance || !fi.stageId || !payoutRecord || isSubmitting}
+                style={{ width: "100%", background: (fi.amount && fi.newBalance && fi.stageId && payoutRecord) ? "#16a34a" : "#111827", color: (fi.amount && fi.newBalance && fi.stageId && payoutRecord) ? "#fff" : "#4b5563", border: "none", borderRadius: 5, padding: "5px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+                {isSubmitting ? "Saving..." : "✓ Mark Received & Advance Stage"}
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
         {/* Trader — Firm — Renewal warning — Score badge */}
@@ -964,7 +1134,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             ["Acct #", a.accountNumber ?? "—"],
             ["Trading Days", a.tradingDays ?? 0],
             ["Days Left", a.tradingDaysLeft ?? "—"],
-            ["Weight", a.accountWeight ?? "—"],
+            ["Multiplier", a.contractMultiplier ?? 1],
           ].map(([label, val]) => (
             <div key={label} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
@@ -2491,7 +2661,7 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
@@ -2545,6 +2715,7 @@ export default function App() {
           score: f["Score"] ?? null,
           accountNumber: f["Account Number"] || null,
           tradingDayDefinition: f["Trading Day Definition"] || null,
+          numPayoutsReceived: f["Number of Payouts Recieved"] || 0,
         };
       };
 
