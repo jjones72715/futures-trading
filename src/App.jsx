@@ -857,11 +857,18 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
     return (
       <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
-        {/* Trader — Firm — Score badge */}
+        {/* Trader — Firm — Renewal warning — Score badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
             {header}
           </span>
+          {a.type === "eval" && a.datePurchased && (() => {
+            const daysSince = Math.floor((Date.now() - new Date(a.datePurchased)) / 86400000);
+            const daysLeft = 30 - daysSince;
+            if (daysSince >= 30) return <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#450a0a", border: "1px solid #dc2626", borderRadius: 4, padding: "1px 6px", flexShrink: 0 }}>⚠ Past Renewal</span>;
+            if (daysLeft <= 7) return <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#450a0a", border: "1px solid #dc2626", borderRadius: 4, padding: "1px 6px", flexShrink: 0 }}>⚠ {daysLeft}d to renewal</span>;
+            return null;
+          })()}
           <span style={(() => { const sc = a.score; const c = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444"; return { fontSize: 12, fontWeight: 800, background: c ? `${c}22` : "#1f2937", color: c ?? "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${c ?? "#374151"}` }; })()}>
             {a.score != null ? a.score : "—"}
           </span>
@@ -882,19 +889,6 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             </div>
           ))}
         </div>
-        {/* 30-day billing warning (eval only) */}
-        {a.type === "eval" && a.datePurchased && (() => {
-          const daysSince = Math.floor((Date.now() - new Date(a.datePurchased)) / 86400000);
-          const daysLeft = 30 - (daysSince % 30);
-          if (daysLeft > 7) return null;
-          return (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 5, background: "#450a0a", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 8px" }}>
-              <span style={{ fontSize: 14, fontWeight: 900, color: "#ef4444" }}>!</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#ef4444" }}>{daysLeft}d until renewal</span>
-              <span style={{ fontSize: 14, fontWeight: 900, color: "#ef4444" }}>!</span>
-            </div>
-          );
-        })()}
         {/* 2x2 action grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
           {/* Row 1: Done Today | Blown */}
@@ -2406,25 +2400,12 @@ export default function App() {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
       }
 
-      let purchaseRecs = [];
-      try {
-        purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Evaluation Account", "Date Purchased", "Status"]);
-      } catch(e) {}
-      const evalDateMap = {};
-      purchaseRecs.forEach(r => {
-        const evalIds = r.fields["Evaluation Account"];
-        const date = r.fields["Date Purchased"];
-        if (!evalIds || !date) return;
-        (Array.isArray(evalIds) ? evalIds : [evalIds]).forEach(id => {
-          if (!evalDateMap[id]) evalDateMap[id] = date;
-        });
-      });
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
@@ -2501,7 +2482,7 @@ export default function App() {
           score: f["Score"] ?? null,
           accountNumber: f["Account Number"] || null,
           tradingDayDefinition: f["Trading Day Definition"] || null,
-          datePurchased: evalDateMap[r.id] || null,
+          datePurchased: f["Date Started"] || null,
         };
       };
 
