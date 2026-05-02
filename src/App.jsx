@@ -328,6 +328,7 @@ function PurchaseTab() {
   const [numAccounts, setNumAccounts] = useState(1);
   const [costPer, setCostPer] = useState("");
   const [notes, setNotes] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [err, setErr] = useState(null);
@@ -425,6 +426,7 @@ function PurchaseTab() {
     setEvalTypeId("");
     setCostPer("");
     setNotes("");
+    setAccountNumber("");
     setNumAccounts(1);
     setDate(today);
     setDateStarted(today);
@@ -447,13 +449,15 @@ function PurchaseTab() {
       if (mode === "reset") {
         await updateRecord(PURCHASE_TABLE, selectedPurchaseId, { "Status": "Failed" });
         if (selectedEvalId) {
-          await updateRecord(EVAL_TABLE, selectedEvalId, {
+          const resetFields = {
             "Current Balance": accountSize,
             "High Water Mark": accountSize,
             "Date Purchased": date,
             "Date Started": dateStarted,
             "Trading Days Completed": 0,
-          });
+          };
+          if (accountNumber) resetFields["Account Number"] = accountNumber;
+          await updateRecord(EVAL_TABLE, selectedEvalId, resetFields);
         }
         const purchaseName = `${selectedPurchase?.fields["Name"]?.split(" - ")[0]} - ${evalType?.name} - ${date}`;
         const fields = {
@@ -488,6 +492,7 @@ function PurchaseTab() {
         };
         if (evalTypeId) evalAccountFields["Evaluation Account Type"] = [evalTypeId];
         if (traderId) evalAccountFields["Trader"] = [traderId];
+        if (accountNumber) evalAccountFields["Account Number"] = accountNumber;
 
         const newEvalRecord = await createRecord(EVAL_TABLE, evalAccountFields);
         const newEvalId = newEvalRecord?.id;
@@ -582,6 +587,10 @@ function PurchaseTab() {
                     {label("Cost Per Account")}
                     <input type="number" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
                   </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    {label("Account Number")}
+                    <input type="text" placeholder="Optional" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} style={inp} />
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: 16 }}>
@@ -649,6 +658,10 @@ function PurchaseTab() {
               <div>
                 {label("Cost Per Account")}
                 <input type="number" placeholder="0.00" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                {label("Account Number")}
+                <input type="text" placeholder="Optional" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} style={inp} />
               </div>
             </div>
 
