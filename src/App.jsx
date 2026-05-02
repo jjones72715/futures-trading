@@ -848,7 +848,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     const isBlown = !!blowns[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
     return (
-      <div style={{ background: C.card, border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#1f2937"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+      <div style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
         {/* Trader — Firm — Score badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
@@ -859,12 +859,13 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
         </div>
-        {/* Stats: Target | Trading Days | Days Left | New Score */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
+        {/* Stats: Target | Trading Days | Days Left | Weight | New Score */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
           {[
             ["Target", $$(a.dailyTarget)],
             ["Trading Days", a.tradingDays ?? 0],
             ["Days Left", a.tradingDaysLeft ?? "—"],
+            ["Weight", a.accountWeight ?? "—"],
           ].map(([label, val]) => (
             <div key={label} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
@@ -2350,12 +2351,18 @@ export default function App() {
   async function load() {
     setLoading(true); setErr(null); setSaved(false);
     try {
-      let pr = [], er = [], traderRecs = [];
+      let pr = [], er = [], traderRecs = [], firmRecs = [];
       try {
         traderRecs = await fetchTable("tbla0lbJ9z1PAhNy7", ["Name"]);
       } catch(e) {}
       const traderMap = {};
       traderRecs.forEach(r => { traderMap[r.id] = r.fields["Name"] || ""; });
+
+      try {
+        firmRecs = await fetchTable("tblR0iLSQZI1xXYa6", ["Name"]);
+      } catch(e) {}
+      const firmMap = {};
+      firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
         pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name"]);
@@ -2372,6 +2379,12 @@ export default function App() {
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
+      const resolveFirm = raw => {
+        const val = Array.isArray(raw) ? raw[0] : raw;
+        return firmMap[val] || val || "";
+      };
+      const firstName = full => (full || "").split(" ")[0];
+
       const mapPerf = r => {
         const f = r.fields;
         const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
@@ -2379,8 +2392,8 @@ export default function App() {
         return {
           id: r.id, type: "perf",
           name: f["Name"] || "?",
-          traderName: traderMap[traderId] || "",
-          firmName: (Array.isArray(f["Firm Name"]) ? f["Firm Name"][0] : f["Firm Name"]) || "",
+          traderName: firstName(traderMap[traderId]),
+          firmName: resolveFirm(f["Firm Name"]),
           trader: traderId,
           status: f["Status"]?.name || f["Status"] || "",
           bal: f["Current Balance"] || 0,
@@ -2413,8 +2426,8 @@ export default function App() {
         return {
           id: r.id, type: "eval",
           name: f["Name"] || "?",
-          traderName: traderMap[traderId] || "",
-          firmName: (Array.isArray(f["Firm Name"]) ? f["Firm Name"][0] : f["Firm Name"]) || "",
+          traderName: firstName(traderMap[traderId]),
+          firmName: resolveFirm(f["Firm Name"]),
           trader: traderId,
           status: f["Status"]?.name || f["Status"] || "",
           bal: f["Current Balance"] || 0,
