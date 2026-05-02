@@ -893,7 +893,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           ) : <div />}
           <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
             style={{ background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
-            {isBlown ? "✓ Blown" : "☐ Blown"}
+            {isBlown ? "✓ Breached" : "☐ Breached"}
           </button>
           {/* Row 2: Count as Trading Day | New Score */}
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -906,7 +906,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             </button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-            <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2, textAlign: "center" }}>New Score</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", textAlign: "center", marginBottom: 2 }}>New Score</div>
             <input
               type="number"
               value={scoreInputs[a.id] ?? ""}
