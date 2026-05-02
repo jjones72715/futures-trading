@@ -896,10 +896,15 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             {isBlown ? "✓ Blown" : "☐ Blown"}
           </button>
           {/* Row 2: Count as Trading Day | New Score */}
-          <button onClick={() => setCountTradingDays(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
-            style={{ background: isCountTD ? "#1d4ed8" : "#1e3a5f", border: `1px solid ${isCountTD ? "#60a5fa" : "#2563eb"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
-            {isCountTD ? "✓ Count Trading Day" : "☐ Count Trading Day"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {a.tradingDayDefinition && (
+              <div style={{ fontSize: 9, color: "#94a3b8", fontStyle: "italic", lineHeight: 1.3 }}>{a.tradingDayDefinition}</div>
+            )}
+            <button onClick={() => setCountTradingDays(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+              style={{ background: isCountTD ? "#1d4ed8" : "#1e3a5f", border: `1px solid ${isCountTD ? "#60a5fa" : "#2563eb"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+              {isCountTD ? "✓ Count Trading Day" : "☐ Count Trading Day"}
+            </button>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2, textAlign: "center" }}>New Score</div>
             <input
@@ -2382,13 +2387,13 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -2434,6 +2439,7 @@ export default function App() {
           cycleStartBal: f["Cycle Start Balance"] || 0,
           score: f["Score"] ?? null,
           accountNumber: f["Account Number"] || null,
+          tradingDayDefinition: f["Trading Day Definition"] || null,
         };
       };
 
@@ -2467,6 +2473,7 @@ export default function App() {
           tradingDaysLeft: f["Trading Days Left"] ?? null,
           score: f["Score"] ?? null,
           accountNumber: f["Account Number"] || null,
+          tradingDayDefinition: f["Trading Day Definition"] || null,
         };
       };
 
