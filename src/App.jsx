@@ -803,7 +803,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   const doneAccounts = allShown.filter(a => dones[a.id]);
   const [scoreInputs, setScoreInputs] = React.useState(() => {
     const init = {};
-    allShown.forEach(a => { init[a.id] = a.score != null ? String(a.score) : ""; });
+    allShown.forEach(a => { init[a.id] = ""; });
     return init;
   });
   const [blowns, setBlowns] = React.useState({});
@@ -831,10 +831,8 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
   function getFeeds(accounts) {
     const feeds = {};
     accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
-      const rawA = parseFloat(scoreInputs[a.id]);
-      const rawB = parseFloat(scoreInputs[b.id]);
-      const va = isNaN(rawA) ? (a.score != null ? a.score : 99) : rawA;
-      const vb = isNaN(rawB) ? (b.score != null ? b.score : 99) : rawB;
+      const va = a.score != null ? a.score : 99;
+      const vb = b.score != null ? b.score : 99;
       return va - vb;
     }).forEach(a => {
       const dp = a.dataProvider || "Other";
@@ -862,7 +860,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
         {/* Stats: Target | Trading Days | Days Left | Weight | New Score */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
           {[
-            ["Target", $$(a.dailyTarget)],
+            ["Target", $$(a.limit)],
             ["Trading Days", a.tradingDays ?? 0],
             ["Days Left", a.tradingDaysLeft ?? "—"],
             ["Weight", a.accountWeight ?? "—"],
@@ -888,12 +886,12 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
         <div style={{ display: "flex", gap: 6 }}>
           {onDone && (
             <button onClick={() => onDone(a.id)}
-              style={{ flex: 1, background: isDone ? "#166534" : "#1f2937", border: `1px solid ${isDone ? "#22c55e" : "#374151"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isDone ? "#4ade80" : "#6b7280", fontWeight: 600 }}>
+              style={{ flex: 1, background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isDone ? "#fff" : "#86efac", fontWeight: 700 }}>
               {isDone ? "✓ Done Today" : "☐ Done Today"}
             </button>
           )}
           <button onClick={() => setBlowns(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
-            style={{ flex: 1, background: isBlown ? "#7f1d1d" : "#1f2937", border: `1px solid ${isBlown ? "#dc2626" : "#374151"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isBlown ? "#fca5a5" : "#6b7280", fontWeight: 600 }}>
+            style={{ flex: 1, background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: isBlown ? "#fff" : "#fca5a5", fontWeight: 700 }}>
             {isBlown ? "✓ Blown" : "☐ Blown"}
           </button>
         </div>
@@ -2353,10 +2351,12 @@ export default function App() {
     try {
       let pr = [], er = [], traderRecs = [], firmRecs = [];
       try {
-        traderRecs = await fetchTable("tbla0lbJ9z1PAhNy7", ["Name"]);
+        traderRecs = await fetchTable("tbla0lbJ9z1PAhNy7", ["Name", "Preferred Name"]);
       } catch(e) {}
       const traderMap = {};
-      traderRecs.forEach(r => { traderMap[r.id] = r.fields["Name"] || ""; });
+      traderRecs.forEach(r => {
+        traderMap[r.id] = r.fields["Preferred Name"] || (r.fields["Name"] || "").split(" ")[0] || "";
+      });
 
       try {
         firmRecs = await fetchTable("tblR0iLSQZI1xXYa6", ["Name"]);
@@ -2365,13 +2365,13 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Daily Target", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Daily Target", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -2407,7 +2407,7 @@ export default function App() {
           contractMultiplier: f["Contract Multiplier"] || 1,
           payoutAccount: f["Payout Account"] || false,
           dataProvider: dp,
-          dailyTarget: f["Daily Target"] || 0,
+          dailyTarget: 0,
           hwm: f["High Water Mark"] || 0,
           accountTypeId: (f["Performance Account Type"] || [])[0] || null,
           tradingDayType: (f["Trading Day Type"] || [])[0] || null,
@@ -2442,7 +2442,7 @@ export default function App() {
           contractMultiplier: 1,
           payoutAccount: false,
           dataProvider: dp,
-          dailyTarget: f["Daily Target"] || 0,
+          dailyTarget: 0,
           accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
           accountTypeId: (f["Evaluation Account Type"] || [])[0] || null,
           tradingDays: f["Trading Days Completed"] || 0,
@@ -2646,7 +2646,7 @@ export default function App() {
               }}
             />
           )}
-          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "#166534", color: "#fff", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>↻ Refresh</button>
+          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "#15803d", color: "#fff", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>↻ Refresh</button>
           <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
