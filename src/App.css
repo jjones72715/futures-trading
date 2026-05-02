@@ -45,7 +45,7 @@ textarea {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
-  background: var(--card) !important;
+  background: #1f2a37 !important;
   border-bottom: 1px solid var(--border) !important;
   box-shadow: var(--shadow);
 }
@@ -81,16 +81,16 @@ textarea {
 
 #root > div > div[style*="justify-content: space-between"] > div:last-child button,
 .app-header-actions button {
-  border-color: var(--border) !important;
-  color: var(--yellow) !important;
-  background: #151515 !important;
+  border-color: #22c55e !important;
+  color: #fff !important;
+  background: #15803d !important;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
 #root > div > div[style*="justify-content: space-between"] > div:last-child button:hover,
 .app-header-actions button:hover {
-  border-color: var(--yellow) !important;
-  background: #1b1b1b !important;
+  border-color: #22c55e !important;
+  background: #166534 !important;
 }
 
 #root > div > div[style*="max-width: 1400px"],
