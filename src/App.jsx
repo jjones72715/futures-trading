@@ -2382,13 +2382,13 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
