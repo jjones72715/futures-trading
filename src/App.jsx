@@ -795,36 +795,19 @@ function PurchaseTab() {
   );
 }
 
-function BreachModal({ account, onClose, onBreached }) {
+function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [step, setStep] = React.useState("choice"); // "choice" | "reset"
-  const [evalTypeList, setEvalTypeList] = React.useState([]);
-  const [traderList, setTraderList] = React.useState([]);
-  const [evalTypeId, setEvalTypeId] = React.useState(account.accountTypeId || "");
+  const [step, setStep] = React.useState("choice");
+  const [evalTypeId] = React.useState(account.accountTypeId || "");
   const [date, setDate] = React.useState(today);
   const [numAccounts, setNumAccounts] = React.useState(1);
-  const [costPer, setCostPer] = React.useState("");
+  const [costPer, setCostPer] = React.useState(() => {
+    const pre = evalTypeList.find(t => t.id === (account.accountTypeId || ""));
+    return pre ? pre.cost.toString() : "";
+  });
   const [notes, setNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [err, setErr] = React.useState(null);
-
-  React.useEffect(() => {
-    fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]).then(rows => {
-      const list = rows.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name));
-      setEvalTypeList(list);
-      const pre = list.find(t => t.id === account.accountTypeId);
-      if (pre) setCostPer(pre.cost.toString());
-    }).catch(() => {});
-    fetchTable(TRADERS_TABLE, ["Name"]).then(rows => {
-      setTraderList(rows.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
-    }).catch(() => {});
-  }, []);
-
-  function handleEvalTypeChange(id) {
-    setEvalTypeId(id);
-    const et = evalTypeList.find(t => t.id === id);
-    if (et) setCostPer(et.cost.toString());
-  }
 
   async function handleBreach() {
     setSubmitting(true); setErr(null);
@@ -965,7 +948,7 @@ function BreachModal({ account, onClose, onBreached }) {
   );
 }
 
-function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
+function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, evalTypeList = [] }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
   const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
@@ -1127,6 +1110,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
       {breachModalAccount && (
         <BreachModal
           account={breachModalAccount}
+          evalTypeList={evalTypeList}
           onClose={() => setBreachModalAccount(null)}
           onBreached={id => setBlowns(prev => ({ ...prev, [id]: true }))}
         />
@@ -2515,6 +2499,7 @@ export default function App() {
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState("accounts");
+  const [evalTypeList, setEvalTypeList] = useState([]);
 
   useEffect(() => { load(); }, []);
 
@@ -2585,6 +2570,11 @@ export default function App() {
         console.error("EVAL FETCH ERROR:", evalErr);
       }
 
+
+      try {
+        const etRecs = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Cost Per Account"]);
+        setEvalTypeList(etRecs.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
+      } catch(e) {}
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
@@ -2887,7 +2877,7 @@ export default function App() {
 
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
-              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} evalTypeList={evalTypeList} />}
               {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
