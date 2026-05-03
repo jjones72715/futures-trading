@@ -1405,7 +1405,15 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
       </div>
       {FeedGrid({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
       {FeedGrid({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
-      {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => (a.tradingDaysLeft ?? 999) - (b.tradingDaysLeft ?? 999) })}
+      {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => {
+  const lpMax = acc => {
+    const amt = acc.stageTarget != null ? acc.stageTarget - acc.bal : null;
+    const ps = amt == null ? 0 : amt <= 0 ? 0 : Math.min(10, Math.ceil(amt / 500));
+    const ds = acc.tradingDaysLeft == null ? 0 : acc.tradingDaysLeft <= 0 ? 0 : acc.tradingDaysLeft;
+    return Math.max(ps, ds);
+  };
+  return lpMax(a) - lpMax(b);
+} })}
       {FeedGrid({ accounts: waitingPerf, color: "#6b7280", title: "Waiting on Payout" })}
       {doneAccounts.length > 0 && (
         <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
@@ -1958,7 +1966,15 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     <div>
       {SnapSection({ title: "Evaluation Accounts", color: "#8b5cf6", accounts: evalAccounts })}
       {SnapSection({ title: "Performance Accounts", color: "#3b82f6", accounts: standardPerf })}
-      {SnapSection({ title: "Live & Payout Accounts", color: "#f59e0b", accounts: livePerf, sortFn: (a, b) => (a.tradingDaysLeft ?? 999) - (b.tradingDaysLeft ?? 999) })}
+      {SnapSection({ title: "Live & Payout Accounts", color: "#f59e0b", accounts: livePerf, sortFn: (a, b) => {
+  const lpMax = acc => {
+    const amt = acc.stageTarget != null ? acc.stageTarget - acc.bal : null;
+    const ps = amt == null ? 0 : amt <= 0 ? 0 : Math.min(10, Math.ceil(amt / 500));
+    const ds = acc.tradingDaysLeft == null ? 0 : acc.tradingDaysLeft <= 0 ? 0 : acc.tradingDaysLeft;
+    return Math.max(ps, ds);
+  };
+  return lpMax(a) - lpMax(b);
+} })}
       {SnapSection({ title: "Waiting on Payout", color: "#6b7280", accounts: waitingPerf })}
     </div>
   );
