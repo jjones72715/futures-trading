@@ -3356,7 +3356,7 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Data Provider Override", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
@@ -3384,7 +3384,8 @@ export default function App() {
 
       const mapPerf = r => {
         const f = r.fields;
-        const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
+        const dpOverride = f["Data Provider Override"] ? (Array.isArray(f["Data Provider Override"]) ? f["Data Provider Override"][0] : f["Data Provider Override"]) : null;
+        const dp = dpOverride || (Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other"));
         const traderId = Array.isArray(f["Trader"]) ? f["Trader"][0] : (f["Trader"] || "");
         return {
           id: r.id, type: "perf",
