@@ -79,6 +79,17 @@ function $$target(v) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
+function lpColor(n) {
+  if (n <= 1) return "#22c55e";
+  if (n >= 10) return "#ef4444";
+  if (n <= 5) {
+    const t = (n - 1) / 4;
+    return `rgb(${Math.round(34 + 200 * t)},${Math.round(197 - 18 * t)},${Math.round(94 - 86 * t)})`;
+  }
+  const t = (n - 5) / 5;
+  return `rgb(${Math.round(234 + 5 * t)},${Math.round(179 - 111 * t)},${Math.round(8 + 60 * t)})`;
+}
+
 function toScore(p) {
   if (!p && p !== 0) return 0;
   return Math.max(1, Math.min(10, Math.round(p * 10)));
@@ -1071,13 +1082,14 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     } catch (e) {}
     setScoreSaving(false);
   }
-  function getFeeds(accounts) {
+  function getFeeds(accounts, sortFn) {
     const feeds = {};
-    accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
+    const defaultSort = (a, b) => {
       const va = a.score != null ? a.score : 99;
       const vb = b.score != null ? b.score : 99;
       return va - vb;
-    }).forEach(a => {
+    };
+    accounts.filter(a => !dones[a.id]).slice().sort(sortFn || defaultSort).forEach(a => {
       const dp = a.dataProvider || "Other";
       if (!feeds[dp]) feeds[dp] = [];
       feeds[dp].push(a);
@@ -1214,11 +1226,17 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
       const profitPerAcct = a.ddLeft;
       const amtForPayout = a.stageTarget != null ? a.stageTarget - a.bal : null;
       const acctValue = a.contractMultiplier > 0 ? a.ddLeft * a.n / a.contractMultiplier : a.ddLeft;
+      const payoutScore = amtForPayout == null ? null : amtForPayout <= 0 ? "✓" : Math.min(10, Math.ceil(amtForPayout / 500));
+      const daysScore = a.tradingDaysLeft == null ? null : a.tradingDaysLeft <= 0 ? "✓" : a.tradingDaysLeft;
+      const psColor = payoutScore === "✓" ? "#22c55e" : payoutScore != null ? lpColor(payoutScore) : "#4b5563";
+      const dsColor = daysScore === "✓" ? "#22c55e" : daysScore != null ? lpColor(Math.min(daysScore, 10)) : "#4b5563";
       return (
         <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+            <span style={{ fontSize: 12, fontWeight: 800, background: `${psColor}22`, color: psColor, padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: `1px solid ${psColor}` }}>{payoutScore ?? "—"}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, background: `${dsColor}22`, color: dsColor, padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: `1px solid ${dsColor}` }}>{daysScore ?? "—"}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
             {[
@@ -1346,9 +1364,9 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
       </div>
     );
   }
-  function FeedGrid({ accounts, color, title }) {
+  function FeedGrid({ accounts, color, title, sortFn }) {
     if (accounts.length === 0) return null;
-    const feeds = getFeeds(accounts);
+    const feeds = getFeeds(accounts, sortFn);
     const feedNames = Object.keys(feeds).sort();
     if (feedNames.length === 0) return null;
     return (
@@ -1387,7 +1405,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
       </div>
       {FeedGrid({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
       {FeedGrid({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
-      {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts" })}
+      {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => (a.tradingDaysLeft ?? 999) - (b.tradingDaysLeft ?? 999) })}
       {FeedGrid({ accounts: waitingPerf, color: "#6b7280", title: "Waiting on Payout" })}
       {doneAccounts.length > 0 && (
         <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
@@ -1816,12 +1834,13 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
   const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
 
-  function groupByProvider(accounts) {
-    const active = accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
+  function groupByProvider(accounts, sortFn) {
+    const defaultSort = (a, b) => {
       const va = a.score != null ? a.score : 99;
       const vb = b.score != null ? b.score : 99;
       return va - vb;
-    });
+    };
+    const active = accounts.filter(a => !dones[a.id]).slice().sort(sortFn || defaultSort);
     const done = accounts.filter(a => dones[a.id]);
     const all = [...active, ...done];
     const byProvider = {};
@@ -1854,6 +1873,10 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
       const profitPerAcct = a.ddLeft ?? null;
       const amtForPayout = a.stageTarget != null && a.bal != null ? a.stageTarget - a.bal : null;
       const acctValue = a.contractMultiplier > 0 && a.ddLeft != null ? a.ddLeft * (a.n || 1) / a.contractMultiplier : null;
+      const payoutScore = amtForPayout == null ? null : amtForPayout <= 0 ? "✓" : Math.min(10, Math.ceil(amtForPayout / 500));
+      const daysScore = a.tradingDaysLeft == null ? null : a.tradingDaysLeft <= 0 ? "✓" : a.tradingDaysLeft;
+      const psColor = payoutScore === "✓" ? "#22c55e" : payoutScore != null ? lpColor(payoutScore) : "#4b5563";
+      const dsColor = daysScore === "✓" ? "#22c55e" : daysScore != null ? lpColor(Math.min(daysScore, 10)) : "#4b5563";
       const stats = [
         ["Target", $$target(a.limit)],
         ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
@@ -1869,6 +1892,8 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             {a.status === "Live" && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
+            <span style={{ fontSize: 10, fontWeight: 800, background: `${psColor}22`, color: psColor, padding: "0px 5px", borderRadius: 99, flexShrink: 0, border: `1px solid ${psColor}` }}>{payoutScore ?? "—"}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, background: `${dsColor}22`, color: dsColor, padding: "0px 5px", borderRadius: 99, flexShrink: 0, border: `1px solid ${dsColor}` }}>{daysScore ?? "—"}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 3 }}>
             {stats.map(([lbl, val]) => (
@@ -1905,9 +1930,9 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     );
   }
 
-  function SnapSection({ title, color, accounts }) {
+  function SnapSection({ title, color, accounts, sortFn }) {
     if (accounts.length === 0) return null;
-    const byProvider = groupByProvider(accounts);
+    const byProvider = groupByProvider(accounts, sortFn);
     const providers = Object.keys(byProvider).sort();
     const activeCount = accounts.filter(a => !dones[a.id]).length;
     return (
@@ -1933,7 +1958,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     <div>
       {SnapSection({ title: "Evaluation Accounts", color: "#8b5cf6", accounts: evalAccounts })}
       {SnapSection({ title: "Performance Accounts", color: "#3b82f6", accounts: standardPerf })}
-      {SnapSection({ title: "Live & Payout Accounts", color: "#f59e0b", accounts: livePerf })}
+      {SnapSection({ title: "Live & Payout Accounts", color: "#f59e0b", accounts: livePerf, sortFn: (a, b) => (a.tradingDaysLeft ?? 999) - (b.tradingDaysLeft ?? 999) })}
       {SnapSection({ title: "Waiting on Payout", color: "#6b7280", accounts: waitingPerf })}
     </div>
   );
