@@ -17,7 +17,7 @@
 
         const data = await response.json();
         return {
-          statusCode: 200,
+          statusCode: response.status,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         };

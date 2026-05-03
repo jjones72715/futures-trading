@@ -53,7 +53,7 @@ async function createRecord(tableId, fields) {
     body: JSON.stringify({ fields }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
   return data;
 }
 
@@ -2524,7 +2524,6 @@ function AccountManagementTab() {
         "Payout Tier": tierDecimal,
       };
       if (cpDateReceived) fields["Date Received"] = cpDateReceived;
-      if (cpStageId) fields["Stage at Payout"] = [cpStageId];
       if (cpNotes) fields["Notes"] = cpNotes;
       await createRecord(PAYOUT_TABLE, fields);
       setSuccess("✓ Payout record created!");
@@ -3040,15 +3039,6 @@ function AccountManagementTab() {
               <div>
                 {label("Payout Tier %")}
                 <input type="number" min="0" max="100" placeholder="50" value={cpTier} onChange={e => setCpTier(e.target.value)} style={inp} />
-              </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                {label("Stage at Payout")}
-                <select value={cpStageId} onChange={e => setCpStageId(e.target.value)} style={sel} disabled={!cpPerfTypeId}>
-                  <option value="">Select stage...</option>
-                  {payoutStrategies.filter(s => s.perfTypeId === cpPerfTypeId).sort((a, b) => a.stage - b.stage).map(s => (
-                    <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>
-                  ))}
-                </select>
               </div>
               <div style={{ gridColumn: "1/-1" }}>
                 {label("Notes (optional)")}
