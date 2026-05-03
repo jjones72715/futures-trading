@@ -1017,10 +1017,12 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     setPayoutSubmitting(prev => ({ ...prev, [a.id]: true }));
     try {
       const numAccts = payoutRecord.fields["Number of Accounts"] || 1;
+      const tierPct = parseFloat(fi.tier ?? "50") || 50;
       await updateRecord(PAYOUT_TABLE, payoutRecord.id, {
         "Status": "Received",
         "Date Received": fi.date || today,
         "Amount Per Account": parseFloat(fi.amount) / numAccts,
+        "Payout Tier": tierPct / 100,
       });
       await updateRecord(PERF_TABLE, a.id, {
         "Status": "Active",
@@ -1168,6 +1170,11 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
                 <div>
                   <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>Total Amount</div>
                   <input type="number" placeholder="e.g. 4500" value={fi.amount || ""} onChange={e => setFI("amount", e.target.value)}
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>Payout Tier %</div>
+                  <input type="number" min="0" max="100" placeholder="50" value={fi.tier ?? "50"} onChange={e => setFI("tier", e.target.value)}
                     style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none", boxSizing: "border-box" }} />
                 </div>
                 <div style={{ gridColumn: "1/-1" }}>
@@ -2238,6 +2245,7 @@ function AccountManagementTab() {
   const [receivedDate, setReceivedDate] = useState(today);
   const [postPayoutBalance, setPostPayoutBalance] = useState("");
   const [postPayoutStageId, setPostPayoutStageId] = useState("");
+  const [payoutTierInput, setPayoutTierInput] = useState("50");
 
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
@@ -2322,7 +2330,7 @@ function AccountManagementTab() {
     setTradeDown(false); setAdvancePayoutAmount("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setPayoutDateRequested(today); setPayoutNumAccounts("");
+    setPostPayoutStageId(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts("");
     setErr(null);
   }
 
@@ -2497,10 +2505,12 @@ function AccountManagementTab() {
       const numAccts = payout?.fields["Number of Accounts"] || 1;
       const amtPerAcct = parseFloat(receivedAmount) / numAccts;
       // Update payout record
+      const tierPct = parseFloat(payoutTierInput) || 50;
       await updateRecord(PAYOUT_TABLE, selectedPayoutId, {
         "Status": "Received",
         "Date Received": receivedDate,
         "Amount Per Account": amtPerAcct,
+        "Payout Tier": tierPct / 100,
       });
       // Update perf account: new balance, stage, back to Active
       if (payoutPerfId) {
@@ -2844,6 +2854,10 @@ function AccountManagementTab() {
                       <div>
                         {label("Total Amount Received")}
                         <input type="number" placeholder="e.g. 4500" value={receivedAmount} onChange={e => setReceivedAmount(e.target.value)} style={inp} />
+                      </div>
+                      <div>
+                        {label("Payout Tier %")}
+                        <input type="number" min="0" max="100" placeholder="50" value={payoutTierInput} onChange={e => setPayoutTierInput(e.target.value)} style={inp} />
                       </div>
                       <div style={{ gridColumn: "1/-1" }}>
                         {label("New Account Balance After Payout")}
