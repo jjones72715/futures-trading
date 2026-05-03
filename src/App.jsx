@@ -2251,6 +2251,18 @@ function AccountManagementTab() {
   const [postPayoutStageId, setPostPayoutStageId] = useState("");
   const [payoutTierInput, setPayoutTierInput] = useState("50");
 
+  // Create New Payout form state
+  const [cpTrader, setCpTrader] = useState("");
+  const [cpPerfTypeId, setCpPerfTypeId] = useState("");
+  const [cpDateRequested, setCpDateRequested] = useState(today);
+  const [cpDateReceived, setCpDateReceived] = useState("");
+  const [cpAmountPerAccount, setCpAmountPerAccount] = useState("");
+  const [cpNumAccounts, setCpNumAccounts] = useState("1");
+  const [cpStatus, setCpStatus] = useState("Requested");
+  const [cpTier, setCpTier] = useState("50");
+  const [cpStageId, setCpStageId] = useState("");
+  const [cpNotes, setCpNotes] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState("");
   const [err, setErr] = useState(null);
@@ -2335,6 +2347,9 @@ function AccountManagementTab() {
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
     setPostPayoutStageId(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
+    setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
+    setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
+    setCpStageId(""); setCpNotes("");
     setErr(null);
   }
 
@@ -2492,6 +2507,33 @@ function AccountManagementTab() {
     setSubmitting(false);
   }
 
+  async function handleCreatePayout() {
+    if (!cpTrader || !cpPerfTypeId || !cpAmountPerAccount) { setErr("Trader, Account Type, and Amount are required."); return; }
+    setSubmitting(true); setErr(null);
+    try {
+      const trader = traderList.find(t => t.id === cpTrader);
+      const pt = perfTypes.find(t => t.id === cpPerfTypeId);
+      const tierDecimal = (parseFloat(cpTier) || 50) / 100;
+      const fields = {
+        "Name": `${trader?.name?.split(" ")[0] ?? "Unknown"} - ${pt?.name ?? "Payout"} - ${cpDateRequested}`,
+        "Trader": [cpTrader],
+        "Date Requested": cpDateRequested,
+        "Amount Per Account": parseFloat(cpAmountPerAccount),
+        "Number of Accounts": parseInt(cpNumAccounts) || 1,
+        "Status": cpStatus,
+        "Payout Tier": tierDecimal,
+      };
+      if (cpDateReceived) fields["Date Received"] = cpDateReceived;
+      if (cpStageId) fields["Stage at Payout"] = [cpStageId];
+      if (cpNotes) fields["Notes"] = cpNotes;
+      await createRecord(PAYOUT_TABLE, fields);
+      setSuccess("✓ Payout record created!");
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSubmitting(false);
+  }
+
   async function handleUpdatePayoutStatus() {
     if (!selectedPayoutId || !newPayoutStatus) return;
     setSubmitting(true); setErr(null);
@@ -2565,10 +2607,11 @@ function AccountManagementTab() {
           <TabBtn id="passed_evals">📈 Passed Evals</TabBtn>
           <TabBtn id="stage_mgmt">🎯 Stages</TabBtn>
           <TabBtn id="payouts">💰 Payouts</TabBtn>
+          <TabBtn id="create_payout">➕ Create Payout</TabBtn>
         </div>
 
         {/* Trader pills — outside the card */}
-        {(() => {
+        {activeTab !== "create_payout" && (() => {
           const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
           const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
           return (
@@ -2584,7 +2627,7 @@ function AccountManagementTab() {
               })}
             </div>
           );
-        })()}
+        })() }
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
 
@@ -2943,6 +2986,76 @@ function AccountManagementTab() {
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── CREATE NEW PAYOUT ── */}
+        {activeTab === "create_payout" && (
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+            {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
+            {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div style={{ gridColumn: "1/-1" }}>
+                {label("Trader")}
+                <select value={cpTrader} onChange={e => setCpTrader(e.target.value)} style={sel}>
+                  <option value="">Select trader...</option>
+                  {traderList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                {label("Performance Account Type")}
+                <select value={cpPerfTypeId} onChange={e => { setCpPerfTypeId(e.target.value); setCpStageId(""); }} style={sel}>
+                  <option value="">Select type...</option>
+                  {perfTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                {label("Date Requested")}
+                <input type="date" value={cpDateRequested} onChange={e => setCpDateRequested(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("Date Received (optional)")}
+                <input type="date" value={cpDateReceived} onChange={e => setCpDateReceived(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("Amount Per Account")}
+                <input type="number" placeholder="e.g. 1500" value={cpAmountPerAccount} onChange={e => setCpAmountPerAccount(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("Number of Accounts")}
+                <input type="number" min="1" value={cpNumAccounts} onChange={e => setCpNumAccounts(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("Status")}
+                <select value={cpStatus} onChange={e => setCpStatus(e.target.value)} style={sel}>
+                  {PAYOUT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                {label("Payout Tier %")}
+                <input type="number" min="0" max="100" placeholder="50" value={cpTier} onChange={e => setCpTier(e.target.value)} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                {label("Stage at Payout")}
+                <select value={cpStageId} onChange={e => setCpStageId(e.target.value)} style={sel} disabled={!cpPerfTypeId}>
+                  <option value="">Select stage...</option>
+                  {payoutStrategies.filter(s => s.perfTypeId === cpPerfTypeId).sort((a, b) => a.stage - b.stage).map(s => (
+                    <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ gridColumn: "1/-1" }}>
+                {label("Notes (optional)")}
+                <textarea value={cpNotes} onChange={e => setCpNotes(e.target.value)} rows={2}
+                  style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
+              </div>
+            </div>
+
+            <button onClick={handleCreatePayout} disabled={submitting || !cpTrader || !cpPerfTypeId || !cpAmountPerAccount}
+              style={{ width: "100%", background: (cpTrader && cpPerfTypeId && cpAmountPerAccount) ? "#16a34a" : "#111827", color: (cpTrader && cpPerfTypeId && cpAmountPerAccount) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              {submitting ? "Saving..." : "✓ Create Payout Record"}
+            </button>
           </div>
         )}
 
