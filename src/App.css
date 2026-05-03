@@ -100,52 +100,6 @@ textarea {
   background: var(--bg);
 }
 
-#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button),
-.top-tabs {
-  display: flex !important;
-  align-items: flex-end;
-  gap: 4px !important;
-  border-bottom: 1px solid var(--border) !important;
-  margin-bottom: 28px !important;
-  padding-top: 4px;
-  overflow-x: auto;
-}
-
-#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button,
-.top-tab {
-  position: relative;
-  z-index: 1;
-  top: 0;
-  margin-bottom: 0 !important;
-  white-space: nowrap;
-  background: #e5e5e5 !important;
-  border: 1px solid #cfcfcf !important;
-  border-bottom-color: #cfcfcf !important;
-  border-radius: 10px 10px 0 0 !important;
-  color: #000000 !important;
-  padding: 9px 18px !important;
-  font-weight: 600 !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button[style*="rgb(96, 165, 250)"],
-#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button[style*="#60a5fa"],
-.top-tab.active {
-  top: -2px !important;
-  z-index: 2 !important;
-  margin-bottom: -1px !important;
-  background: var(--yellow) !important;
-  border-color: var(--yellow) !important;
-  border-bottom-color: var(--yellow) !important;
-  color: #000000 !important;
-  font-weight: 800 !important;
-  box-shadow: 0 -2px 10px rgba(255, 215, 0, 0.24);
-}
-
-#root > div > div[style*="max-width: 1400px"] > div[style*="border-bottom"]:has(> button) > button:hover,
-.top-tab:hover {
-  transform: translateY(-1px);
-}
 
 #root > div > div[style*="max-width: 1400px"] div[style*="background: #111827"][style*="padding"],
 #root > div > div[style*="max-width: 1400px"] div[style*="background: rgb(17, 24, 39)"][style*="padding"],

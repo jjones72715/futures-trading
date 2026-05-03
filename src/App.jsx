@@ -1476,6 +1476,14 @@ function FirmUsageTab() {
   );
 }
 
+function TraderPLTab() {
+  return (
+    <div style={{ color: "#6b7280", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
+      Trader P&amp;L — coming soon.
+    </div>
+  );
+}
+
 function PLTab({ evalAccounts, perfAccounts }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const [startingLiquidation, setStartingLiquidation] = useState("");
@@ -3004,16 +3012,17 @@ export default function App() {
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>⚠ {err}</div>}
 
 
-        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 16 }}>
-              {[
-                ["accounts", "📋 All Accounts"],
-                ["purchases", "🛒 Purchases"],
-                ["mgmt", "🔄 Account Management"],
-                ["pl", "📈 P&L"],
-                ["firms", "🏢 Firm Usage"],
-              ].map(([key, label]) => (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+          {[
+            ["accounts", "📋 All Accounts"],
+            ["purchases", "🛒 Purchases"],
+            ["mgmt", "🔄 Account Management"],
+            ["snapshot", "📈 Snapshot"],
+            ["traderpl", "💹 Trader P&L"],
+            ["firms", "🏢 Firm Usage"],
+          ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              style={{ background: "none", border: "none", borderBottom: tab === key ? "2px solid #3b82f6" : "2px solid transparent", color: tab === key ? "#60a5fa" : "#6b7280", padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: -1 }}>
+              style={{ background: tab === key ? "#1f3a5f" : "#18222f", color: tab === key ? "#7dd3fc" : "#888", border: `1px solid ${tab === key ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
               {label}
             </button>
           ))}
@@ -3022,7 +3031,8 @@ export default function App() {
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
-              {tab === "pl" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
+              {tab === "snapshot" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
+              {tab === "traderpl" && <TraderPLTab />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
             </div>
