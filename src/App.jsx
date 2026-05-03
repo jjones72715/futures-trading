@@ -2238,6 +2238,7 @@ function AccountManagementTab() {
   const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
   const [payoutDateRequested, setPayoutDateRequested] = useState(today);
   const [payoutNumAccounts, setPayoutNumAccounts] = useState("");
+  const [payoutTradeDown, setPayoutTradeDown] = useState(false);
 
   // Payout Management state
   const [selectedPayoutId, setSelectedPayoutId] = useState("");
@@ -2332,7 +2333,7 @@ function AccountManagementTab() {
     setTradeDown(false); setAdvancePayoutAmount("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts("");
+    setPostPayoutStageId(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
     setErr(null);
   }
 
@@ -2467,7 +2468,9 @@ function AccountManagementTab() {
     try {
       const perf = perfAccounts.find(r => r.id === selectedPerfId);
       const trader = traderList.find(t => t.id === traderId);
-      await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
+      const perfUpdate = { "Status": "Waiting on Payout" };
+      if (payoutTradeDown) perfUpdate["Trade Down Account"] = true;
+      await updateRecord(PERF_TABLE, selectedPerfId, perfUpdate);
       // Create payout record
       const dateReq = payoutDateRequested || today;
       const numAccts = payoutNumAccounts ? parseInt(payoutNumAccounts) : (perf?.fields["Number of Accounts"] || 1);
@@ -2757,6 +2760,13 @@ function AccountManagementTab() {
                     {label("Number of Accounts")}
                     <input type="number" min="1" placeholder="Auto" value={payoutNumAccounts} onChange={e => setPayoutNumAccounts(e.target.value)} style={inp} />
                   </div>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={payoutTradeDown} onChange={e => setPayoutTradeDown(e.target.checked)}
+                      style={{ width: 16, height: 16, cursor: "pointer" }} />
+                    <span style={{ fontSize: 13, color: "#d1d5db" }}>Trade Down Account</span>
+                  </label>
                 </div>
                 <div style={{ background: "#2d1f00", border: "1px solid #f59e0b", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
                   <div style={{ fontSize: 11, color: "#fde68a" }}>• Sets account to "Waiting on Payout"</div>
