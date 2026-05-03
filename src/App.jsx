@@ -1544,10 +1544,96 @@ function TraderPLTab() {
   );
 }
 
-function SnapshotTab() {
+function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
+  const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
+
+  function groupByProvider(accounts) {
+    const active = accounts.filter(a => !dones[a.id]).slice().sort((a, b) => {
+      const va = a.score != null ? a.score : 99;
+      const vb = b.score != null ? b.score : 99;
+      return va - vb;
+    });
+    const done = accounts.filter(a => dones[a.id]);
+    const all = [...active, ...done];
+    const byProvider = {};
+    all.forEach(a => {
+      const dp = a.dataProvider || "Other";
+      if (!byProvider[dp]) byProvider[dp] = [];
+      byProvider[dp].push(a);
+    });
+    return byProvider;
+  }
+
+  function SnapCard(a) {
+    const isDone = !!dones[a.id];
+    const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
+
+    if (a.status === "Waiting on Payout") {
+      return (
+        <div key={a.id} style={{ background: "#131e28", border: "1px solid #1e2e3e", borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+            <span style={{ fontSize: 8, fontWeight: 700, background: "#3b2a0a", color: "#fbbf24", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>WAITING</span>
+          </div>
+        </div>
+      );
+    }
+
+    const sc = a.score;
+    const scoreColor = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444";
+    return (
+      <div key={a.id} style={{ background: "#131e28", border: `1px solid ${isDone ? "#1a2030" : "#1e2e3e"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+          <span style={{ fontSize: 11, fontWeight: 800, background: scoreColor ? `${scoreColor}22` : "#1f2937", color: scoreColor ?? "#4b5563", padding: "0px 6px", borderRadius: 99, flexShrink: 0, border: `1px solid ${scoreColor ?? "#374151"}` }}>
+            {sc != null ? sc : "—"}
+          </span>
+          {a.status === "Live" && !isDone && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 3 }}>
+          {[["Target", $$(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+            <div key={lbl} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#4ade80" }}>{val}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function SnapSection({ title, color, accounts }) {
+    if (accounts.length === 0) return null;
+    const byProvider = groupByProvider(accounts);
+    const providers = Object.keys(byProvider).sort();
+    const activeCount = accounts.filter(a => !dones[a.id]).length;
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 3, height: 14, background: color, borderRadius: 99 }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 9, padding: "1px 5px", borderRadius: 99 }}>{activeCount}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(providers.length, 4)}, 1fr)`, gap: 6 }}>
+          {providers.map(dp => (
+            <div key={dp}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, paddingBottom: 2, borderBottom: "1px solid #1f2937" }}>{dp}</div>
+              {byProvider[dp].map(a => SnapCard(a))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ color: "#6b7280", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-      Snapshot — coming soon.
+    <div>
+      {SnapSection({ title: "Evaluation Accounts", color: "#8b5cf6", accounts: evalAccounts })}
+      {SnapSection({ title: "Performance Accounts", color: "#3b82f6", accounts: standardPerf })}
+      {SnapSection({ title: "Live & Payout Accounts", color: "#f59e0b", accounts: livePerf })}
+      {SnapSection({ title: "Waiting on Payout", color: "#6b7280", accounts: waitingPerf })}
     </div>
   );
 }
@@ -3084,7 +3170,7 @@ export default function App() {
           {[
             ["snapshot", "📷 Snapshot"],
             ["purchases", "🛒 Purchases"],
-            ["mgmt", "🔄 Account Management"],
+            ["mgmt", "🔄 Lifecycle"],
             ["accounts", "📋 Manage"],
             ["reconcile", "📊 Reconcile"],
             ["firms", "🏢 Firm Usage"],
@@ -3097,7 +3183,7 @@ export default function App() {
           ))}
         </div>
 
-              {tab === "snapshot" && <SnapshotTab />}
+              {tab === "snapshot" && <SnapshotTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
