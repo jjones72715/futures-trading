@@ -794,6 +794,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
     return pre ? pre.cost.toString() : "";
   });
   const [notes, setNotes] = React.useState("");
+  const [newAccountNumber, setNewAccountNumber] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [err, setErr] = React.useState(null);
 
@@ -827,7 +828,8 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
         "Number of Accounts": parseInt(numAccounts),
       };
       if (evalTypeId) newEvalFields["Evaluation Account Type"] = [evalTypeId];
-      // Carry over trader link if available
+      if (account.trader) newEvalFields["Trader"] = [account.trader];
+      if (newAccountNumber) newEvalFields["Account Number"] = newAccountNumber;
       const newEvalRecord = await createRecord(EVAL_TABLE, newEvalFields);
       const newEvalId = newEvalRecord?.id;
       // Create purchase log
@@ -842,6 +844,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
       };
       if (evalTypeId) purchaseFields["Evaluation Account Type"] = [evalTypeId];
       if (newEvalId) purchaseFields["Evaluation Account"] = [newEvalId];
+      if (account.trader) purchaseFields["Trader"] = [account.trader];
       await createRecord(PURCHASE_TABLE, purchaseFields);
       onBreached(account.id);
       onClose();
@@ -910,9 +913,13 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
                 {lbl("# of Accounts")}
                 <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div>
                 {lbl("Cost Per Account")}
                 <input type="number" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {lbl("Account Number (optional)")}
+                <input type="text" placeholder="e.g. ABC123" value={newAccountNumber} onChange={e => setNewAccountNumber(e.target.value)} style={inp} />
               </div>
             </div>
             <div style={{ marginBottom: 14 }}>
@@ -1207,7 +1214,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             ["Acct #", a.accountNumber ?? "—"],
             ["Trading Days", a.tradingDays ?? 0],
             ["Days Left", a.tradingDaysLeft ?? "—"],
-            ["Multiplier", a.contractMultiplier ?? 1],
+            a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1],
           ].map(([label, val]) => (
             <div key={label} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
@@ -1593,7 +1600,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
           {a.status === "Live" && !isDone && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 3 }}>
-          {[["Target", $$(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+          {[["Target", $$(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
             <div key={lbl} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#4ade80" }}>{val}</div>
