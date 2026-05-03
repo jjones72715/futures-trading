@@ -2055,6 +2055,8 @@ function AccountManagementTab() {
   const [tradeDown, setTradeDown] = useState(false);
   const [resetTradingDays, setResetTradingDays] = useState(true);
   const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
+  const [payoutDateRequested, setPayoutDateRequested] = useState(today);
+  const [payoutNumAccounts, setPayoutNumAccounts] = useState("");
 
   // Payout Management state
   const [selectedPayoutId, setSelectedPayoutId] = useState("");
@@ -2148,7 +2150,8 @@ function AccountManagementTab() {
     setTradeDown(false); setAdvancePayoutAmount("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setErr(null);
+    setPostPayoutStageId(""); setPayoutDateRequested(today); setPayoutNumAccounts("");
+    setErr(null);
   }
 
   const selectedEval = evalAccounts.find(r => r.id === selectedEvalId);
@@ -2284,12 +2287,14 @@ function AccountManagementTab() {
       const trader = traderList.find(t => t.id === traderId);
       await updateRecord(PERF_TABLE, selectedPerfId, { "Status": "Waiting on Payout" });
       // Create payout record
+      const dateReq = payoutDateRequested || today;
+      const numAccts = payoutNumAccounts ? parseInt(payoutNumAccounts) : (perf?.fields["Number of Accounts"] || 1);
       const payoutFields = {
-        "Name": `${trader?.name?.split(" ")[0] ?? "Unknown"} - ${perf?.fields["Name"]} - ${today}`,
+        "Name": `${trader?.name?.split(" ")[0] ?? "Unknown"} - ${perf?.fields["Name"]} - ${dateReq}`,
         "Performance Account": [selectedPerfId],
-        "Date Requested": today,
+        "Date Requested": dateReq,
         "Status": "Requested",
-        "Number of Accounts": perf?.fields["Number of Accounts"] || 1,
+        "Number of Accounts": numAccts,
       };
       if (traderId) payoutFields["Trader"] = [traderId];
       await createRecord(PAYOUT_TABLE, payoutFields);
@@ -2559,10 +2564,20 @@ function AccountManagementTab() {
                   <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Request Payout</span>
                 </div>
-                <div style={{ background: "#2d1f00", border: "1px solid #f59e0b", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: "#fde68a" }}>• Sets account to "Waiting on Payout"</div>
-                  <div style={{ fontSize: 12, color: "#fde68a" }}>• Creates a Payout record with status "Requested"</div>
-                  <div style={{ fontSize: 11, color: "#92400e", marginTop: 6 }}>When received, go to Payout Management to log the amount and advance the stage.</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    {label("Date Requested")}
+                    <input type="date" value={payoutDateRequested} onChange={e => setPayoutDateRequested(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Number of Accounts")}
+                    <input type="number" min="1" placeholder="Auto" value={payoutNumAccounts} onChange={e => setPayoutNumAccounts(e.target.value)} style={inp} />
+                  </div>
+                </div>
+                <div style={{ background: "#2d1f00", border: "1px solid #f59e0b", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, color: "#fde68a" }}>• Sets account to "Waiting on Payout"</div>
+                  <div style={{ fontSize: 11, color: "#fde68a" }}>• Creates a Payout record with status "Requested"</div>
+                  <div style={{ fontSize: 10, color: "#92400e", marginTop: 5 }}>When received, go to Payout Management to log the amount and advance the stage.</div>
                 </div>
                 <button onClick={handleRequestPayout} disabled={submitting}
                   style={{ width: "100%", background: "#d97706", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
