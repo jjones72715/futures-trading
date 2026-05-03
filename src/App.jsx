@@ -1718,20 +1718,9 @@ function TraderPLTab() {
             {traderPurchases.length === 0 ? (
               <div style={{ color: "#4b5563", fontSize: 12 }}>No purchases for this trader.</div>
             ) : (
-              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-                {traderPurchases.slice().sort((a, b) => (b.datePurchased || "").localeCompare(a.datePurchased || "")).map((p, i, arr) => (
-                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none" }}>
-                    <div>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#e5e7eb" }}>{p.purchaseType || "Purchase"}</span>
-                      <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 10 }}>{p.datePurchased || "—"}</span>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#f87171" }}>{$$(p.totalCost)}</span>
-                  </div>
-                ))}
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", background: "#0d1117", borderTop: `1px solid ${C.border}` }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af" }}>Total</span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: "#f87171" }}>{$$(totalSpent)}</span>
-                </div>
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 13, color: "#9ca3af" }}>Purchases ({traderPurchases.length})</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#f87171" }}>{$$(totalSpent)}</span>
               </div>
             )}
           </div>
