@@ -1677,7 +1677,7 @@ function TraderPLTab() {
             {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
             {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: "Set aside from gross payouts" })}
             {SummaryCard({ label: "Net Profit", value: $$(totalProfit), color: totalProfit >= 0 ? "#4ade80" : "#f87171" })}
-            {SummaryCard({ label: "Trader Fees (35%)", value: $$(totalTraderFees), color: "#a78bfa", sub: "35% of post-tier payout" })}
+            {SummaryCard({ label: "Trader Fees", value: $$(totalTraderFees), color: "#a78bfa" })}
           </div>
 
           {/* Payouts breakdown */}
