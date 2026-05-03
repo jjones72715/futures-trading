@@ -1211,21 +1211,20 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
 
     if (isLivePayout) {
-      const profitPerAcct = a.bal - a.ddToFloor;
+      const profitPerAcct = a.ddLeft;
       const amtForPayout = a.stageTarget != null ? a.stageTarget - a.bal : null;
-      const acctValue = a.contractMultiplier > 0 ? a.bal / a.contractMultiplier : a.bal;
+      const acctValue = a.contractMultiplier > 0 ? a.ddLeft * a.n / a.contractMultiplier : a.ddLeft;
       return (
         <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginBottom: 7 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
             {[
               ["Target", $$target(a.limit)],
               ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
               ["Acct #", a.accountNumber ?? "—"],
-              ["Trading Days", a.tradingDays ?? 0],
               ["Days Left", a.tradingDaysLeft ?? "—"],
               ["Multiplier", a.contractMultiplier ?? 1],
               ["Profit/Acct", $$(profitPerAcct)],
@@ -1234,7 +1233,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             ].map(([label, val]) => (
               <div key={label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: label === "Amt for Payout" && amtForPayout <= 0 ? "#4ade80" : "#4ade80" }}>{val}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
               </div>
             ))}
           </div>
@@ -1245,6 +1244,10 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
                 {isDone ? "✓ Done Today" : "☐ Done Today"}
               </button>
             ) : <div />}
+            <button onClick={() => isBlown ? setBlowns(prev => ({ ...prev, [a.id]: false })) : setBreachModalAccount(a)}
+              style={{ background: "#7f1d1d", border: "1px solid #dc2626", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+              {isBlown ? "✓ Breached" : "☐ Breached"}
+            </button>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {a.tradingDayDefinition && (
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", textAlign: "center", textTransform: "uppercase", lineHeight: 1.3 }}>{a.tradingDayDefinition}</div>
@@ -1254,7 +1257,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
                 {isCountTD ? "✓ Count Trading Day" : "☐ Count Trading Day"}
               </button>
             </div>
-            <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", textAlign: "center", marginBottom: 2 }}>New Balance</div>
               <input
                 type="number"
@@ -1848,9 +1851,9 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
 
     if (isLivePayout) {
-      const profitPerAcct = a.bal != null && a.ddToFloor != null ? a.bal - a.ddToFloor : null;
+      const profitPerAcct = a.ddLeft ?? null;
       const amtForPayout = a.stageTarget != null && a.bal != null ? a.stageTarget - a.bal : null;
-      const acctValue = a.contractMultiplier > 0 && a.bal != null ? a.bal / a.contractMultiplier : null;
+      const acctValue = a.contractMultiplier > 0 && a.ddLeft != null ? a.ddLeft * (a.n || 1) / a.contractMultiplier : null;
       const stats = [
         ["Target", $$target(a.limit)],
         ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
