@@ -72,6 +72,13 @@ function $$(v) {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
+function $$target(v) {
+  if (!v || v === 0) return "Max";
+  const n = parseFloat(v);
+  if (isNaN(n) || n > 4501) return "Max";
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
 function toScore(p) {
   if (!p && p !== 0) return 0;
   return Math.max(1, Math.min(10, Math.round(p * 10)));
@@ -1090,7 +1097,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
             <span style={{ fontSize: 9, fontWeight: 700, background: "#1c3a1c", color: "#4ade80", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>WAITING</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
-            {[["Target", $$(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Trading Days", a.tradingDays ?? 0], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+            {[["Target", $$target(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Trading Days", a.tradingDays ?? 0], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
               <div key={lbl} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{lbl}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
@@ -1210,7 +1217,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
           {[
-            ["Target", $$(a.limit)],
+            ["Target", $$target(a.limit)],
             ["Acct #", a.accountNumber ?? "—"],
             ["Trading Days", a.tradingDays ?? 0],
             ["Days Left", a.tradingDaysLeft ?? "—"],
@@ -1600,7 +1607,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
           {a.status === "Live" && !isDone && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 3 }}>
-          {[["Target", $$(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+          {[["Target", $$target(a.limit)], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
             <div key={lbl} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#4ade80" }}>{val}</div>
