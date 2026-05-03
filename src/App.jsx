@@ -535,26 +535,28 @@ function PurchaseTab() {
 
   return (
     <div style={{ maxWidth: 560 }}>
-      {/* Trader pills */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-        {traderList.filter(t => mode === "new" || mode === "all_purchases" || (purchaseCountsByTrader[t.id] || 0) > 0).map(t => {
-          const active = traderId === t.id;
-          const count = purchaseCountsByTrader[t.id];
-          return (
-            <button key={t.id} onClick={() => { setTraderId(active ? "" : t.id); resetForm(true); }}
-              style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-              {t.preferredName}{count ? ` (${count})` : ""}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Subtabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {[["reset", "🔄 Reset Account"], ["new", "➕ New Account"], ["recent", "🕐 Recent Purchases"], ["all_purchases", "📋 All Purchases"]].map(([m, lbl]) => (
           <button key={m} onClick={() => { setMode(m); resetForm(true); }} style={subTabStyle(mode === m)}>{lbl}</button>
         ))}
       </div>
+
+      {/* Trader pills — below subtabs, hidden for All Purchases */}
+      {mode !== "all_purchases" && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          {traderList.filter(t => mode === "new" || (purchaseCountsByTrader[t.id] || 0) > 0).map(t => {
+            const active = traderId === t.id;
+            const count = purchaseCountsByTrader[t.id];
+            return (
+              <button key={t.id} onClick={() => { setTraderId(active ? "" : t.id); resetForm(true); }}
+                style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                {t.preferredName}{count ? ` (${count})` : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
@@ -563,13 +565,17 @@ function PurchaseTab() {
         {/* Reset Flow */}
         {mode === "reset" && (
           <>
-
+            {!traderId ? (
+              <div style={{ color: "#6b7280", fontSize: 12 }}>Select a trader above to see their active accounts.</div>
+            ) : <>
             {label("Select the breached account")}
             {loadingActive ? (
               <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading active accounts...</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
                 {activePurchases.filter(r => {
+                  const traderArr = r.fields["Trader"];
+                  if (traderId && !(Array.isArray(traderArr) && traderArr.includes(traderId))) return false;
                   const evalArr = r.fields["Evaluation Account"];
                   if (!evalArr || !evalArr.length) return false;
                   const evalId = typeof evalArr[0] === "string" ? evalArr[0] : evalArr[0]?.id;
@@ -644,6 +650,7 @@ function PurchaseTab() {
                 </button>
               </>
             )}
+            </>}
           </>
         )}
 
@@ -3041,7 +3048,7 @@ export default function App() {
             ["firms", "🏢 Firm Usage"],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              style={{ background: tab === key ? "#ffd700" : "#e5e5e5", color: "#000", border: `1px solid ${tab === key ? "#d4a800" : "#c8c8c8"}`, borderRadius: 999, padding: "7px 16px", fontSize: 13, fontWeight: tab === key ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              style={{ background: tab === key ? "#ffd700" : "#e5e5e5", color: "#000", border: `1px solid ${tab === key ? "#d4a800" : "#c8c8c8"}`, borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: tab === key ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>
               {label}
             </button>
           ))}
