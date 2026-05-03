@@ -1860,6 +1860,8 @@ function AccountManagementTab() {
   const [loading, setLoading] = useState(false);
   const [traderList, setTraderList] = useState([]);
   const [perfCountsByTrader, setPerfCountsByTrader] = useState({});
+  const [evalCountsByTrader, setEvalCountsByTrader] = useState({});
+  const [payoutCountsByTrader, setPayoutCountsByTrader] = useState({});
 
   // Passed Evals state
   const [selectedEvalId, setSelectedEvalId] = useState("");
@@ -1901,7 +1903,7 @@ function AccountManagementTab() {
       })).sort((a, b) => a.preferredName.localeCompare(b.preferredName)));
     }).catch(e => { console.error("[AccountManagementTab] traders error:", e); });
   }, []);
-  useEffect(() => { if (traderId || activeTab === "payouts" || activeTab === "stage_mgmt") loadData(); }, [traderId, activeTab]);
+  useEffect(() => { loadData(); }, [traderId, activeTab]);
 
   async function loadData() {
     setLoading(true);
@@ -1918,31 +1920,46 @@ function AccountManagementTab() {
           return Array.isArray(t) && t.includes(traderId);
         });
 
-      setEvalAccounts(filterByTrader(er.records || []).filter(r => {
+      const activeEvalRecords = (er.records || []).filter(r => {
         const status = r.fields["Status"]?.name || r.fields["Status"];
         return status === "Active";
-      }));
+      });
+      const eCounts = {};
+      activeEvalRecords.forEach(r => {
+        const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+        if (tid) eCounts[tid] = (eCounts[tid] || 0) + 1;
+      });
+      setEvalCountsByTrader(eCounts);
+      setEvalAccounts(filterByTrader(activeEvalRecords));
+
       const activePerfRecords = (pr.records || []).filter(r => {
         const status = r.fields["Status"]?.name || r.fields["Status"];
         return ["Active", "Live", "Waiting on Payout"].includes(status);
       });
-      const counts = {};
+      const pCounts = {};
       activePerfRecords.forEach(r => {
         const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
-        if (tid) counts[tid] = (counts[tid] || 0) + (r.fields["Number of Accounts"] || 1);
+        if (tid) pCounts[tid] = (pCounts[tid] || 0) + 1;
       });
-      setPerfCountsByTrader(counts);
+      setPerfCountsByTrader(pCounts);
       setPerfAccounts(filterByTrader(activePerfRecords));
 
       // Payouts: filter by trader if selected, show non-Received by default
       const allPayouts = payr.records || [];
+      const pendingPayouts = allPayouts.filter(r => r.fields["Status"] !== "Received");
+      const payCounts = {};
+      pendingPayouts.forEach(r => {
+        const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+        if (tid) payCounts[tid] = (payCounts[tid] || 0) + 1;
+      });
+      setPayoutCountsByTrader(payCounts);
       const filteredPayouts = traderId
-        ? allPayouts.filter(r => {
+        ? pendingPayouts.filter(r => {
             const t = r.fields["Trader"];
             return Array.isArray(t) && t.includes(traderId);
           })
-        : allPayouts;
-      setPayouts(filteredPayouts.filter(r => r.fields["Status"] !== "Received"));
+        : pendingPayouts;
+      setPayouts(filteredPayouts);
     } catch (e) {}
     setLoading(false);
   }
@@ -2185,28 +2202,24 @@ function AccountManagementTab() {
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
         {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
 
-        {/* Trader selector — dropdown for Passed Evals & Payouts, pills for Stages */}
-        {activeTab !== "stage_mgmt" ? (
-          <div style={{ marginBottom: 16 }}>
-            {label("Trader")}
-            <select value={traderId} onChange={e => { setTraderId(e.target.value); resetForm(); }} style={sel}>
-              <option value="">All Traders</option>
-              {traderList.map(t => <option key={t.id} value={t.id}>{t.preferredName}</option>)}
-            </select>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-            {traderList.filter(t => (perfCountsByTrader[t.id] || 0) > 0).map(t => {
-              const active = traderId === t.id;
-              return (
-                <button key={t.id} onClick={() => { setTraderId(active ? "" : t.id); resetForm(); }}
-                  style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  {t.preferredName} ({perfCountsByTrader[t.id]})
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Trader pills */}
+        {(() => {
+          const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
+          const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
+          return (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+              {visible.map(t => {
+                const active = traderId === t.id;
+                return (
+                  <button key={t.id} onClick={() => { setTraderId(active ? "" : t.id); resetForm(); }}
+                    style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    {t.preferredName} ({countMap[t.id]})
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* ── PASSED EVALS ── */}
         {activeTab === "passed_evals" && (
