@@ -2227,6 +2227,7 @@ function AccountManagementTab() {
   const [numAccounts, setNumAccounts] = useState(1);
   const [activationFee, setActivationFee] = useState("");
   const [contractMultiplier, setContractMultiplier] = useState(1);
+  const [perfAccountNumber, setPerfAccountNumber] = useState("");
 
   // Stage Management state
   const [selectedPerfId, setSelectedPerfId] = useState("");
@@ -2327,7 +2328,7 @@ function AccountManagementTab() {
 
   function resetForm() {
     setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
-    setNumAccounts(1); setActivationFee(""); setContractMultiplier(1);
+    setNumAccounts(1); setActivationFee(""); setContractMultiplier(1); setPerfAccountNumber("");
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
     setTradeDown(false); setAdvancePayoutAmount("");
@@ -2397,6 +2398,7 @@ function AccountManagementTab() {
       };
       if (firstStage) perfFields["Current Stage"] = [firstStage.id];
       if (contractMultiplier) perfFields["Contract Multiplier"] = parseFloat(contractMultiplier);
+      if (perfAccountNumber) perfFields["Account Number"] = perfAccountNumber;
       const newPerfRecord = await createRecord(PERF_TABLE, perfFields);
       const newPerfId = newPerfRecord?.id;
       await createRecord(PURCHASE_TABLE, {
@@ -2643,6 +2645,10 @@ function AccountManagementTab() {
                   <div>
                     {label("Contract Multiplier")}
                     <input type="number" min="1" placeholder="1" value={contractMultiplier} onChange={e => setContractMultiplier(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    {label("Account Number (optional)")}
+                    <input type="text" placeholder="e.g. ABC123" value={perfAccountNumber} onChange={e => setPerfAccountNumber(e.target.value)} style={inp} />
                   </div>
                 </div>
 
