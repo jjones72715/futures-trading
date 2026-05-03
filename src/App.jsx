@@ -337,6 +337,7 @@ function PurchaseTab() {
   const [traderId, setTraderId] = useState("");
   const [evalTypeList, setEvalTypeList] = useState([]);
   const [traderList, setTraderList] = useState([]);
+  const [purchaseCountsByTrader, setPurchaseCountsByTrader] = useState({});
 
   useEffect(() => {
     loadActivePurchases();
@@ -351,6 +352,12 @@ function PurchaseTab() {
     try {
       const records = await fetchTable(PURCHASE_TABLE, ["Name", "Status", "Trader", "Evaluation Account Type", "Evaluation Account", "Date Purchased", "Cost Per Account", "Number of Accounts", "Purchase Type"]);
       const active = records.filter(r => r.fields["Status"] === "Active");
+      const counts = {};
+      active.forEach(r => {
+        const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+        if (tid) counts[tid] = (counts[tid] || 0) + 1;
+      });
+      setPurchaseCountsByTrader(counts);
       setActivePurchases(active);
     } catch (e) {}
     setLoadingActive(false);
@@ -366,8 +373,8 @@ function PurchaseTab() {
   async function loadRecent() {
     setLoadingRecent(true);
     try {
-      const records = await fetchTable(PURCHASE_TABLE, ["Name", "Date Purchased", "Number of Accounts", "Cost Per Account", "Total Cost", "Purchase Type", "Status"]);
-      const sorted = records.sort((a, b) => new Date(b.fields["Date Purchased"] || 0) - new Date(a.fields["Date Purchased"] || 0)).slice(0, 10);
+      const records = await fetchTable(PURCHASE_TABLE, ["Name", "Date Purchased", "Number of Accounts", "Cost Per Account", "Total Cost", "Purchase Type", "Status", "Trader"]);
+      const sorted = records.sort((a, b) => new Date(b.fields["Date Purchased"] || 0) - new Date(a.fields["Date Purchased"] || 0));
       setRecentPurchases(sorted);
     } catch (e) {}
     setLoadingRecent(false);
@@ -381,12 +388,14 @@ function PurchaseTab() {
   }
 
   async function loadTraders() {
-    console.log("[PurchaseTab] loadTraders called");
     try {
-      const traders = await fetchTable(TRADERS_TABLE, ["Name"]);
-      console.log("[PurchaseTab] traders fetched:", traders.length, traders.map(r => r.fields["Name"]));
-      setTraderList(traders.map(r => ({ id: r.id, name: r.fields["Name"] })).sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (e) { console.error("[PurchaseTab] loadTraders error:", e); }
+      const traders = await fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]);
+      setTraderList(traders.map(r => ({
+        id: r.id,
+        name: r.fields["Name"],
+        preferredName: r.fields["Preferred Name"] || r.fields["Name"].split(" ")[0],
+      })).sort((a, b) => a.preferredName.localeCompare(b.preferredName)));
+    } catch (e) {}
   }
 
   function handleSelectPurchase(purchaseId) {
@@ -430,7 +439,6 @@ function PurchaseTab() {
     setNumAccounts(1);
     setDate(today);
     setDateStarted(today);
-    setTraderId("");
   }
 
   const selectedPurchase = activePurchases.find(r => r.id === selectedPurchaseId);
@@ -527,9 +535,23 @@ function PurchaseTab() {
 
   return (
     <div style={{ maxWidth: 560 }}>
+      {/* Trader pills */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+        {traderList.filter(t => mode === "new" || mode === "all_purchases" || (purchaseCountsByTrader[t.id] || 0) > 0).map(t => {
+          const active = traderId === t.id;
+          const count = purchaseCountsByTrader[t.id];
+          return (
+            <button key={t.id} onClick={() => { setTraderId(active ? "" : t.id); resetForm(true); }}
+              style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              {t.preferredName}{count ? ` (${count})` : ""}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Subtabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {[["reset", "🔄 Reset Account"], ["new", "➕ New Account"], ["recent", "🕐 Recent Purchases"]].map(([m, lbl]) => (
+        {[["reset", "🔄 Reset Account"], ["new", "➕ New Account"], ["recent", "🕐 Recent Purchases"], ["all_purchases", "📋 All Purchases"]].map(([m, lbl]) => (
           <button key={m} onClick={() => { setMode(m); resetForm(true); }} style={subTabStyle(mode === m)}>{lbl}</button>
         ))}
       </div>
@@ -628,15 +650,8 @@ function PurchaseTab() {
         {/* New Account Flow */}
         {mode === "new" && (
           <>
-            <div style={{ marginBottom: 16 }}>
-              {label("Select Trader")}
-              <select value={traderId} onChange={e => setTraderId(e.target.value)} style={sel}>
-                <option value="">Choose trader...</option>
-                {traderList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
+            {!traderId && <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Select a trader above to continue.</div>}
+            {traderId && <><div style={{ marginBottom: 16 }}>
               {label("Evaluation Account Type")}
               <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
                 <option value="">Choose type...</option>
@@ -682,41 +697,45 @@ function PurchaseTab() {
               style={{ width: "100%", background: canSubmit ? "#2563eb" : "#1f2937", color: canSubmit ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed" }}>
               {submitting ? "Saving..." : `Log Purchase — ${$$(totalCost)}`}
             </button>
+            </>}
           </>
         )}
 
-        {/* Recent Purchases */}
-        {mode === "recent" && (
-          loadingRecent ? (
-            <div style={{ color: "#6b7280", fontSize: 13 }}>Loading...</div>
-          ) : recentPurchases.length === 0 ? (
-            <div style={{ color: "#6b7280", fontSize: 13 }}>No purchases logged yet.</div>
-          ) : (
-            recentPurchases.map(r => {
-              const f = r.fields;
-              const pt = f["Purchase Type"];
-              const st = f["Status"];
-              const ptColor = pt === "New" ? "#22c55e" : pt === "Reset" ? "#f59e0b" : "#60a5fa";
-              const stColor = st === "Active" ? "#22c55e" : st === "Failed" ? "#ef4444" : "#f59e0b";
-              return (
-                <div key={r.id} style={{ background: "#111827", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{f["Name"]}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>{f["Date Purchased"]} · ×{f["Number of Accounts"]} accounts</div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: `${ptColor}20`, color: ptColor, padding: "2px 8px", borderRadius: 99 }}>{pt}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: `${stColor}20`, color: stColor, padding: "2px 8px", borderRadius: 99 }}>{st}</span>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171" }}>{$$(f["Total Cost"])}</div>
-                    <div style={{ fontSize: 10, color: "#6b7280" }}>{$$(f["Cost Per Account"])} each</div>
-                  </div>
+        {/* Recent Purchases (trader-filtered) / All Purchases (global top 10) */}
+        {(mode === "recent" || mode === "all_purchases") && (() => {
+          const isAll = mode === "all_purchases";
+          const list = isAll
+            ? recentPurchases.slice(0, 10)
+            : !traderId
+              ? []
+              : recentPurchases.filter(r => (r.fields["Trader"] || []).includes(traderId)).slice(0, 10);
+          if (loadingRecent) return <div style={{ color: "#6b7280", fontSize: 13 }}>Loading...</div>;
+          if (!isAll && !traderId) return <div style={{ color: "#6b7280", fontSize: 13 }}>Select a trader above to see their recent purchases.</div>;
+          if (list.length === 0) return <div style={{ color: "#6b7280", fontSize: 13 }}>No purchases found.</div>;
+          return list.map(r => {
+            const f = r.fields;
+            const pt = f["Purchase Type"];
+            const st = f["Status"];
+            const ptColor = pt === "New" ? "#22c55e" : pt === "Reset" ? "#f59e0b" : "#60a5fa";
+            const stColor = st === "Active" ? "#22c55e" : st === "Failed" ? "#ef4444" : "#f59e0b";
+            return (
+              <div key={r.id} style={{ background: "#111827", border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 8, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 3 }}>{f["Name"]}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>{f["Date Purchased"]} · ×{f["Number of Accounts"]} accounts</div>
                 </div>
-              );
-            })
-          )
-        )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: `${ptColor}20`, color: ptColor, padding: "2px 8px", borderRadius: 99 }}>{pt}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: `${stColor}20`, color: stColor, padding: "2px 8px", borderRadius: 99 }}>{st}</span>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f87171" }}>{$$(f["Total Cost"])}</div>
+                  <div style={{ fontSize: 10, color: "#6b7280" }}>{$$(f["Cost Per Account"])} each</div>
+                </div>
+              </div>
+            );
+          });
+        })()}
       </div>
     </div>
   );
@@ -1923,7 +1942,7 @@ function AccountManagementTab() {
       ]);
 
       const filterByTrader = (records, field = "Trader") =>
-        !traderId ? records : (records || []).filter(r => {
+        !traderId ? [] : (records || []).filter(r => {
           const t = r.fields[field];
           return Array.isArray(t) && t.includes(traderId);
         });
@@ -3022,7 +3041,7 @@ export default function App() {
             ["firms", "🏢 Firm Usage"],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              style={{ background: tab === key ? "#1f3a5f" : "#18222f", color: tab === key ? "#7dd3fc" : "#888", border: `1px solid ${tab === key ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              style={{ background: tab === key ? "#ffd700" : "#e5e5e5", color: "#000", border: `1px solid ${tab === key ? "#d4a800" : "#c8c8c8"}`, borderRadius: 999, padding: "7px 16px", fontSize: 13, fontWeight: tab === key ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>
               {label}
             </button>
           ))}
