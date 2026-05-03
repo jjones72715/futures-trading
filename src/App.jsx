@@ -335,6 +335,7 @@ function PurchaseTab() {
   const [recentPurchases, setRecentPurchases] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [traderId, setTraderId] = useState("");
+  const [showAllRecent, setShowAllRecent] = useState(false);
   const [evalTypeList, setEvalTypeList] = useState([]);
   const [traderList, setTraderList] = useState([]);
   const [purchaseCountsByTrader, setPurchaseCountsByTrader] = useState({});
@@ -429,7 +430,7 @@ function PurchaseTab() {
   }
 
   function resetForm(keepMode) {
-    if (!keepMode) setMode("reset");
+    if (!keepMode) { setMode("reset"); setShowAllRecent(false); }
     setSelectedPurchaseId("");
     setSelectedEvalId("");
     setEvalTypeId("");
@@ -537,26 +538,60 @@ function PurchaseTab() {
     <div style={{ maxWidth: 560 }}>
       {/* Subtabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {[["reset", "🔄 Reset Account"], ["new", "➕ New Account"], ["recent", "🕐 Recent Purchases"], ["all_purchases", "📋 All Purchases"]].map(([m, lbl]) => (
-          <button key={m} onClick={() => { setMode(m); resetForm(true); }} style={subTabStyle(mode === m)}>{lbl}</button>
+        {[["reset", "🔄 Reset Account"], ["new", "➕ New Account"], ["recent", "🕐 Recent Purchases"]].map(([m, lbl]) => (
+          <button key={m} onClick={() => { setMode(m); setShowAllRecent(false); resetForm(true); }} style={subTabStyle(mode === m)}>{lbl}</button>
         ))}
       </div>
 
-      {/* Trader pills — below subtabs, hidden for All Purchases */}
-      {mode !== "all_purchases" && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {traderList.filter(t => mode === "new" || (purchaseCountsByTrader[t.id] || 0) > 0).map(t => {
-            const active = traderId === t.id;
-            const count = purchaseCountsByTrader[t.id];
-            return (
-              <button key={t.id} onClick={() => { setTraderId(active ? "" : t.id); resetForm(true); }}
-                style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                {t.preferredName}{count ? ` (${count})` : ""}
+      {/* Trader pills */}
+      {(() => {
+        // Per-mode count maps
+        const resetCounts = (() => {
+          const c = {};
+          activePurchases.filter(r => {
+            const ea = r.fields["Evaluation Account"];
+            if (!ea?.length) return false;
+            const eid = typeof ea[0] === "string" ? ea[0] : ea[0]?.id;
+            return evalAccounts.some(a => a.id === eid);
+          }).forEach(r => {
+            const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+            if (tid) c[tid] = (c[tid] || 0) + 1;
+          });
+          return c;
+        })();
+        const recentCounts = (() => {
+          const c = {};
+          recentPurchases.forEach(r => {
+            const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+            if (tid) c[tid] = (c[tid] || 0) + 1;
+          });
+          return c;
+        })();
+        const countMap = mode === "reset" ? resetCounts : mode === "recent" ? recentCounts : {};
+        const visibleTraders = traderList.filter(t => mode === "new" || (countMap[t.id] || 0) > 0);
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {visibleTraders.map(t => {
+              const active = traderId === t.id;
+              const count = countMap[t.id];
+              return (
+                <button key={t.id}
+                  onClick={() => { setTraderId(active ? "" : t.id); setShowAllRecent(false); resetForm(true); }}
+                  style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {t.preferredName}{mode !== "new" && count ? ` (${count})` : ""}
+                </button>
+              );
+            })}
+            {mode === "recent" && (
+              <button
+                onClick={() => { setTraderId(""); setShowAllRecent(v => !v); }}
+                style={{ background: showAllRecent ? "#1f3a5f" : "#18222f", color: showAllRecent ? "#7dd3fc" : "#888", border: `1px solid ${showAllRecent ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                📋 All Purchases
               </button>
-            );
-          })}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
         {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
@@ -708,16 +743,15 @@ function PurchaseTab() {
           </>
         )}
 
-        {/* Recent Purchases (trader-filtered) / All Purchases (global top 10) */}
-        {(mode === "recent" || mode === "all_purchases") && (() => {
-          const isAll = mode === "all_purchases";
-          const list = isAll
+        {/* Recent Purchases */}
+        {mode === "recent" && (() => {
+          const list = showAllRecent
             ? recentPurchases.slice(0, 10)
-            : !traderId
-              ? []
-              : recentPurchases.filter(r => (r.fields["Trader"] || []).includes(traderId)).slice(0, 10);
+            : traderId
+              ? recentPurchases.filter(r => (r.fields["Trader"] || []).includes(traderId)).slice(0, 10)
+              : [];
           if (loadingRecent) return <div style={{ color: "#6b7280", fontSize: 13 }}>Loading...</div>;
-          if (!isAll && !traderId) return <div style={{ color: "#6b7280", fontSize: 13 }}>Select a trader above to see their recent purchases.</div>;
+          if (!showAllRecent && !traderId) return <div style={{ color: "#6b7280", fontSize: 13 }}>Select a trader or "All Purchases" above.</div>;
           if (list.length === 0) return <div style={{ color: "#6b7280", fontSize: 13 }}>No purchases found.</div>;
           return list.map(r => {
             const f = r.fields;
