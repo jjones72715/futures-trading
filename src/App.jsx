@@ -563,7 +563,7 @@ function PurchaseTab() {
           const c = {};
           recentPurchases.forEach(r => {
             const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
-            if (tid) c[tid] = (c[tid] || 0) + 1;
+            if (tid) c[tid] = Math.min((c[tid] || 0) + 1, 10);
           });
           return c;
         })();
@@ -1544,6 +1544,14 @@ function TraderPLTab() {
   );
 }
 
+function SnapshotTab() {
+  return (
+    <div style={{ color: "#6b7280", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
+      Snapshot — coming soon.
+    </div>
+  );
+}
+
 function PLTab({ evalAccounts, perfAccounts }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const [startingLiquidation, setStartingLiquidation] = useState("");
@@ -2265,17 +2273,12 @@ function AccountManagementTab() {
           <TabBtn id="payouts">💰 Payouts</TabBtn>
         </div>
 
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-
-        {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
-        {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
-
-        {/* Trader pills */}
+        {/* Trader pills — outside the card */}
         {(() => {
           const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
           const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
           return (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
               {visible.map(t => {
                 const active = traderId === t.id;
                 return (
@@ -2288,6 +2291,11 @@ function AccountManagementTab() {
             </div>
           );
         })()}
+
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+
+        {err && <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{err}</div>}
+        {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
 
         {/* ── PASSED EVALS ── */}
         {activeTab === "passed_evals" && (
@@ -2716,7 +2724,7 @@ export default function App() {
   const [advanceDayAccounts, setAdvanceDayAccounts] = useState([]);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState(null);
-  const [tab, setTab] = useState("accounts");
+  const [tab, setTab] = useState("snapshot");
   useEffect(() => { load(); }, []);
 
   function advanceDay() {
@@ -3074,12 +3082,13 @@ export default function App() {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
           {[
-            ["accounts", "📋 All Accounts"],
+            ["snapshot", "📷 Snapshot"],
             ["purchases", "🛒 Purchases"],
             ["mgmt", "🔄 Account Management"],
-            ["snapshot", "📈 Snapshot"],
-            ["traderpl", "💹 Trader P&L"],
+            ["accounts", "📋 Manage"],
+            ["reconcile", "📊 Reconcile"],
             ["firms", "🏢 Firm Usage"],
+            ["traderpl", "💹 Trader P&L"],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ background: tab === key ? "#ffd700" : "#e5e5e5", color: "#000", border: `1px solid ${tab === key ? "#d4a800" : "#c8c8c8"}`, borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: tab === key ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -3088,10 +3097,11 @@ export default function App() {
           ))}
         </div>
 
+              {tab === "snapshot" && <SnapshotTab />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
               {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
-              {tab === "snapshot" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
+              {tab === "reconcile" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "traderpl" && <TraderPLTab />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
             </div>
