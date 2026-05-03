@@ -1631,6 +1631,7 @@ function TraderPLTab() {
   const totalPayouts = payoutRows.reduce((s, r) => s + r.gross, 0);
   const totalTaxes = payoutRows.reduce((s, r) => s + r.tax, 0);
   const totalProfit = payoutRows.reduce((s, r) => s + r.profit, 0);
+  const totalTraderFees = payoutRows.reduce((s, r) => s + r.afterTier * 0.35, 0);
 
   const C = { card: "#111827", border: "#1f2937" };
   const pill = (active) => ({
@@ -1676,6 +1677,7 @@ function TraderPLTab() {
             {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
             {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: "Set aside from gross payouts" })}
             {SummaryCard({ label: "Net Profit", value: $$(totalProfit), color: totalProfit >= 0 ? "#4ade80" : "#f87171" })}
+            {SummaryCard({ label: "Trader Fees (35%)", value: $$(totalTraderFees), color: "#a78bfa", sub: "35% of post-tier payout" })}
           </div>
 
           {/* Payouts breakdown */}
