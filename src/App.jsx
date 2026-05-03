@@ -2611,7 +2611,19 @@ function AccountManagementTab() {
         </div>
 
         {/* Trader pills — outside the card */}
-        {activeTab !== "create_payout" && (() => {
+        {activeTab === "create_payout" ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {traderList.map(t => {
+              const active = cpTrader === t.id;
+              return (
+                <button key={t.id} onClick={() => setCpTrader(active ? "" : t.id)}
+                  style={{ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {t.preferredName}
+                </button>
+              );
+            })}
+          </div>
+        ) : (() => {
           const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
           const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
           return (
@@ -2627,7 +2639,7 @@ function AccountManagementTab() {
               })}
             </div>
           );
-        })() }
+        })()}
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
 
@@ -2996,13 +3008,6 @@ function AccountManagementTab() {
             {success && <div style={{ background: "#052e16", border: "1px solid #166534", color: "#4ade80", padding: "8px 12px", borderRadius: 8, fontSize: 12, marginBottom: 14 }}>{success}</div>}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-              <div style={{ gridColumn: "1/-1" }}>
-                {label("Trader")}
-                <select value={cpTrader} onChange={e => setCpTrader(e.target.value)} style={sel}>
-                  <option value="">Select trader...</option>
-                  {traderList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
               <div style={{ gridColumn: "1/-1" }}>
                 {label("Performance Account Type")}
                 <select value={cpPerfTypeId} onChange={e => { setCpPerfTypeId(e.target.value); setCpStageId(""); }} style={sel}>
