@@ -970,6 +970,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     return init;
   });
   const [blowns, setBlowns] = React.useState({});
+  const [newBalanceInputs, setNewBalanceInputs] = React.useState({});
   const [countTradingDays, setCountTradingDays] = React.useState({});
   const [breachModalAccount, setBreachModalAccount] = React.useState(null);
   const [evalTypeList, setEvalTypeList] = React.useState([]);
@@ -1043,6 +1044,11 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
     if (isNaN(num)) return;
     const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
     await updateRecord(tableId, a.id, { "Score": num });
+  }
+  async function saveBalance(a, val) {
+    const num = parseFloat(val);
+    if (isNaN(num)) return;
+    await updateRecord(PERF_TABLE, a.id, { "Current Balance": num });
   }
   async function submitAllScores() {
     setScoreSaving(true);
@@ -1198,6 +1204,68 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
               </button>
             </div>
           )}
+        </div>
+      );
+    }
+
+    const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
+
+    if (isLivePayout) {
+      const profitPerAcct = a.bal - a.ddToFloor;
+      const amtForPayout = a.stageTarget != null ? a.stageTarget - a.bal : null;
+      const acctValue = a.contractMultiplier > 0 ? a.bal / a.contractMultiplier : a.bal;
+      return (
+        <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+            {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginBottom: 7 }}>
+            {[
+              ["Target", $$target(a.limit)],
+              ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
+              ["Acct #", a.accountNumber ?? "—"],
+              ["Trading Days", a.tradingDays ?? 0],
+              ["Days Left", a.tradingDaysLeft ?? "—"],
+              ["Multiplier", a.contractMultiplier ?? 1],
+              ["Profit/Acct", $$(profitPerAcct)],
+              ["Amt for Payout", amtForPayout == null ? "—" : amtForPayout <= 0 ? "✓ Met" : $$(amtForPayout)],
+              ["Acct Value", $$(acctValue)],
+            ].map(([label, val]) => (
+              <div key={label} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{label}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: label === "Amt for Payout" && amtForPayout <= 0 ? "#4ade80" : "#4ade80" }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+            {onDone ? (
+              <button onClick={() => onDone(a.id)}
+                style={{ background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+                {isDone ? "✓ Done Today" : "☐ Done Today"}
+              </button>
+            ) : <div />}
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {a.tradingDayDefinition && (
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", textAlign: "center", textTransform: "uppercase", lineHeight: 1.3 }}>{a.tradingDayDefinition}</div>
+              )}
+              <button onClick={() => setCountTradingDays(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+                style={{ background: isCountTD ? "#1d4ed8" : "#1e3a5f", border: `1px solid ${isCountTD ? "#60a5fa" : "#2563eb"}`, borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+                {isCountTD ? "✓ Count Trading Day" : "☐ Count Trading Day"}
+              </button>
+            </div>
+            <div style={{ gridColumn: "1/-1", display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", textAlign: "center", marginBottom: 2 }}>New Balance</div>
+              <input
+                type="number"
+                value={newBalanceInputs[a.id] ?? ""}
+                onChange={e => setNewBalanceInputs(prev => ({ ...prev, [a.id]: e.target.value }))}
+                onBlur={e => saveBalance(a, e.target.value)}
+                placeholder={$$(a.bal)}
+                style={{ background: "#0f172a", border: "1px solid #374151", borderRadius: 4, color: "#fff", fontSize: 10, width: "100%", padding: "2px 4px", outline: "none", textAlign: "center", boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
         </div>
       );
     }
@@ -1772,6 +1840,40 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             <span style={{ fontSize: 8, fontWeight: 700, background: "#3b2a0a", color: "#fbbf24", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>WAITING</span>
+          </div>
+        </div>
+      );
+    }
+
+    const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
+
+    if (isLivePayout) {
+      const profitPerAcct = a.bal != null && a.ddToFloor != null ? a.bal - a.ddToFloor : null;
+      const amtForPayout = a.stageTarget != null && a.bal != null ? a.stageTarget - a.bal : null;
+      const acctValue = a.contractMultiplier > 0 && a.bal != null ? a.bal / a.contractMultiplier : null;
+      const stats = [
+        ["Target", $$target(a.limit)],
+        ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
+        ["Acct #", a.accountNumber ?? "—"],
+        ["Days Left", a.tradingDaysLeft ?? "—"],
+        ["Multiplier", a.contractMultiplier ?? 1],
+        ["Profit/Acct", profitPerAcct != null ? $$(profitPerAcct) : "—"],
+        ["Amt for Payout", amtForPayout == null ? "—" : amtForPayout <= 0 ? "✓ Met" : $$(amtForPayout)],
+        ["Acct Value", acctValue != null ? $$(acctValue) : "—"],
+      ];
+      return (
+        <div key={a.id} style={{ background: "#131e28", border: `1px solid ${isDone ? "#1a2030" : "#78350f"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+            {a.status === "Live" && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 3 }}>
+            {stats.map(([lbl, val]) => (
+              <div key={lbl} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#fbbf24" }}>{val}</div>
+              </div>
+            ))}
           </div>
         </div>
       );
@@ -3210,7 +3312,7 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
@@ -3222,6 +3324,11 @@ export default function App() {
         console.error("EVAL FETCH ERROR:", evalErr);
       }
 
+
+      let stratRecs = [];
+      try { stratRecs = await fetchTable("tbljLby6v0o6fydOw", ["Stage Target"]); } catch(e) {}
+      const stratMap = {};
+      stratRecs.forEach(r => { stratMap[r.id] = r.fields["Stage Target"] || 0; });
 
       const activeStatuses = ["Active", "Live", "Waiting on Payout"];
 
@@ -3266,6 +3373,8 @@ export default function App() {
           tradingDayDefinition: f["Trading Day Definition"] || null,
           numPayoutsReceived: f["Number of Payouts Recieved"] || 0,
           dailyLossLimit: f["Daily Loss Limit"] || null,
+          currentStageId: (() => { const v = (f["Current Stage"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })(),
+          stageTarget: (() => { const v = (f["Current Stage"] || [])[0]; const sid = typeof v === "string" ? v : v?.id || null; return sid ? (stratMap[sid] || null) : null; })(),
         };
       };
 
