@@ -1414,7 +1414,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           account={breachModalAccount}
           evalTypeList={evalTypeList}
           onClose={() => setBreachModalAccount(null)}
-          onBreached={id => setBlowns(prev => ({ ...prev, [id]: true }))}
+          onBreached={id => { setBlowns(prev => ({ ...prev, [id]: true })); setTimeout(() => window.location.reload(), 30000); }}
         />
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
