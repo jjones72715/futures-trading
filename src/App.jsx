@@ -1417,6 +1417,12 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           onBreached={id => setBlowns(prev => ({ ...prev, [id]: true }))}
         />
       )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button onClick={submitAllScores} disabled={scoreSaving || dayCompleting}
+          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
+          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
+        </button>
+      </div>
       {FeedGrid({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
       {FeedGrid({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
       {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => {
@@ -1441,11 +1447,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           </div>
         </div>
       )}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-        <button onClick={submitAllScores} disabled={scoreSaving || dayCompleting}
-          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
-          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
-        </button>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
         <button onClick={completeDay} disabled={scoreSaving || dayCompleting}
           style={{ background: dayCompleted ? "#1e3a5f" : "#1d4ed8", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
           {dayCompleting ? "Completing..." : dayCompleted ? "✓ Day Complete" : "Complete Day"}
@@ -3679,7 +3681,6 @@ export default function App() {
               }}
             />
           )}
-          <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
 
