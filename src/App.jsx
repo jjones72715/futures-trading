@@ -968,7 +968,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   );
 }
 
-function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
+function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDones }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
   const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
@@ -1068,9 +1068,14 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
         const v = scoreInputs[a.id];
         return v !== "" && v !== undefined && !isNaN(parseFloat(v));
       });
+      const balanceUpdates = allShown.filter(a => {
+        const v = newBalanceInputs[a.id];
+        return v !== "" && v !== undefined && !isNaN(parseFloat(v));
+      });
       const tdUpdates = allShown.filter(a => countTradingDays[a.id]);
       await Promise.all([
         ...scoreUpdates.map(a => saveScore(a, scoreInputs[a.id])),
+        ...balanceUpdates.map(a => saveBalance(a, newBalanceInputs[a.id])),
         ...tdUpdates.map(a => {
           const table = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
           const field = a.type === "perf" ? "Trading Days this Cycle" : "Trading Days Completed";
@@ -1081,6 +1086,21 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
       setTimeout(() => setScoreSaved(false), 3000);
     } catch (e) {}
     setScoreSaving(false);
+  }
+
+  const [dayCompleting, setDayCompleting] = React.useState(false);
+  const [dayCompleted, setDayCompleted] = React.useState(false);
+
+  async function completeDay() {
+    setDayCompleting(true);
+    await submitAllScores();
+    if (onClearDones) onClearDones();
+    setScoreInputs({});
+    setNewBalanceInputs({});
+    setCountTradingDays({});
+    setDayCompleted(true);
+    setTimeout(() => setDayCompleted(false), 3000);
+    setDayCompleting(false);
   }
   function getFeeds(accounts, sortFn) {
     const feeds = {};
@@ -1397,12 +1417,6 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           onBreached={id => setBlowns(prev => ({ ...prev, [id]: true }))}
         />
       )}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button onClick={submitAllScores} disabled={scoreSaving}
-          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: scoreSaving ? "not-allowed" : "pointer" }}>
-          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
-        </button>
-      </div>
       {FeedGrid({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
       {FeedGrid({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
       {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => {
@@ -1427,6 +1441,16 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone }) {
           </div>
         </div>
       )}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+        <button onClick={submitAllScores} disabled={scoreSaving || dayCompleting}
+          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
+          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
+        </button>
+        <button onClick={completeDay} disabled={scoreSaving || dayCompleting}
+          style={{ background: dayCompleted ? "#1e3a5f" : "#1d4ed8", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
+          {dayCompleting ? "Completing..." : dayCompleted ? "✓ Day Complete" : "Complete Day"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -3655,7 +3679,6 @@ export default function App() {
               }}
             />
           )}
-          <button onClick={() => { setDones({}); localStorage.removeItem("tradingDones"); load(); }} style={{ background: "#15803d", color: "#fff", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, cursor: "pointer", fontWeight: 700 }}>↻ Refresh</button>
           <button onClick={advanceDay} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#4ade80", cursor: "pointer", fontWeight: 600 }}>⏭ Next Day</button>
         </div>
       </div>
@@ -3684,7 +3707,7 @@ export default function App() {
               {tab === "snapshot" && <SnapshotTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
-              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} onClearDones={() => { setDones({}); localStorage.removeItem("tradingDones"); }} />}
               {tab === "reconcile" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "traderpl" && <TraderPLTab />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
