@@ -355,6 +355,7 @@ function PurchaseTab() {
   const [traderId, setTraderId] = useState("");
   const [showAllRecent, setShowAllRecent] = useState(false);
   const [evalTypeList, setEvalTypeList] = useState([]);
+  const [perfTypeListForPurchase, setPerfTypeListForPurchase] = useState([]);
   const [traderList, setTraderList] = useState([]);
   const [purchaseCountsByTrader, setPurchaseCountsByTrader] = useState({});
 
@@ -364,6 +365,7 @@ function PurchaseTab() {
     loadRecent();
     loadEvalTypes();
     loadTraders();
+    loadStraightToFundedTypes();
   }, []);
 
   async function loadActivePurchases() {
@@ -406,6 +408,23 @@ function PurchaseTab() {
     } catch (e) {}
   }
 
+  async function loadStraightToFundedTypes() {
+    try {
+      const recs = await fetchTable("tbluVaCiyff48ic7L", ["Name", "Account Size", "Activation Fee", "Data Provider"]);
+      const filtered = recs.filter(r => {
+        const dp = r.fields["Data Provider"];
+        const dpStr = (Array.isArray(dp) ? dp.join(" ") : (dp || "")).toLowerCase();
+        return dpStr.includes("yrm") || dpStr.includes("savius");
+      }).map(r => ({
+        id: r.id,
+        name: r.fields["Name"],
+        accountSize: r.fields["Account Size"] || 0,
+        cost: r.fields["Activation Fee"] || 0,
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      setPerfTypeListForPurchase(filtered);
+    } catch (e) {}
+  }
+
   async function loadTraders() {
     try {
       const traders = await fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]);
@@ -443,8 +462,13 @@ function PurchaseTab() {
 
   function handleEvalTypeChange(typeId) {
     setEvalTypeId(typeId);
-    const et = evalTypeList.find(t => t.id === typeId);
-    if (et) setCostPer(et.cost.toString());
+    if (typeId.startsWith("perf:")) {
+      const pt = perfTypeListForPurchase.find(t => t.id === typeId.slice(5));
+      if (pt) setCostPer(pt.cost ? pt.cost.toString() : "");
+    } else {
+      const et = evalTypeList.find(t => t.id === typeId);
+      if (et) setCostPer(et.cost.toString());
+    }
   }
 
   function resetForm(keepMode) {
@@ -503,6 +527,38 @@ function PurchaseTab() {
           fields["Trader"] = [typeof traderArr[0] === "string" ? traderArr[0] : traderArr[0]?.id];
         }
         await createRecord(PURCHASE_TABLE, fields);
+      } else if (evalTypeId.startsWith("perf:")) {
+        // Straight to Funded: create perf account directly
+        const actualPerfTypeId = evalTypeId.slice(5);
+        const pt = perfTypeListForPurchase.find(t => t.id === actualPerfTypeId);
+        const perfAccountSize = pt ? pt.accountSize : 0;
+        const traderObj = traderList.find(t => t.id === traderId);
+        const traderFirst = traderObj?.name?.split(" ")[0] || "Unknown";
+        const perfAccountFields = {
+          "Name": `${traderFirst} - ${pt?.name}`,
+          "Status": "Active",
+          "Current Balance": perfAccountSize,
+          "Date Activated": date,
+          "Number of Accounts": parseInt(numAccounts),
+          "Performance Account Type": [actualPerfTypeId],
+          "Trader": [traderId],
+        };
+        if (accountNumber) perfAccountFields["Account Number"] = accountNumber;
+        const newPerfRecord = await createRecord(PERF_TABLE, perfAccountFields);
+        const newPerfId = newPerfRecord?.id;
+        const purchaseFields = {
+          "Name": `${traderObj?.name || "Unknown"} - ${pt?.name} - ${date}`,
+          "Date Purchased": date,
+          "Number of Accounts": parseInt(numAccounts),
+          "Cost Per Account": parseFloat(costPer) || 0,
+          "Purchase Type": "New",
+          "Status": "Active",
+          "Performance Account Type": [actualPerfTypeId],
+          "Trader": [traderId],
+        };
+        if (newPerfId) purchaseFields["Performance Account"] = [newPerfId];
+        if (notes) purchaseFields["Notes"] = notes;
+        await createRecord(PURCHASE_TABLE, purchaseFields);
       } else {
         const traderObj = traderList.find(t => t.id === traderId);
         const purchaseName = `${traderObj?.name || "Unknown"} - ${evalType?.name} - ${date}`;
@@ -712,12 +768,21 @@ function PurchaseTab() {
           <>
             {!traderId && <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Select a trader above to continue.</div>}
             {traderId && <><div style={{ marginBottom: 16 }}>
-              {label("Evaluation Account Type")}
+              {label("Account Type")}
               <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
                 <option value="">Choose type...</option>
-                {evalTypeList.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
+                <optgroup label="Evaluation Accounts">
+                  {evalTypeList.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </optgroup>
+                {perfTypeListForPurchase.length > 0 && (
+                  <optgroup label="Straight to Funded">
+                    {perfTypeListForPurchase.map(t => (
+                      <option key={t.id} value={`perf:${t.id}`}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
 
