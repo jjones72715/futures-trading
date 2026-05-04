@@ -410,11 +410,10 @@ function PurchaseTab() {
 
   async function loadStraightToFundedTypes() {
     try {
-      const recs = await fetchTable("tbluVaCiyff48ic7L", ["Name", "Account Size", "Activation Fee", "Data Provider"]);
+      const recs = await fetchTable("tbluVaCiyff48ic7L", ["Name", "Account Size", "Activation Fee"]);
       const filtered = recs.filter(r => {
-        const dp = r.fields["Data Provider"];
-        const dpStr = (Array.isArray(dp) ? dp.join(" ") : (dp || "")).toLowerCase();
-        return dpStr.includes("yrm") || dpStr.includes("savius");
+        const name = (r.fields["Name"] || "").toLowerCase();
+        return name.includes("yrm") || name.includes("savius");
       }).map(r => ({
         id: r.id,
         name: r.fields["Name"],
