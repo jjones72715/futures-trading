@@ -1758,7 +1758,7 @@ function TraderPLTab() {
       setLoading(true);
       try {
         const [traderRecs, purchaseRecs, payoutRecs] = await Promise.all([
-          fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]),
+          fetchTable(TRADERS_TABLE, ["Name", "Preferred Name", "Tax Account"]),
           fetchTable(PURCHASE_TABLE, ["Trader", "Total Cost", "Purchase Type", "Status", "Date Purchased"]),
           fetchTable(PAYOUT_TABLE, ["Name", "Trader", "Total Amount", "Payout Tier", "Status", "Date Received"]),
         ]);
@@ -1766,6 +1766,7 @@ function TraderPLTab() {
           id: r.id,
           name: r.fields["Name"] || "",
           preferredName: r.fields["Preferred Name"] || r.fields["Name"]?.split(" ")[0] || "?",
+          taxAccount: r.fields["Tax Account"] || null,
         })));
         setPurchases(purchaseRecs.map(r => ({
           id: r.id,
@@ -1863,7 +1864,7 @@ function TraderPLTab() {
           <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
             {SummaryCard({ label: "Total Spent", value: $$(totalSpent), color: "#f87171" })}
             {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
-            {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: "Set aside from gross payouts" })}
+            {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: traders.find(t => t.id === traderId)?.taxAccount ? `Tax Account: ${traders.find(t => t.id === traderId).taxAccount}` : null })}
             {SummaryCard({ label: "Net Profit", value: $$(totalProfit), color: totalProfit >= 0 ? "#4ade80" : "#f87171" })}
             {SummaryCard({ label: "Trader Fees", value: $$(totalTraderFees), color: "#a78bfa" })}
           </div>
