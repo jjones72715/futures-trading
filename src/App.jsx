@@ -1200,8 +1200,8 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             <span style={{ fontSize: 9, fontWeight: 700, background: "#1c3a1c", color: "#4ade80", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>WAITING</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
-            {[["Target", $$target(a.limit)], ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"], ["Acct #", a.accountNumber ?? "—"], ["Trading Days", a.tradingDays ?? 0], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
+            {[["Trade Target", $$target(a.limit)], ["Profit Target", a.stageTarget ? $$(a.stageTarget) : "—"], ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"], ["Acct #", a.accountNumber ?? "—"], ["Trading Days", a.tradingDays ?? 0], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
               <div key={lbl} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{lbl}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#4ade80" }}>{val}</div>
@@ -1322,9 +1322,10 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             <span style={{ fontSize: 12, fontWeight: 800, background: `${psColor}22`, color: psColor, padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: `1px solid ${psColor}` }}>{payoutScore ?? "—"}</span>
             <span style={{ fontSize: 12, fontWeight: 800, background: `${dsColor}22`, color: dsColor, padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: `1px solid ${dsColor}` }}>{daysScore ?? "—"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginBottom: 7 }}>
             {[
-              ["Target", $$target(a.limit)],
+              ["Trade Target", $$target(a.limit)],
+              ["Profit Target", a.stageTarget ? $$(a.stageTarget) : "—"],
               ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
               ["Acct #", a.accountNumber ?? "—"],
               ["Days Left", a.tradingDaysLeft ?? "—"],
@@ -1395,9 +1396,10 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
         </div>
         {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr", gap: 4, marginBottom: 7 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
           {[
-            ["Target", $$target(a.limit)],
+            ["Trade Target", $$target(a.limit)],
+            ["Profit Target", a.type === "eval" ? (a.profitTarget ? $$(a.profitTarget) : "—") : (a.stageTarget ? $$(a.stageTarget) : "—")],
             ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
             ["Acct #", a.accountNumber ?? "—"],
             ["Trading Days", a.tradingDays ?? 0],
@@ -1977,7 +1979,8 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
       const psColor = payoutScore === "✓" ? "#22c55e" : payoutScore != null ? lpColor(payoutScore) : "#4b5563";
       const dsColor = daysScore === "✓" ? "#22c55e" : daysScore != null ? lpColor(Math.min(daysScore, 10)) : "#4b5563";
       const stats = [
-        ["Target", $$target(a.limit)],
+        ["Trade Target", $$target(a.limit)],
+        ["Profit Target", a.stageTarget ? $$(a.stageTarget) : "—"],
         ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"],
         ["Acct #", a.accountNumber ?? "—"],
         ["Days Left", a.tradingDaysLeft ?? "—"],
@@ -1994,7 +1997,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
             <span style={{ fontSize: 10, fontWeight: 800, background: `${psColor}22`, color: psColor, padding: "0px 5px", borderRadius: 99, flexShrink: 0, border: `1px solid ${psColor}` }}>{payoutScore ?? "—"}</span>
             <span style={{ fontSize: 10, fontWeight: 800, background: `${dsColor}22`, color: dsColor, padding: "0px 5px", borderRadius: 99, flexShrink: 0, border: `1px solid ${dsColor}` }}>{daysScore ?? "—"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 3 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3 }}>
             {stats.map(([lbl, val]) => (
               <div key={lbl} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
@@ -2017,8 +2020,8 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
           </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 3 }}>
-          {[["Target", $$target(a.limit)], ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3 }}>
+          {[["Trade Target", $$target(a.limit)], ["Profit Target", a.type === "eval" ? (a.profitTarget ? $$(a.profitTarget) : "—") : (a.stageTarget ? $$(a.stageTarget) : "—")], ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
             <div key={lbl} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#4ade80" }}>{val}</div>
@@ -3453,7 +3456,7 @@ export default function App() {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Profit Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -3548,6 +3551,7 @@ export default function App() {
           tradingDayDefinition: f["Trading Day Definition"] || null,
           datePurchased: f["Date Started"] || null,
           dailyLossLimit: f["Daily Loss Limit"] || null,
+          profitTarget: (() => { const v = f["Profit Target"]; return Array.isArray(v) ? (v[0] || null) : (v || null); })(),
         };
       };
 
