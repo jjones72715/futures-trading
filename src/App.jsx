@@ -898,6 +898,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   });
   const [notes, setNotes] = React.useState("");
   const [newAccountNumber, setNewAccountNumber] = React.useState("");
+  const [accountWeightOverride, setAccountWeightOverride] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [err, setErr] = React.useState(null);
 
@@ -933,6 +934,7 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
       if (evalTypeId) newEvalFields["Evaluation Account Type"] = [evalTypeId];
       if (account.trader) newEvalFields["Trader"] = [account.trader];
       if (newAccountNumber) newEvalFields["Account Number"] = newAccountNumber;
+      if (accountWeightOverride) newEvalFields["Account Weight Override"] = parseFloat(accountWeightOverride);
       const newEvalRecord = await createRecord(EVAL_TABLE, newEvalFields);
       const newEvalId = newEvalRecord?.id;
       // Create purchase log
@@ -1024,6 +1026,24 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
                 {lbl("Account Number (optional)")}
                 <input type="text" placeholder="e.g. ABC123" value={newAccountNumber} onChange={e => setNewAccountNumber(e.target.value)} style={inp} />
               </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                {lbl("Account Weight Override (optional)")}
+                {(() => {
+                  const et = evalTypeList.find(t => t.id === evalTypeId);
+                  const dd = et?.drawdownLimit || 0;
+                  const cp = parseFloat(costPer) || 0;
+                  const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                  return (
+                    <>
+                      <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
+                      <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 12 }}>
+                        {et?.accountWeight != null && <span style={{ color: "#9ca3af" }}>Current: <strong style={{ color: "#e5e7eb" }}>{et.accountWeight}</strong></span>}
+                        {suggested != null && <span style={{ color: "#60a5fa" }}>Suggested: <strong>{suggested}</strong></span>}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
             <div style={{ marginBottom: 14 }}>
               {lbl("Notes (optional)")}
@@ -1071,8 +1091,8 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
   const [breachModalAccount, setBreachModalAccount] = React.useState(null);
   const [evalTypeList, setEvalTypeList] = React.useState([]);
   React.useEffect(() => {
-    fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts"]).then(rows => {
-      setEvalTypeList(rows.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
+    fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight"]).then(rows => {
+      setEvalTypeList(rows.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0, drawdownLimit: r.fields["Drawdown Limit"] || 0, accountWeight: r.fields["Account Weight"] || null })).sort((a, b) => a.name.localeCompare(b.name)));
     }).catch(() => {});
   }, []);
   const [scoreSaving, setScoreSaving] = React.useState(false);
