@@ -347,6 +347,7 @@ function PurchaseTab() {
   const [costPer, setCostPer] = useState("");
   const [notes, setNotes] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
+  const [accountWeightOverride, setAccountWeightOverride] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [err, setErr] = useState(null);
@@ -478,6 +479,7 @@ function PurchaseTab() {
     setCostPer("");
     setNotes("");
     setAccountNumber("");
+    setAccountWeightOverride("");
     setNumAccounts(1);
     setDate(today);
     setDateStarted(today);
@@ -575,6 +577,7 @@ function PurchaseTab() {
         if (evalTypeId) evalAccountFields["Evaluation Account Type"] = [evalTypeId];
         if (traderId) evalAccountFields["Trader"] = [traderId];
         if (accountNumber) evalAccountFields["Account Number"] = accountNumber;
+        if (accountWeightOverride) evalAccountFields["Account Weight Override"] = parseFloat(accountWeightOverride);
 
         const newEvalRecord = await createRecord(EVAL_TABLE, evalAccountFields);
         const newEvalId = newEvalRecord?.id;
@@ -798,9 +801,13 @@ function PurchaseTab() {
                 {label("Cost Per Account")}
                 <input type="number" placeholder="0.00" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
               </div>
-              <div style={{ gridColumn: "1/-1" }}>
+              <div>
                 {label("Account Number")}
                 <input type="text" placeholder="Optional" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} style={inp} />
+              </div>
+              <div>
+                {label("Account Weight Override")}
+                <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
               </div>
             </div>
 
@@ -3456,7 +3463,7 @@ export default function App() {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Profit Target", "Data Provider", "Account Weight", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Profit Target", "Data Provider", "Account Weight", "Account Weight Override", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -3541,7 +3548,7 @@ export default function App() {
           payoutAccount: false,
           dataProvider: dp,
           dailyTarget: 0,
-          accountWeight: Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null),
+          accountWeight: f["Account Weight Override"] != null ? f["Account Weight Override"] : (Array.isArray(f["Account Weight"]) ? f["Account Weight"][0] : (f["Account Weight"] || null)),
           accountTypeId: (() => { const v = (f["Evaluation Account Type"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })(),
           accountTypeName: (() => { const v = (f["Evaluation Account Type"] || [])[0]; return typeof v === "object" ? v?.name || null : null; })(),
           tradingDays: f["Trading Days Completed"] || 0,
