@@ -1200,7 +1200,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             <span style={{ fontSize: 9, fontWeight: 700, background: "#1c3a1c", color: "#4ade80", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>WAITING</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 7 }}>
             {[["Trade Target", $$target(a.limit)], ["Profit Target", a.stageTarget ? $$(a.stageTarget) : "—"], ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"], ["Acct #", a.accountNumber ?? "—"], ["Trading Days", a.tradingDays ?? 0], ["Days Left", a.tradingDaysLeft ?? "—"], ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
               <div key={lbl} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>{lbl}</div>
@@ -1322,7 +1322,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             <span style={{ fontSize: 12, fontWeight: 800, background: `${psColor}22`, color: psColor, padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: `1px solid ${psColor}` }}>{payoutScore ?? "—"}</span>
             <span style={{ fontSize: 12, fontWeight: 800, background: `${dsColor}22`, color: dsColor, padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: `1px solid ${dsColor}` }}>{daysScore ?? "—"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginBottom: 7 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4, marginBottom: 7 }}>
             {[
               ["Trade Target", $$target(a.limit)],
               ["Profit Target", a.stageTarget ? $$(a.stageTarget) : "—"],
@@ -1396,7 +1396,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
         </div>
         {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, marginBottom: 7 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 7 }}>
           {[
             ["Trade Target", $$target(a.limit)],
             ["Profit Target", a.type === "eval" ? (a.profitTarget ? $$(a.profitTarget) : "—") : (a.stageTarget ? $$(a.stageTarget) : "—")],
@@ -1997,7 +1997,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
             <span style={{ fontSize: 10, fontWeight: 800, background: `${psColor}22`, color: psColor, padding: "0px 5px", borderRadius: 99, flexShrink: 0, border: `1px solid ${psColor}` }}>{payoutScore ?? "—"}</span>
             <span style={{ fontSize: 10, fontWeight: 800, background: `${dsColor}22`, color: dsColor, padding: "0px 5px", borderRadius: 99, flexShrink: 0, border: `1px solid ${dsColor}` }}>{daysScore ?? "—"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
             {stats.map(([lbl, val]) => (
               <div key={lbl} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
@@ -2020,7 +2020,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
           </span>
           {a.status === "Live" && !isDone && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 3 }}>
           {[["Trade Target", $$target(a.limit)], ["Profit Target", a.type === "eval" ? (a.profitTarget ? $$(a.profitTarget) : "—") : (a.stageTarget ? $$(a.stageTarget) : "—")], ["Daily Loss", a.dailyLossLimit ? $$(a.dailyLossLimit) : "—"], ["Acct #", a.accountNumber ?? "—"], ["Days Left", a.tradingDaysLeft ?? "—"], a.type === "eval" ? ["Weight", a.accountWeight ?? "—"] : ["Multiplier", a.contractMultiplier ?? 1]].map(([lbl, val]) => (
             <div key={lbl} style={{ textAlign: "center" }}>
               <div style={{ fontSize: 8, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 1 }}>{lbl}</div>
