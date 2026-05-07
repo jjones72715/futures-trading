@@ -405,7 +405,7 @@ function PurchaseTab() {
   async function loadEvalTypes() {
     try {
       const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts"]);
-      setEvalTypeList(evalTypes.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
+      setEvalTypeList(evalTypes.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0, drawdownLimit: r.fields["Drawdown Limit"] || 0 })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {}
   }
 
@@ -807,7 +807,22 @@ function PurchaseTab() {
               </div>
               <div>
                 {label("Account Weight Override")}
-                <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
+                {(() => {
+                  const et = evalTypeList.find(t => t.id === evalTypeId);
+                  const dd = et?.drawdownLimit || 0;
+                  const cp = parseFloat(costPer) || 0;
+                  const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                  return (
+                    <>
+                      <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
+                      {suggested != null && (
+                        <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4 }}>
+                          Suggested: <strong>{suggested}</strong> ({dd > 0 ? `$${dd.toLocaleString()} drawdown / $${cp.toLocaleString()} cost` : ""})
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
