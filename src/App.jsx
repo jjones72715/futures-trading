@@ -2508,6 +2508,7 @@ function AccountManagementTab() {
   const [traderId, setTraderId] = useState("");
   const [evalAccounts, setEvalAccounts] = useState([]);
   const [perfAccounts, setPerfAccounts] = useState([]);
+  const [allPerfRecords, setAllPerfRecords] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [traderList, setTraderList] = useState([]);
@@ -2613,6 +2614,7 @@ function AccountManagementTab() {
         if (tid) pCounts[tid] = (pCounts[tid] || 0) + 1;
       });
       setPerfCountsByTrader(pCounts);
+      setAllPerfRecords(activePerfRecords);
       setPerfAccounts(filterByTrader(activePerfRecords));
 
       // Payouts: filter by trader if selected, show non-Received by default
@@ -2677,7 +2679,7 @@ function AccountManagementTab() {
   const payoutPerfId = selectedPayout
     ? (Array.isArray(selectedPayout.fields["Performance Account"]) ? selectedPayout.fields["Performance Account"][0] : null)
     : null;
-  const payoutPerf = payoutPerfId ? [...perfAccounts].find(r => r.id === payoutPerfId) : null;
+  const payoutPerf = payoutPerfId ? [...allPerfRecords].find(r => r.id === payoutPerfId) : null;
   const payoutPerfTypeId = payoutPerf
     ? (() => { const v = (payoutPerf.fields["Performance Account Type"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })()
     : null;
