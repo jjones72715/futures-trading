@@ -1636,7 +1636,15 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{doneAccounts.length}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
-            {doneAccounts.map(a => AccountMiniCard(a))}
+            {doneAccounts.map(a => {
+              const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
+              return (
+                <div key={a.id} style={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "7px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="checkbox" checked onChange={() => onDone && onDone(a.id)} style={{ width: 14, height: 14, cursor: "pointer", flexShrink: 0, accentColor: "#4b5563" }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
