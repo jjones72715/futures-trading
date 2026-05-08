@@ -3551,7 +3551,7 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Data Provider Override", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Data Provider Override", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage", "Stage Target Override"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
@@ -3614,7 +3614,7 @@ export default function App() {
           numPayoutsReceived: f["Number of Payouts Recieved"] || 0,
           dailyLossLimit: f["Daily Loss Limit"] || null,
           currentStageId: (() => { const v = (f["Current Stage"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })(),
-          stageTarget: (() => { const v = (f["Current Stage"] || [])[0]; const sid = typeof v === "string" ? v : v?.id || null; return sid ? (stratMap[sid] || null) : null; })(),
+          stageTarget: (() => { if (f["Stage Target Override"] != null) return f["Stage Target Override"]; const v = (f["Current Stage"] || [])[0]; const sid = typeof v === "string" ? v : v?.id || null; return sid ? (stratMap[sid] || null) : null; })(),
         };
       };
 
