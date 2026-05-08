@@ -2545,6 +2545,7 @@ function AccountManagementTab() {
   const [receivedDate, setReceivedDate] = useState(today);
   const [postPayoutBalance, setPostPayoutBalance] = useState("");
   const [postPayoutStageId, setPostPayoutStageId] = useState("");
+  const [postPayoutStageOverride, setPostPayoutStageOverride] = useState("");
   const [payoutTierInput, setPayoutTierInput] = useState("50");
 
   // Create New Payout form state
@@ -2642,7 +2643,7 @@ function AccountManagementTab() {
     setTradeDown(false); setAdvancePayoutAmount(""); setStageTargetOverride("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
+    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
     setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
     setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
     setCpStageId(""); setCpNotes("");
@@ -2859,8 +2860,7 @@ function AccountManagementTab() {
       });
       // Update perf account: new balance, stage, back to Active
       if (payoutPerfId) {
-        const stage = payoutStrategies.find(s => s.id === postPayoutStageId);
-        await updateRecord(PERF_TABLE, payoutPerfId, {
+        const perfUpdate = {
           "Status": "Active",
           "Current Balance": parseFloat(postPayoutBalance),
           "High Water Mark": parseFloat(postPayoutBalance),
@@ -2868,7 +2868,9 @@ function AccountManagementTab() {
           "Current Stage": [postPayoutStageId],
           "Trading Days this Cycle": 0,
           "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
-        });
+        };
+        if (postPayoutStageOverride) perfUpdate["Stage Target Override"] = parseFloat(postPayoutStageOverride);
+        await updateRecord(PERF_TABLE, payoutPerfId, perfUpdate);
       }
       setSuccess("✓ Payout received, account back to Active!");
       setTimeout(() => setSuccess(""), 4000);
@@ -3239,13 +3241,23 @@ function AccountManagementTab() {
                       </div>
                       <div style={{ gridColumn: "1/-1" }}>
                         {label("Advance to Stage")}
-                        <select value={postPayoutStageId} onChange={e => setPostPayoutStageId(e.target.value)} style={sel}>
+                        <select value={postPayoutStageId} onChange={e => { setPostPayoutStageId(e.target.value); setPostPayoutStageOverride(""); }} style={sel}>
                           <option value="">Select next stage...</option>
                           {payoutAvailableStages.map(s => (
                             <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>
                           ))}
                         </select>
                       </div>
+                      {postPayoutStageId && (() => {
+                        const sel2 = payoutAvailableStages.find(s => s.id === postPayoutStageId);
+                        return sel2 ? (
+                          <div style={{ gridColumn: "1/-1" }}>
+                            {label("Stage Target Override (optional)")}
+                            <input type="number" placeholder={`Default: ${$$(sel2.target)}`} value={postPayoutStageOverride} onChange={e => setPostPayoutStageOverride(e.target.value)} style={inp} />
+                            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Default target: <strong style={{ color: "#e5e7eb" }}>{$$(sel2.target)}</strong></div>
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                     <button onClick={handleReceivePayout} disabled={!receivedAmount || !postPayoutBalance || !postPayoutStageId || submitting}
                       style={{ width: "100%", background: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#16a34a" : "#111827", color: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
