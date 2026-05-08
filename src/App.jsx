@@ -1249,8 +1249,8 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
     const isCountTD = !!countTradingDays[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
 
-    const typeCardBg = isBlown ? "#1a0505" : isDone ? "#111827" : a.status === "Waiting on Payout" ? "#1a1800" : a.status === "Live" ? "#051a0e" : a.payoutAccount ? "#1c1405" : a.type === "perf" ? "#011418" : "#1a0614";
-    const typeCardBorder = isBlown ? "#7f1d1d" : isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30855" : a.status === "Live" ? "#22c55e55" : a.payoutAccount ? "#f59e0b55" : a.type === "perf" ? "#06b6d455" : "#ec489955";
+    const typeCardBg = isBlown ? "#1a0505" : isDone ? "#111827" : a.status === "Waiting on Payout" ? "#160d1f" : a.status === "Live" ? "#051a0e" : a.payoutAccount ? "#1c0e05" : a.type === "perf" ? "#011418" : "#1a0614";
+    const typeCardBorder = isBlown ? "#7f1d1d" : isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#a855f755" : a.status === "Live" ? "#22c55e55" : a.payoutAccount ? "#f9731655" : a.type === "perf" ? "#06b6d455" : "#ec489955";
 
     if (a.status === "Waiting on Payout") {
       const payoutRecord = payoutData[a.id];
@@ -1616,9 +1616,9 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
         </button>
       </div>
-      {TraderFeedSection({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
-      {TraderFeedSection({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
-      {TraderFeedSection({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => {
+      {TraderFeedSection({ accounts: evalAccounts, color: "#ec4899", title: "Evaluation Accounts" })}
+      {TraderFeedSection({ accounts: standardPerf, color: "#06b6d4", title: "Performance Accounts" })}
+      {TraderFeedSection({ accounts: livePerf, color: "#22c55e", title: "Live & Payout Accounts", sortFn: (a, b) => {
         const lpMax = acc => {
           const amt = acc.stageTarget != null ? acc.stageTarget - acc.bal : null;
           const ps = amt == null ? 0 : amt <= 0 ? 0 : Math.min(10, Math.ceil(amt / 500));
@@ -1627,7 +1627,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
         };
         return lpMax(a) - lpMax(b);
       } })}
-      {FeedGrid({ accounts: waitingPerf, color: "#6b7280", title: "Waiting on Payout" })}
+      {FeedGrid({ accounts: waitingPerf, color: "#a855f7", title: "Waiting on Payout" })}
       {doneAccounts.length > 0 && (
         <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -2083,15 +2083,15 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
   function SnapCard(a) {
     const isDone = !!dones[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
-    const snapBg = isDone ? "#0d1117" : a.status === "Waiting on Payout" ? "#1a1800" : a.status === "Live" ? "#051a0e" : a.payoutAccount ? "#1c1405" : a.type === "perf" ? "#011418" : "#1a0614";
-    const snapBorder = isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30855" : a.status === "Live" ? "#22c55e55" : a.payoutAccount ? "#f59e0b55" : a.type === "perf" ? "#06b6d455" : "#ec489955";
+    const snapBg = isDone ? "#0d1117" : a.status === "Waiting on Payout" ? "#160d1f" : a.status === "Live" ? "#051a0e" : a.payoutAccount ? "#1c0e05" : a.type === "perf" ? "#011418" : "#1a0614";
+    const snapBorder = isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#a855f755" : a.status === "Live" ? "#22c55e55" : a.payoutAccount ? "#f9731655" : a.type === "perf" ? "#06b6d455" : "#ec489955";
 
     if (a.status === "Waiting on Payout") {
       return (
         <div key={a.id} style={{ background: snapBg, border: `1px solid ${snapBorder}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
-            <span style={{ fontSize: 8, fontWeight: 700, background: "#3b2a0a", color: "#fbbf24", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>WAITING</span>
+            <span style={{ fontSize: 8, fontWeight: 700, background: "#2d1545", color: "#d8b4fe", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>WAITING</span>
           </div>
         </div>
       );
@@ -2192,9 +2192,9 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
 
   return (
     <div>
-      {SnapSection({ title: "Evaluation Accounts", color: "#8b5cf6", accounts: evalAccounts })}
-      {SnapSection({ title: "Performance Accounts", color: "#3b82f6", accounts: standardPerf })}
-      {SnapSection({ title: "Live & Payout Accounts", color: "#f59e0b", accounts: livePerf, sortFn: (a, b) => {
+      {SnapSection({ title: "Evaluation Accounts", color: "#ec4899", accounts: evalAccounts })}
+      {SnapSection({ title: "Performance Accounts", color: "#06b6d4", accounts: standardPerf })}
+      {SnapSection({ title: "Live & Payout Accounts", color: "#22c55e", accounts: livePerf, sortFn: (a, b) => {
   const lpMax = acc => {
     const amt = acc.stageTarget != null ? acc.stageTarget - acc.bal : null;
     const ps = amt == null ? 0 : amt <= 0 ? 0 : Math.min(10, Math.ceil(amt / 500));
@@ -2203,7 +2203,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
   };
   return lpMax(a) - lpMax(b);
 } })}
-      {SnapSection({ title: "Waiting on Payout", color: "#6b7280", accounts: waitingPerf })}
+      {SnapSection({ title: "Waiting on Payout", color: "#a855f7", accounts: waitingPerf })}
     </div>
   );
 }
