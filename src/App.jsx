@@ -2678,7 +2678,9 @@ function AccountManagementTab() {
     ? (Array.isArray(selectedPayout.fields["Performance Account"]) ? selectedPayout.fields["Performance Account"][0] : null)
     : null;
   const payoutPerf = payoutPerfId ? [...perfAccounts].find(r => r.id === payoutPerfId) : null;
-  const payoutPerfTypeId = payoutPerf?.accountTypeId ?? null;
+  const payoutPerfTypeId = payoutPerf
+    ? (() => { const v = (payoutPerf.fields["Performance Account Type"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })()
+    : null;
   const payoutAvailableStages = payoutStrategies.filter(s => s.perfTypeId === payoutPerfTypeId).sort((a, b) => a.stage - b.stage);
 
   async function handleConvertEval() {
@@ -2865,7 +2867,7 @@ function AccountManagementTab() {
           "Cycle Start Balance": parseFloat(postPayoutBalance),
           "Current Stage": [postPayoutStageId],
           "Trading Days this Cycle": 0,
-          "Number of Payouts Recieved": (payoutPerf?.numPayoutsReceived || 0) + 1,
+          "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
         };
         if (postPayoutStageOverride) perfUpdate["Stage Target Override"] = parseFloat(postPayoutStageOverride);
         await updateRecord(PERF_TABLE, payoutPerfId, perfUpdate);
@@ -3374,8 +3376,8 @@ function AccountManagementTab() {
               ["Status", selectedPayout.fields["Status"]],
               ["Date Requested", selectedPayout.fields["Date Requested"] || "—"],
               ["Accounts", `×${selectedPayout.fields["Number of Accounts"] || 1}`],
-              ["Perf Account", payoutPerf?.name || "—"],
-              ["Current Balance", payoutPerf ? $$(payoutPerf.bal) : "—"],
+              ["Perf Account", payoutPerf?.fields["Name"] || "—"],
+              ["Current Balance", payoutPerf ? $$(payoutPerf.fields["Current Balance"]) : "—"],
             ].map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d3f50" }}>
                 <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
