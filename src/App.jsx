@@ -1141,7 +1141,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
         "Amount Per Account": parseFloat(fi.amount) / numAccts,
         "Payout Tier": tierPct / 100,
       });
-      await updateRecord(PERF_TABLE, a.id, {
+      const perfUpdate = {
         "Status": "Active",
         "Current Balance": parseFloat(fi.newBalance),
         "High Water Mark": parseFloat(fi.newBalance),
@@ -1149,7 +1149,9 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
         "Current Stage": [fi.stageId],
         "Trading Days this Cycle": 0,
         "Number of Payouts Recieved": a.numPayoutsReceived + 1,
-      });
+      };
+      if (fi.stageTargetOverride) perfUpdate["Stage Target Override"] = parseFloat(fi.stageTargetOverride);
+      await updateRecord(PERF_TABLE, a.id, perfUpdate);
       setPayoutActionState(prev => ({ ...prev, [a.id]: null }));
       setPayoutFormInputs(prev => ({ ...prev, [a.id]: {} }));
     } catch (e) {}
@@ -1333,6 +1335,17 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
                     {availableStages.map(s => <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>)}
                   </select>
                 </div>
+                {fi.stageId && (() => {
+                  const sel = availableStages.find(s => s.id === fi.stageId);
+                  return sel ? (
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", marginBottom: 2 }}>Stage Target Override (optional)</div>
+                      <input type="number" placeholder={`Default: ${$$(sel.target)}`} value={fi.stageTargetOverride || ""} onChange={e => setFI("stageTargetOverride", e.target.value)}
+                        style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 4, color: "#fff", fontSize: 9, width: "100%", padding: "3px 4px", outline: "none", boxSizing: "border-box" }} />
+                      <div style={{ fontSize: 9, color: "#6b7280", marginTop: 2 }}>Default: <strong style={{ color: "#9ca3af" }}>{$$(sel.target)}</strong></div>
+                    </div>
+                  ) : null;
+                })()}
               </div>
               <button onClick={() => handlePayoutReceive(a, payoutRecord, fi)}
                 disabled={!fi.amount || !fi.newBalance || !fi.stageId || !payoutRecord || isSubmitting}
@@ -2519,6 +2532,7 @@ function AccountManagementTab() {
   const [tradeDown, setTradeDown] = useState(false);
   const [resetTradingDays, setResetTradingDays] = useState(true);
   const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
+  const [stageTargetOverride, setStageTargetOverride] = useState("");
   const [payoutDateRequested, setPayoutDateRequested] = useState(today);
   const [payoutNumAccounts, setPayoutNumAccounts] = useState("");
   const [payoutTradeDown, setPayoutTradeDown] = useState(false);
@@ -2625,7 +2639,7 @@ function AccountManagementTab() {
     setNumAccounts(1); setActivationFee(""); setContractMultiplier(1); setPerfAccountNumber("");
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
-    setTradeDown(false); setAdvancePayoutAmount("");
+    setTradeDown(false); setAdvancePayoutAmount(""); setStageTargetOverride("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
     setPostPayoutStageId(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
@@ -2729,6 +2743,7 @@ function AccountManagementTab() {
         "Trading Days this Cycle": tradingDays ? parseInt(tradingDays) : 0,
       };
       if (contractMultiplier) fields["Contract Multiplier"] = parseFloat(contractMultiplier);
+      if (stageTargetOverride) fields["Stage Target Override"] = parseFloat(stageTargetOverride);
       // Auto-set payout account when advancing to stage 2 or higher
       if (nextStage.stage >= 2) {
         fields["Payout Account"] = true;
@@ -3063,6 +3078,11 @@ function AccountManagementTab() {
                   <div style={{ gridColumn: "1/-1" }}>
                     {label("Payout Amount Received (optional)")}
                     <input type="number" placeholder="Enter total payout received..." value={advancePayoutAmount} onChange={e => setAdvancePayoutAmount(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    {label("Stage Target Override (optional)")}
+                    <input type="number" placeholder={nextStage ? `Default: ${$$(nextStage.target)}` : "Enter override..."} value={stageTargetOverride} onChange={e => setStageTargetOverride(e.target.value)} style={inp} />
+                    {nextStage && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Stage {nextStage.stage} default target: <strong style={{ color: "#e5e7eb" }}>{$$(nextStage.target)}</strong></div>}
                   </div>
                   <div style={{ gridColumn: "1/-1" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -3542,7 +3562,7 @@ export default function App() {
           dataProvider: dp,
           dailyTarget: 0,
           hwm: f["High Water Mark"] || 0,
-          accountTypeId: (f["Performance Account Type"] || [])[0] || null,
+          accountTypeId: (() => { const v = (f["Performance Account Type"] || [])[0]; return typeof v === "string" ? v : v?.id || null; })(),
           tradingDayType: (f["Trading Day Type"] || [])[0] || null,
           minProfitDay: (f["Min Profitable Day Amount"] || [])[0] || 0,
           tradingDays: f["Trading Days this Cycle"] || 0,
