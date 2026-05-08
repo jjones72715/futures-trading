@@ -1551,6 +1551,47 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
       </div>
     );
   }
+  function TraderFeedSection({ accounts, color, title, sortFn }) {
+    if (accounts.length === 0) return null;
+    const traderOrder = [];
+    const traderGroups = {};
+    accounts.forEach(a => {
+      const key = a.trader || "__unknown__";
+      if (!traderGroups[key]) { traderGroups[key] = { name: a.traderName || "Unknown", accts: [] }; traderOrder.push(key); }
+      traderGroups[key].accts.push(a);
+    });
+    traderOrder.sort((a, b) => (traderGroups[a].name || "").localeCompare(traderGroups[b].name || ""));
+    return (
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
+          <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.filter(a => !dones[a.id]).length}</span>
+        </div>
+        {traderOrder.map(traderId => {
+          const { name, accts } = traderGroups[traderId];
+          const feeds = getFeeds(accts, sortFn);
+          const feedNames = Object.keys(feeds).sort();
+          if (feedNames.length === 0) return null;
+          return (
+            <div key={traderId} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 7, paddingBottom: 4, borderBottom: `1px solid ${color}44`, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color, fontSize: 13 }}>›</span>{name}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 8 }}>
+                {feedNames.map(feed => (
+                  <div key={feed}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, paddingBottom: 3, borderBottom: "1px solid #1f2937" }}>{feed}</div>
+                    {feeds[feed].map(a => AccountMiniCard(a))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
   return (
     <div>
       {breachModalAccount && (
@@ -1567,17 +1608,17 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
         </button>
       </div>
-      {FeedGrid({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
-      {FeedGrid({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
-      {FeedGrid({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => {
-  const lpMax = acc => {
-    const amt = acc.stageTarget != null ? acc.stageTarget - acc.bal : null;
-    const ps = amt == null ? 0 : amt <= 0 ? 0 : Math.min(10, Math.ceil(amt / 500));
-    const ds = acc.tradingDaysLeft == null ? 0 : acc.tradingDaysLeft <= 0 ? 0 : acc.tradingDaysLeft;
-    return Math.max(ps, ds);
-  };
-  return lpMax(a) - lpMax(b);
-} })}
+      {TraderFeedSection({ accounts: evalAccounts, color: "#8b5cf6", title: "Evaluation Accounts" })}
+      {TraderFeedSection({ accounts: standardPerf, color: "#3b82f6", title: "Performance Accounts" })}
+      {TraderFeedSection({ accounts: livePerf, color: "#f59e0b", title: "Live & Payout Accounts", sortFn: (a, b) => {
+        const lpMax = acc => {
+          const amt = acc.stageTarget != null ? acc.stageTarget - acc.bal : null;
+          const ps = amt == null ? 0 : amt <= 0 ? 0 : Math.min(10, Math.ceil(amt / 500));
+          const ds = acc.tradingDaysLeft == null ? 0 : acc.tradingDaysLeft <= 0 ? 0 : acc.tradingDaysLeft;
+          return Math.max(ps, ds);
+        };
+        return lpMax(a) - lpMax(b);
+      } })}
       {FeedGrid({ accounts: waitingPerf, color: "#6b7280", title: "Waiting on Payout" })}
       {doneAccounts.length > 0 && (
         <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
