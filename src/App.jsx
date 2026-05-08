@@ -1553,6 +1553,8 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
   }
   function TraderFeedSection({ accounts, color, title, sortFn }) {
     if (accounts.length === 0) return null;
+    // All feed names across the whole section (consistent columns)
+    const allFeeds = [...new Set(accounts.map(a => a.dataProvider || "Other"))].sort();
     const traderOrder = [];
     const traderGroups = {};
     accounts.forEach(a => {
@@ -1563,26 +1565,29 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
     traderOrder.sort((a, b) => (traderGroups[a].name || "").localeCompare(traderGroups[b].name || ""));
     return (
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <div style={{ width: 3, height: 16, background: color, borderRadius: 99 }} />
           <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{title}</span>
           <span style={{ background: "#1f2937", color: "#9ca3af", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{accounts.filter(a => !dones[a.id]).length}</span>
         </div>
+        {/* Sticky feed column headers */}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${allFeeds.length}, 1fr)`, gap: 8, marginBottom: 4 }}>
+          {allFeeds.map(feed => (
+            <div key={feed} style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, paddingBottom: 3, borderBottom: `1px solid ${color}55`, textAlign: "center" }}>{feed}</div>
+          ))}
+        </div>
         {traderOrder.map(traderId => {
           const { name, accts } = traderGroups[traderId];
           const feeds = getFeeds(accts, sortFn);
-          const feedNames = Object.keys(feeds).sort();
-          if (feedNames.length === 0) return null;
           return (
-            <div key={traderId} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 7, paddingBottom: 4, borderBottom: `1px solid ${color}44`, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color, fontSize: 13 }}>›</span>{name}
+            <div key={traderId} style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ color, fontSize: 12 }}>›</span>{name}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(feedNames.length, 4)}, 1fr)`, gap: 8 }}>
-                {feedNames.map(feed => (
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${allFeeds.length}, 1fr)`, gap: 8 }}>
+                {allFeeds.map(feed => (
                   <div key={feed}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, paddingBottom: 3, borderBottom: "1px solid #1f2937" }}>{feed}</div>
-                    {feeds[feed].map(a => AccountMiniCard(a))}
+                    {(feeds[feed] || []).map(a => AccountMiniCard(a))}
                   </div>
                 ))}
               </div>
