@@ -1463,6 +1463,11 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             if (daysLeft <= 7) return <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#450a0a", border: "1px solid #dc2626", borderRadius: 4, padding: "1px 6px", flexShrink: 0 }}>⚠ {daysLeft}d to renewal</span>;
             return null;
           })()}
+          {a.type === "eval" && a.purchases30 != null && (
+            <span style={{ fontSize: 11, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "1px 7px", borderRadius: 99, flexShrink: 0, border: "1px solid #3b82f6" }} title="Purchases last 30 days">
+              {a.purchases30}
+            </span>
+          )}
           <span style={(() => { const sc = a.score; const c = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444"; return { fontSize: 12, fontWeight: 800, background: c ? `${c}22` : "#1f2937", color: c ?? "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${c ?? "#374151"}` }; })()}>
             {a.score != null ? a.score : "—"}
           </span>
@@ -2088,6 +2093,11 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
       <div key={a.id} style={{ background: "#131e28", border: `1px solid ${isDone ? "#1a2030" : "#1e2e3e"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+          {a.type === "eval" && a.purchases30 != null && (
+            <span style={{ fontSize: 10, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "0px 6px", borderRadius: 99, flexShrink: 0, border: "1px solid #3b82f6" }} title="Purchases last 30 days">
+              {a.purchases30}
+            </span>
+          )}
           <span style={{ fontSize: 11, fontWeight: 800, background: scoreColor ? `${scoreColor}22` : "#1f2937", color: scoreColor ?? "#4b5563", padding: "0px 6px", borderRadius: 99, flexShrink: 0, border: `1px solid ${scoreColor ?? "#374151"}` }}>
             {sc != null ? sc : "—"}
           </span>
@@ -3557,7 +3567,7 @@ export default function App() {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Profit Target", "Data Provider", "Account Weight", "Account Weight Override", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Profit Target", "Data Provider", "Account Weight", "Account Weight Override", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit", "Purchases Last 30 Days"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -3653,6 +3663,7 @@ export default function App() {
           datePurchased: f["Date Started"] || null,
           dailyLossLimit: f["Daily Loss Limit"] || null,
           profitTarget: (() => { const v = f["Profit Target"]; return Array.isArray(v) ? (v[0] || null) : (v || null); })(),
+          purchases30: (() => { const v = f["Purchases Last 30 Days"]; return Array.isArray(v) ? (v[0] ?? null) : (v ?? null); })(),
         };
       };
 
