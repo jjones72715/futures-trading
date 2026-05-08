@@ -2547,6 +2547,7 @@ function AccountManagementTab() {
   const [postPayoutBalance, setPostPayoutBalance] = useState("");
   const [postPayoutStageId, setPostPayoutStageId] = useState("");
   const [postPayoutStageOverride, setPostPayoutStageOverride] = useState("");
+  const [postPayoutMultiplier, setPostPayoutMultiplier] = useState("");
   const [payoutTierInput, setPayoutTierInput] = useState("50");
 
   // Create New Payout form state
@@ -2645,7 +2646,7 @@ function AccountManagementTab() {
     setTradeDown(false); setAdvancePayoutAmount(""); setStageTargetOverride("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
+    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPostPayoutMultiplier(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
     setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
     setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
     setCpStageId(""); setCpNotes("");
@@ -2872,6 +2873,7 @@ function AccountManagementTab() {
           "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
         };
         if (postPayoutStageOverride) perfUpdate["Stage Target Override"] = parseFloat(postPayoutStageOverride);
+        if (postPayoutMultiplier) perfUpdate["Contract Multiplier"] = parseFloat(postPayoutMultiplier);
         await updateRecord(PERF_TABLE, payoutPerfId, perfUpdate);
       }
       setSuccess("✓ Payout received, account back to Active!");
@@ -3185,7 +3187,7 @@ function AccountManagementTab() {
                         <div style={{ fontSize: 11, color: "#6b7280" }}>Move between Requested / Processing / Approved</div>
                       </div>
                     </div>
-                    <div onClick={() => setPayoutAction("receive")}
+                    <div onClick={() => { setPayoutAction("receive"); setPostPayoutMultiplier((payoutPerf?.fields["Contract Multiplier"] ?? "").toString()); }}
                       style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ fontSize: 20 }}>✅</span>
                       <div>
@@ -3236,6 +3238,11 @@ function AccountManagementTab() {
                       <div>
                         {label("Payout Tier %")}
                         <input type="number" min="0" max="100" placeholder="50" value={payoutTierInput} onChange={e => setPayoutTierInput(e.target.value)} style={inp} />
+                      </div>
+                      <div>
+                        {label("Contract Multiplier")}
+                        <input type="number" min="1" placeholder="1" value={postPayoutMultiplier} onChange={e => setPostPayoutMultiplier(e.target.value)} style={inp} />
+                        {payoutPerf?.fields["Contract Multiplier"] != null && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Current: <strong style={{ color: "#e5e7eb" }}>{payoutPerf.fields["Contract Multiplier"]}</strong></div>}
                       </div>
                       <div style={{ gridColumn: "1/-1" }}>
                         {label("New Account Balance After Payout")}
