@@ -1450,7 +1450,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
     }
 
     return (
-      <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1, position: "relative" }}>
+      <div key={a.id} style={{ background: (() => { if (isDone) return "#111827"; if (isBlown) return "#1a0505"; if (a.status === "Waiting on Payout") return "#1c1a05"; if (a.status === "Live") return "#051a0e"; if (a.payoutAccount) return "#1c1405"; if (a.type === "perf") return "#05101a"; return "#120d1f"; })(), border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30844" : a.status === "Live" ? "#22c55e44" : a.payoutAccount ? "#f59e0b44" : a.type === "perf" ? "#3b82f644" : "#8b5cf644"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1, position: "relative" }}>
         {a.type === "eval" && a.purchases30 != null && (
           <span style={{ position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)", fontSize: 11, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "1px 8px", borderRadius: 99, border: "1px solid #3b82f6", zIndex: 1, whiteSpace: "nowrap" }} title="Purchases last 30 days">
             {a.purchases30}
@@ -2136,7 +2136,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     const sc = a.score;
     const scoreColor = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444";
     return (
-      <div key={a.id} style={{ background: "#131e28", border: `1px solid ${isDone ? "#1a2030" : "#1e2e3e"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1, position: "relative" }}>
+      <div key={a.id} style={{ background: (() => { if (isDone) return "#0d1117"; if (a.status === "Waiting on Payout") return "#1c1a05"; if (a.status === "Live") return "#051a0e"; if (a.payoutAccount) return "#1c1405"; if (a.type === "perf") return "#05101a"; return "#120d1f"; })(), border: `1px solid ${isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30844" : a.status === "Live" ? "#22c55e44" : a.payoutAccount ? "#f59e0b44" : a.type === "perf" ? "#3b82f644" : "#8b5cf644"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1, position: "relative" }}>
         {a.type === "eval" && a.purchases30 != null && (
           <span style={{ position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)", fontSize: 10, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "0px 7px", borderRadius: 99, border: "1px solid #3b82f6", zIndex: 1, whiteSpace: "nowrap" }} title="Purchases last 30 days">
             {a.purchases30}
