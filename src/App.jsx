@@ -509,6 +509,7 @@ function PurchaseTab() {
             "Trading Days Completed": 0,
           };
           if (accountNumber) resetFields["Account Number"] = accountNumber;
+          if (accountWeightOverride) resetFields["Account Weight Override"] = parseFloat(accountWeightOverride);
           await updateRecord(EVAL_TABLE, selectedEvalId, resetFields);
         }
         const purchaseName = `${selectedPurchase?.fields["Name"]?.split(" - ")[0]} - ${evalType?.name} - ${date}`;
@@ -729,6 +730,24 @@ function PurchaseTab() {
                   <div style={{ gridColumn: "1/-1" }}>
                     {label("Account Number")}
                     <input type="text" placeholder="Optional" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    {label("Account Weight Override (optional)")}
+                    {(() => {
+                      const et = evalTypeList.find(t => t.id === evalTypeId);
+                      const dd = et?.drawdownLimit || 0;
+                      const cp = parseFloat(costPer) || 0;
+                      const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                      return (
+                        <>
+                          <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
+                          <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 12 }}>
+                            {et?.accountWeight != null && <span style={{ color: "#9ca3af" }}>Current: <strong style={{ color: "#e5e7eb" }}>{et.accountWeight}</strong></span>}
+                            {suggested != null && <span style={{ color: "#60a5fa" }}>Suggested: <strong>{suggested}</strong></span>}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
