@@ -1581,8 +1581,8 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
           const feeds = getFeeds(accts, sortFn);
           return (
             <div key={traderId} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 5, display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ color, fontSize: 12 }}>›</span>{name}
+              <div style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 6, letterSpacing: 0.5 }}>
+                {name}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: `repeat(${allFeeds.length}, 1fr)`, gap: 8 }}>
                 {allFeeds.map(feed => (
