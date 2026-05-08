@@ -1249,6 +1249,9 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
     const isCountTD = !!countTradingDays[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
 
+    const typeCardBg = isBlown ? "#1a0505" : isDone ? "#111827" : a.status === "Waiting on Payout" ? "#1a1800" : a.status === "Live" ? "#051a0e" : a.payoutAccount ? "#1c1405" : a.type === "perf" ? "#011418" : "#1a0614";
+    const typeCardBorder = isBlown ? "#7f1d1d" : isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30855" : a.status === "Live" ? "#22c55e55" : a.payoutAccount ? "#f59e0b55" : a.type === "perf" ? "#06b6d455" : "#ec489955";
+
     if (a.status === "Waiting on Payout") {
       const payoutRecord = payoutData[a.id];
       const action = payoutActionState[a.id] || null;
@@ -1257,7 +1260,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
       const availableStages = payoutStrategies.filter(s => s.perfTypeId === a.accountTypeId).sort((x, y) => x.stage - y.stage);
       const setFI = (field, value) => setPayoutFormInputs(prev => ({ ...prev, [a.id]: { ...(prev[a.id] || {}), [field]: value } }));
       return (
-        <div key={a.id} style={{ background: "#1f2a37", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 10px", marginBottom: 4 }}>
+        <div key={a.id} style={{ background: typeCardBg, border: `1px solid ${typeCardBorder}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             <span style={{ fontSize: 9, fontWeight: 700, background: "#1c3a1c", color: "#4ade80", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>WAITING</span>
@@ -1388,7 +1391,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
       const psColor = payoutScore === "✓" ? "#22c55e" : payoutScore != null ? lpColor(payoutScore) : "#4b5563";
       const dsColor = daysScore === "✓" ? "#22c55e" : daysScore != null ? lpColor(Math.min(daysScore, 10)) : "#4b5563";
       return (
-        <div key={a.id} style={{ background: "#1f2a37", border: `1px solid ${isDone ? "#1a2030" : "#2d3f50"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
+        <div key={a.id} style={{ background: typeCardBg, border: `1px solid ${typeCardBorder}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             {a.status === "Live" && !isDone && <span style={{ fontSize: 9, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>LIVE</span>}
@@ -1450,7 +1453,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
     }
 
     return (
-      <div key={a.id} style={{ background: (() => { if (isDone) return "#111827"; if (isBlown) return "#1a0505"; if (a.status === "Waiting on Payout") return "#1c1a05"; if (a.status === "Live") return "#051a0e"; if (a.payoutAccount) return "#1c1405"; if (a.type === "perf") return "#05101a"; return "#120d1f"; })(), border: `1px solid ${isBlown ? "#7f1d1d" : isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30844" : a.status === "Live" ? "#22c55e44" : a.payoutAccount ? "#f59e0b44" : a.type === "perf" ? "#3b82f644" : "#8b5cf644"}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1, position: "relative" }}>
+      <div key={a.id} style={{ background: typeCardBg, border: `1px solid ${typeCardBorder}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1, position: "relative" }}>
         {a.type === "eval" && a.purchases30 != null && (
           <span style={{ position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)", fontSize: 11, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "1px 8px", borderRadius: 99, border: "1px solid #3b82f6", zIndex: 1, whiteSpace: "nowrap" }} title="Purchases last 30 days">
             {a.purchases30}
@@ -2080,10 +2083,12 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
   function SnapCard(a) {
     const isDone = !!dones[a.id];
     const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
+    const snapBg = isDone ? "#0d1117" : a.status === "Waiting on Payout" ? "#1a1800" : a.status === "Live" ? "#051a0e" : a.payoutAccount ? "#1c1405" : a.type === "perf" ? "#011418" : "#1a0614";
+    const snapBorder = isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30855" : a.status === "Live" ? "#22c55e55" : a.payoutAccount ? "#f59e0b55" : a.type === "perf" ? "#06b6d455" : "#ec489955";
 
     if (a.status === "Waiting on Payout") {
       return (
-        <div key={a.id} style={{ background: "#131e28", border: "1px solid #1e2e3e", borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
+        <div key={a.id} style={{ background: snapBg, border: `1px solid ${snapBorder}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             <span style={{ fontSize: 8, fontWeight: 700, background: "#3b2a0a", color: "#fbbf24", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>WAITING</span>
@@ -2114,7 +2119,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
         ["Acct Value", acctValue != null ? $$(acctValue) : "—"],
       ];
       return (
-        <div key={a.id} style={{ background: "#131e28", border: `1px solid ${isDone ? "#1a2030" : "#78350f"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
+        <div key={a.id} style={{ background: snapBg, border: `1px solid ${snapBorder}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
             {a.status === "Live" && <span style={{ fontSize: 8, fontWeight: 700, background: "#7f1d1d", color: "#fca5a5", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>LIVE</span>}
@@ -2136,7 +2141,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     const sc = a.score;
     const scoreColor = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444";
     return (
-      <div key={a.id} style={{ background: (() => { if (isDone) return "#0d1117"; if (a.status === "Waiting on Payout") return "#1c1a05"; if (a.status === "Live") return "#051a0e"; if (a.payoutAccount) return "#1c1405"; if (a.type === "perf") return "#05101a"; return "#120d1f"; })(), border: `1px solid ${isDone ? "#1f2937" : a.status === "Waiting on Payout" ? "#eab30844" : a.status === "Live" ? "#22c55e44" : a.payoutAccount ? "#f59e0b44" : a.type === "perf" ? "#3b82f644" : "#8b5cf644"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1, position: "relative" }}>
+      <div key={a.id} style={{ background: snapBg, border: `1px solid ${snapBorder}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1, position: "relative" }}>
         {a.type === "eval" && a.purchases30 != null && (
           <span style={{ position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)", fontSize: 10, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "0px 7px", borderRadius: 99, border: "1px solid #3b82f6", zIndex: 1, whiteSpace: "nowrap" }} title="Purchases last 30 days">
             {a.purchases30}
