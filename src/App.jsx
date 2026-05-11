@@ -1461,12 +1461,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
     }
 
     return (
-      <div key={a.id} style={{ background: typeCardBg, border: `1px solid ${typeCardBorder}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1, position: "relative" }}>
-        {a.type === "eval" && a.purchases30 != null && (
-          <span style={{ position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)", fontSize: 11, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "1px 8px", borderRadius: 99, border: "1px solid #3b82f6", zIndex: 1, whiteSpace: "nowrap" }} title="Purchases last 30 days">
-            {a.purchases30}
-          </span>
-        )}
+      <div key={a.id} style={{ background: typeCardBg, border: `1px solid ${typeCardBorder}`, borderRadius: 8, padding: "8px 10px", marginBottom: 4, opacity: isDone ? 0.45 : 1 }}>
         {/* Trader — Firm — Renewal warning — Score badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: isDone ? "#4b5563" : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
@@ -1479,6 +1474,11 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
             if (daysLeft <= 7) return <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#450a0a", border: "1px solid #dc2626", borderRadius: 4, padding: "1px 6px", flexShrink: 0 }}>⚠ {daysLeft}d to renewal</span>;
             return null;
           })()}
+          {a.type === "eval" && a.purchases30 != null && (
+            <span style={{ fontSize: 11, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "1px 8px", borderRadius: 99, border: "1px solid #3b82f6", flexShrink: 0, whiteSpace: "nowrap" }} title="Purchases last 30 days">
+              {a.purchases30}
+            </span>
+          )}
           <span style={(() => { const sc = a.score; const c = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444"; return { fontSize: 12, fontWeight: 800, background: c ? `${c}22` : "#1f2937", color: c ?? "#4b5563", padding: "1px 8px", borderRadius: 99, flexShrink: 0, border: `1px solid ${c ?? "#374151"}` }; })()}>
             {a.score != null ? a.score : "—"}
           </span>
@@ -2157,14 +2157,14 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
     const sc = a.score;
     const scoreColor = sc == null ? null : sc >= 8 ? "#22c55e" : sc >= 5 ? "#eab308" : "#ef4444";
     return (
-      <div key={a.id} style={{ background: snapBg, border: `1px solid ${snapBorder}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1, position: "relative" }}>
-        {a.type === "eval" && a.purchases30 != null && (
-          <span style={{ position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)", fontSize: 10, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "0px 7px", borderRadius: 99, border: "1px solid #3b82f6", zIndex: 1, whiteSpace: "nowrap" }} title="Purchases last 30 days">
-            {a.purchases30}
-          </span>
-        )}
+      <div key={a.id} style={{ background: snapBg, border: `1px solid ${snapBorder}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3, opacity: isDone ? 0.4 : 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? "#4b5563" : "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{header}</span>
+          {a.type === "eval" && a.purchases30 != null && (
+            <span style={{ fontSize: 10, fontWeight: 800, background: "#1e3a5f", color: "#93c5fd", padding: "0px 7px", borderRadius: 99, border: "1px solid #3b82f6", flexShrink: 0, whiteSpace: "nowrap" }} title="Purchases last 30 days">
+              {a.purchases30}
+            </span>
+          )}
           <span style={{ fontSize: 11, fontWeight: 800, background: scoreColor ? `${scoreColor}22` : "#1f2937", color: scoreColor ?? "#4b5563", padding: "0px 6px", borderRadius: 99, flexShrink: 0, border: `1px solid ${scoreColor ?? "#374151"}` }}>
             {sc != null ? sc : "—"}
           </span>
@@ -3642,7 +3642,7 @@ export default function App() {
       }
 
       let purchaseRecs = [];
-      try { purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Trader", "Date Purchased", "Total Cost"]); } catch(e) {}
+      try { purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Trader", "Date Purchased"]); } catch(e) {}
       const now = Date.now();
       const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
       const purchaseLast30ByTrader = {};
@@ -3653,7 +3653,7 @@ export default function App() {
         if (now - new Date(dateStr).getTime() > thirtyDaysMs) return;
         const traderArr = Array.isArray(f["Trader"]) ? f["Trader"] : (f["Trader"] ? [f["Trader"]] : []);
         traderArr.forEach(tid => {
-          purchaseLast30ByTrader[tid] = (purchaseLast30ByTrader[tid] || 0) + (f["Total Cost"] || 0);
+          purchaseLast30ByTrader[tid] = (purchaseLast30ByTrader[tid] || 0) + 1;
         });
       });
 
