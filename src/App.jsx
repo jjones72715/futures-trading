@@ -3641,19 +3641,34 @@ export default function App() {
         console.error("EVAL FETCH ERROR:", evalErr);
       }
 
+      // Map evalTypeId → firmId so purchases can be matched by trader + firm
+      const evalTypeFirmMap = {};
+      (er || []).forEach(r => {
+        const typeArr = r.fields["Evaluation Account Type"];
+        const typeId = Array.isArray(typeArr) ? (typeof typeArr[0] === "string" ? typeArr[0] : typeArr[0]?.id) : null;
+        const firmArr = r.fields["Firm Name"];
+        const firmId = Array.isArray(firmArr) ? firmArr[0] : (firmArr || null);
+        if (typeId && firmId) evalTypeFirmMap[typeId] = firmId;
+      });
+
       let purchaseRecs = [];
-      try { purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Trader", "Date Purchased"]); } catch(e) {}
+      try { purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Trader", "Date Purchased", "Evaluation Account Type"]); } catch(e) {}
       const now = Date.now();
       const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-      const purchaseLast30ByTrader = {};
+      const purchaseLast30ByTraderFirm = {};
       purchaseRecs.forEach(r => {
         const f = r.fields;
         const dateStr = f["Date Purchased"];
         if (!dateStr) return;
         if (now - new Date(dateStr).getTime() > thirtyDaysMs) return;
+        const typeArr = f["Evaluation Account Type"];
+        const typeId = Array.isArray(typeArr) ? (typeof typeArr[0] === "string" ? typeArr[0] : typeArr[0]?.id) : null;
+        const firmId = typeId ? evalTypeFirmMap[typeId] : null;
+        if (!firmId) return;
         const traderArr = Array.isArray(f["Trader"]) ? f["Trader"] : (f["Trader"] ? [f["Trader"]] : []);
         traderArr.forEach(tid => {
-          purchaseLast30ByTrader[tid] = (purchaseLast30ByTrader[tid] || 0) + 1;
+          const key = `${tid}::${firmId}`;
+          purchaseLast30ByTraderFirm[key] = (purchaseLast30ByTraderFirm[key] || 0) + 1;
         });
       });
 
@@ -3715,6 +3730,7 @@ export default function App() {
         const f = r.fields;
         const dp = Array.isArray(f["Data Provider"]) ? f["Data Provider"][0] : (f["Data Provider"] || "Other");
         const traderId = Array.isArray(f["Trader"]) ? f["Trader"][0] : (f["Trader"] || "");
+        const firmId = Array.isArray(f["Firm Name"]) ? f["Firm Name"][0] : (f["Firm Name"] || null);
         return {
           id: r.id, type: "eval",
           name: f["Name"] || "?",
@@ -3746,7 +3762,7 @@ export default function App() {
           datePurchased: f["Date Started"] || null,
           dailyLossLimit: f["Daily Loss Limit"] || null,
           profitTarget: (() => { const v = f["Profit Target"]; return Array.isArray(v) ? (v[0] || null) : (v || null); })(),
-          purchases30: purchaseLast30ByTrader[traderId] ?? null,
+          purchases30: firmId ? (purchaseLast30ByTraderFirm[`${traderId}::${firmId}`] ?? null) : null,
         };
       };
 
