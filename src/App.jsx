@@ -3652,7 +3652,7 @@ export default function App() {
       });
 
       let purchaseRecs = [];
-      try { purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Trader", "Date Purchased", "Evaluation Account Type"]); } catch(e) {}
+      try { purchaseRecs = await fetchTable(PURCHASE_TABLE, ["Trader", "Date Purchased", "Evaluation Account Type", "Number of Accounts"]); } catch(e) {}
       const now = Date.now();
       const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
       const purchaseLast30ByTraderFirm = {};
@@ -3668,7 +3668,7 @@ export default function App() {
         const traderArr = Array.isArray(f["Trader"]) ? f["Trader"] : (f["Trader"] ? [f["Trader"]] : []);
         traderArr.forEach(tid => {
           const key = `${tid}::${firmId}`;
-          purchaseLast30ByTraderFirm[key] = (purchaseLast30ByTraderFirm[key] || 0) + 1;
+          purchaseLast30ByTraderFirm[key] = (purchaseLast30ByTraderFirm[key] || 0) + (f["Number of Accounts"] || 1);
         });
       });
 
