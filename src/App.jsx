@@ -2735,6 +2735,14 @@ function AccountManagementTab() {
     setLoading(false);
   }
 
+  // Separate state
+  const [sepSelectedId, setSepSelectedId] = useState("");
+  const [sepAccountNumbers, setSepAccountNumbers] = useState([]);
+  const [sepSubmitting, setSepSubmitting] = useState(false);
+
+  const sepSelected = evalAccounts.find(r => r.id === sepSelectedId);
+  const sepN = sepSelected ? (sepSelected.fields["Number of Accounts"] || 1) : 0;
+
   function resetForm() {
     setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
     setNumAccounts(1); setActivationFee(""); setContractMultiplier(1); setPerfAccountNumber("");
@@ -2747,6 +2755,7 @@ function AccountManagementTab() {
     setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
     setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
     setCpStageId(""); setCpNotes("");
+    setSepSelectedId(""); setSepAccountNumbers([]);
     setErr(null);
   }
 
@@ -2905,6 +2914,47 @@ function AccountManagementTab() {
     setSubmitting(false);
   }
 
+  async function handleSeparate() {
+    if (!sepSelected || sepN < 2) return;
+    setSepSubmitting(true); setErr(null);
+    try {
+      const f = sepSelected.fields;
+      const baseFields = {
+        "Status": "Active",
+        "Number of Accounts": 1,
+        "Evaluation Account Type": f["Evaluation Account Type"] || [],
+        "Trader": f["Trader"] || [],
+        "Data Provider": f["Data Provider"] || [],
+        "Firm Name": f["Firm Name"] || [],
+        "Trading Day Definition": f["Trading Day Definition"] || null,
+        "Daily Loss Limit": f["Daily Loss Limit"] || null,
+        "Account Weight": f["Account Weight"] || null,
+        "Account Weight Override": f["Account Weight Override"] || null,
+        "Max Trade Size": f["Max Trade Size"] || null,
+        "Drawdown Safety": f["Drawdown Safety"] || null,
+        "Current Balance": f["Current Balance"] || null,
+        "High Water Mark": f["High Water Mark"] || null,
+        "Current Drawdown Left": f["Current Drawdown Left"] || null,
+        "Profit Target": f["Profit Target"] || null,
+        "Date Started": f["Date Started"] || null,
+      };
+      await Promise.all(
+        sepAccountNumbers.map((acctNum, i) =>
+          createRecord(EVAL_TABLE, {
+            ...baseFields,
+            "Name": `${f["Name"] || "Account"} #${i + 1}`,
+            "Account Number": acctNum || null,
+          })
+        )
+      );
+      await updateRecord(EVAL_TABLE, sepSelected.id, { "Status": "Inactive" });
+      setSuccess(`✓ Separated into ${sepN} individual accounts!`);
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSepSubmitting(false);
+  }
+
   async function handleCreatePayout() {
     if (!cpTrader || !cpPerfTypeId || !cpAmountPerAccount) { setErr("Trader, Account Type, and Amount are required."); return; }
     setSubmitting(true); setErr(null);
@@ -3007,6 +3057,7 @@ function AccountManagementTab() {
           <TabBtn id="stage_mgmt">🎯 Stages</TabBtn>
           <TabBtn id="payouts">💰 Payouts</TabBtn>
           <TabBtn id="create_payout">➕ Create Payout</TabBtn>
+          <TabBtn id="separate">✂️ Separate</TabBtn>
         </div>
 
         {/* Trader pills — outside the card */}
@@ -3023,7 +3074,7 @@ function AccountManagementTab() {
             })}
           </div>
         ) : (() => {
-          const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
+          const countMap = activeTab === "passed_evals" || activeTab === "separate" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
           const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
           return (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
@@ -3375,6 +3426,27 @@ function AccountManagementTab() {
             )}
           </>
         )}
+
+        {/* ── SEPARATE ── */}
+        {activeTab === "separate" && (
+          <>
+            {label("Select Account to Separate")}
+            {loading ? <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading...</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {evalAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).length === 0
+                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No multi-account eval records{traderId ? " for this trader" : ""}.</div>
+                  : evalAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).map(r => (
+                    <div key={r.id} onClick={() => { setSepSelectedId(r.id); setSepAccountNumbers(Array(r.fields["Number of Accounts"] || 1).fill("")); }}
+                      style={{ background: sepSelectedId === r.id ? "#1a2a1a" : "#111827", border: `1px solid ${sepSelectedId === r.id ? "#22c55e" : "#2d3f50"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>×{r.fields["Number of Accounts"]} accounts</div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </>
+        )}
       </div>
       </div>
 
@@ -3492,11 +3564,38 @@ function AccountManagementTab() {
             ))}
           </div>
         )}
+
+        {activeTab === "separate" && sepSelected && (
+          <div style={{ background: C.card, border: "1px solid #22c55e", borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>Separate: {sepSelected.fields["Name"]}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>Enter an account number for each of the {sepN} accounts. The original will be marked inactive.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              {sepAccountNumbers.map((val, i) => (
+                <div key={i}>
+                  {label(`Account ${i + 1} Number`)}
+                  <input
+                    type="text"
+                    placeholder={`e.g. ABC${i + 1}`}
+                    value={val}
+                    onChange={e => setSepAccountNumbers(prev => { const next = [...prev]; next[i] = e.target.value; return next; })}
+                    style={inp}
+                  />
+                </div>
+              ))}
+            </div>
+            {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{err}</div>}
+            {success && <div style={{ color: "#22c55e", fontSize: 12, marginBottom: 10 }}>{success}</div>}
+            <button onClick={handleSeparate} disabled={sepSubmitting}
+              style={{ width: "100%", background: "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" }}>
+              {sepSubmitting ? "Separating..." : `✂️ Separate into ${sepN} Accounts`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-  
+
 // ── Advance Day Modal ─────────────────────────────────────────────────────────
 
 function AdvanceDayModal({ accounts, onConfirm, onCancel }) {
