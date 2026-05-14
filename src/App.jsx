@@ -2264,7 +2264,7 @@ function PLTab({ evalAccounts, perfAccounts }) {
     try {
       const [purchaseRecords, payoutRecords] = await Promise.all([
         fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
-        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts", "% Payout Tier"]),
       ]);
       setPurchases(purchaseRecords.map(r => ({
         id: r.id,
@@ -2282,33 +2282,39 @@ function PLTab({ evalAccounts, perfAccounts }) {
         account: Array.isArray(r.fields["Performance Account"]) ? r.fields["Performance Account"][0] : (r.fields["Performance Account"] || null),
         status: r.fields["Status"]?.name || r.fields["Status"] || "",
         numAccounts: r.fields["Number of Accounts"] || 1,
+        payoutTierPct: r.fields["% Payout Tier"] != null ? r.fields["% Payout Tier"] : null,
       })));
     } catch (e) {}
     setLoading(false);
   }
 
-  // Filter purchases/payouts only after a date is submitted
-  const dayPurchases = selectedDate ? purchases.filter(p => p.datePurchased === selectedDate && p.status === "Active") : [];
+  // Filter purchases by date (selectedDate is always YYYY-MM-DD)
+  const dayPurchases = purchases.filter(p => p.datePurchased === selectedDate && p.status === "Active");
   const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-  const dayPayouts = selectedDate ? payouts.filter(p => String(p.dateReceived ?? "").trim().slice(0, 10) === selectedDate) : [];
+
+  // Filter payouts by Date Received
+  const dayPayouts = payouts.filter(p => String(p.dateReceived ?? "").trim().slice(0, 10) === selectedDate);
 
   // Liquidation calc
   const startLiq = parseFloat(startingLiquidation) || 0;
   const totalLiq = startLiq + dayPurchaseCost;
-  const tier = totalLiq <= 5000 ? 0.40 : totalLiq <= 10000 ? 0.50 : totalLiq <= 20000 ? 0.60 : 0.70;
-  const tierPct = Math.round(tier * 100);
-  const liqReduction = dayPayouts.reduce((sum, p) => sum + (p.totalAmount || 0) * tier, 0);
+  const fallbackTier = totalLiq <= 5000 ? 0.40 : totalLiq <= 10000 ? 0.50 : totalLiq <= 20000 ? 0.60 : 0.70;
+  const liqReduction = dayPayouts.reduce((sum, p) => {
+    const t = p.payoutTierPct != null ? p.payoutTierPct / 100 : fallbackTier;
+    return sum + (p.totalAmount || 0) * t;
+  }, 0);
   const endingLiq = totalLiq - liqReduction;
 
   const payoutRows = dayPayouts.map(p => {
     const traderId = typeof p.trader === "object" ? p.trader?.id : p.trader;
     const traderName = TRADER_NAMES[traderId] ?? p.trader ?? "—";
+    const t = p.payoutTierPct != null ? p.payoutTierPct / 100 : fallbackTier;
     const totalPayout  = Math.round(p.totalAmount || 0);
-    const liqRepayment = Math.round(totalPayout * tier);
+    const liqRepayment = Math.round(totalPayout * t);
     const afterLiq     = Math.round(totalPayout - liqRepayment);
     const taxSet       = Math.round(totalPayout * 0.10);
     const traderProfit = Math.round(afterLiq * 0.65 - taxSet);
-    return { traderName, totalPayout, liqRepayment, afterLiq, taxSet, traderProfit };
+    return { traderName, totalPayout, liqRepayment, afterLiq, taxSet, traderProfit, tierPct: Math.round(t * 100) };
   });
 
   const activeEvals = evalAccounts;
@@ -2355,144 +2361,201 @@ function PLTab({ evalAccounts, perfAccounts }) {
     );
   }
 
-  if (loading) return <div style={{ color: "#6b7280", padding: 40, textAlign: "center" }}>Loading reconcile data...</div>;
-
-  const miniStat = (label, value, color) => (
-    <div key={label} style={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "6px 10px", textAlign: "center" }}>
-      <div style={{ fontSize: 9, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color }}>{value}</div>
-    </div>
-  );
+  if (loading) return <div style={{ color: "#6b7280", padding: 40, textAlign: "center" }}>Loading P&L data...</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-      {/* Date row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Date</div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px" }}>
-            <input ref={mRef} type="text" inputMode="numeric" maxLength={2} placeholder="MM" value={dateM}
-              onChange={e => { const v = e.target.value.replace(/\D/g, ""); setDateM(v); if (v.length === 2) dRef.current?.focus(); }}
-              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }} />
+            <input
+              ref={mRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="MM"
+              value={dateM}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateM(v);
+                if (v.length === 2) dRef.current?.focus();
+              }}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }}
+            />
             <span style={{ color: "#6b7280" }}>/</span>
-            <input ref={dRef} type="text" inputMode="numeric" maxLength={2} placeholder="DD" value={dateD}
-              onChange={e => { const v = e.target.value.replace(/\D/g, ""); setDateD(v); if (v.length === 2) yRef.current?.focus(); }}
+            <input
+              ref={dRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="DD"
+              value={dateD}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateD(v);
+                if (v.length === 2) yRef.current?.focus();
+              }}
               onKeyDown={e => e.key === "Backspace" && dateD === "" && mRef.current?.focus()}
-              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }} />
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 22, textAlign: "center", outline: "none", border: "none" }}
+            />
             <span style={{ color: "#6b7280" }}>/</span>
-            <input ref={yRef} type="text" inputMode="numeric" maxLength={4} placeholder="YYYY" value={dateY}
-              onChange={e => { const v = e.target.value.replace(/\D/g, ""); setDateY(v); }}
-              onKeyDown={e => { if (e.key === "Backspace" && dateY === "") dRef.current?.focus(); if (e.key === "Enter" && dateY.length === 4) handleDateSubmit(); }}
-              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 38, textAlign: "center", outline: "none", border: "none" }} />
+            <input
+              ref={yRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="YYYY"
+              value={dateY}
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, "");
+                setDateY(v);
+              }}
+              onKeyDown={e => {
+                if (e.key === "Backspace" && dateY === "") dRef.current?.focus();
+                if (e.key === "Enter" && dateY.length === 4) handleDateSubmit();
+              }}
+              style={{ background: "transparent", color: "#fff", fontSize: 14, width: 38, textAlign: "center", outline: "none", border: "none" }}
+            />
           </div>
         </div>
-        <button onClick={handleDateSubmit} style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#fff", cursor: "pointer", marginTop: 18, fontWeight: 600 }}>Submit</button>
-        <button onClick={loadPLData} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#9ca3af", cursor: "pointer", marginTop: 18 }}>🔄 Refresh</button>
+        <button onClick={handleDateSubmit} style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, color: "#fff", cursor: "pointer", marginTop: 18, fontWeight: 600 }}>
+          Submit
+        </button>
+        <button onClick={loadPLData} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 14px", fontSize: 12, color: "#9ca3af", cursor: "pointer", marginTop: 18 }}>
+          🔄 Refresh
+        </button>
       </div>
 
-      {/* Account counts — 2 compact rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {/* Row 1: Evals + Perf */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, alignItems: "center" }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" }}>Evals</div>
-          {miniStat("RMC", rmcEvals, "#a78bfa")}
-          {miniStat("TDV", tdvEvals, "#a78bfa")}
-          {miniStat("X", xEvals, "#a78bfa")}
-          {miniStat("Total", totalActiveEvals, "#fff")}
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#93c5fd", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" }}>Perf</div>
-          {miniStat("RMC", rmcPerf, "#93c5fd")}
-          {miniStat("TDV", tdvPerf, "#93c5fd")}
-          {miniStat("Total", totalActivePerf, "#fff")}
-        </div>
-        {/* Row 2: Live + Financials */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, alignItems: "center" }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#fcd34d", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" }}>Live</div>
-          {miniStat("RMC", rmcLive, "#fcd34d")}
-          {miniStat("TDV", tdvLive, "#fcd34d")}
-          {miniStat("X", xLive, "#fcd34d")}
-          {miniStat("Total", totalActiveLive, "#fff")}
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" }}>$</div>
-          {miniStat("Cashed Out", selectedDate ? $$(cashedOut) : "—", "#4ade80")}
-          {miniStat("From Others", selectedDate ? $$(profitFromOthers) : "—", "#4ade80")}
-          <div />
-        </div>
-      </div>
+      {/* Liquidation Section */}
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 14 }}>💧 Liquidation</div>
 
-      {/* Date-gated content */}
-      {selectedDate && (
-        <>
-          {/* Liquidation */}
-          <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 12 }}>💧 Liquidation</div>
-            <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3 }}>Starting Liquidation</div>
-                <input type="number" value={startingLiquidation} onChange={e => setStartingLiquidation(e.target.value)} placeholder="0.00"
-                  style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 6, padding: "6px 10px", fontSize: 12, color: "#fff", outline: "none", boxSizing: "border-box" }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3 }}>Purchases Today</div>
-                <div style={{ background: "#1f2937", borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "#f59e0b" }}>${dayPurchaseCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3 }}>Total Liquidation</div>
-                <div style={{ background: "#1f2937", borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "#fff", fontWeight: 600 }}>${totalLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
-              </div>
-              <div style={{ flex: 0.5 }}>
-                <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3 }}>Tier</div>
-                <div style={{ background: "#1f2937", borderRadius: 6, padding: "7px 10px", fontSize: 12, color: "#6366f1", fontWeight: 700 }}>{tierPct}%</div>
-              </div>
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Starting Liquidation</div>
+            <input type="number" value={startingLiquidation} onChange={e => setStartingLiquidation(e.target.value)}
+              placeholder="0.00"
+              style={{ width: "100%", background: "#1f2937", border: "1px solid #374151", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Purchases Today</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#f59e0b" }}>
+              ${dayPurchaseCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </div>
-            {dayPayouts.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 6 }}>Payouts Received</div>
-                {dayPayouts.map((p, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#1f2937", borderRadius: 6, padding: "6px 10px", marginBottom: 4, fontSize: 12 }}>
-                    <span style={{ color: "#d1d5db" }}>{p.name}</span>
-                    <span style={{ color: "#4ade80" }}>${p.totalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                    <span style={{ color: "#9ca3af" }}>× {tierPct}% = <span style={{ color: "#f87171" }}>-${(p.totalAmount * tier).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>
-                  </div>
-                ))}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Total Liquidation</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#fff", fontWeight: 600 }}>
+              ${totalLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div style={{ flex: 0.5 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>Tier</div>
+            <div style={{ background: "#1f2937", borderRadius: 8, padding: "9px 12px", fontSize: 13, color: "#6366f1", fontWeight: 700 }}>
+              {Math.round(fallbackTier * 100)}%
+            </div>
+          </div>
+        </div>
+
+        {dayPayouts.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 8 }}>Payouts Received Today</div>
+            {dayPayouts.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#1f2937", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: 12 }}>
+                <span style={{ color: "#d1d5db" }}>{p.name}</span>
+                <span style={{ color: "#4ade80" }}>${p.totalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span style={{ color: "#9ca3af" }}>× {p.payoutTierPct != null ? p.payoutTierPct : Math.round(fallbackTier * 100)}% = <span style={{ color: "#f87171" }}>-${((p.totalAmount || 0) * (p.payoutTierPct != null ? p.payoutTierPct / 100 : fallbackTier)).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {dayPayouts.length === 0 && (
+          <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 14 }}>No payouts received on this date.</div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1f2937", paddingTop: 12 }}>
+          <div style={{ fontSize: 13, color: "#9ca3af" }}>Ending Liquidation</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: endingLiq <= 0 ? "#4ade80" : endingLiq < 5000 ? "#f59e0b" : "#f87171" }}>
+            ${endingLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+
+      {/* Payouts Received Section */}
+      <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span>💰</span>
+          <span style={{ color: "#fff", fontWeight: 600, fontSize: 15 }}>Payouts Received</span>
+        </div>
+
+        {payoutRows.length === 0 ? (
+          <div style={{ fontSize: 12, color: "#4b5563", fontStyle: "italic" }}>No payouts received on this date.</div>
+        ) : (
+          <>
+            {/* Header Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, padding: "0 10px", marginBottom: 6 }}>
+              <span>Trader</span>
+              <span style={{ textAlign: "right" }}>Payout</span>
+              <span style={{ textAlign: "right" }}>After Liq Repayment</span>
+              <span style={{ textAlign: "right" }}>Put Away for Taxes</span>
+              <span style={{ textAlign: "right" }}>Trader's Profit</span>
+            </div>
+
+            {payoutRows.map((row, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, background: "#1f2937", borderRadius: 8, padding: "10px", marginBottom: 6, fontSize: 13, alignItems: "center" }}>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{row.traderName}</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${row.totalPayout.toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${row.afterLiq.toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${row.taxSet.toLocaleString()}</span>
+                <span style={{ textAlign: "right", fontWeight: 700, color: row.traderProfit >= 0 ? "#4ade80" : "#f87171" }}>${row.traderProfit.toLocaleString()}</span>
+              </div>
+            ))}
+
+            {/* Totals Row */}
+            {payoutRows.length > 1 && (
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 8, borderTop: "1px solid #374151", paddingTop: 10, marginTop: 4, fontSize: 13, fontWeight: 600, padding: "10px" }}>
+                <span style={{ color: "#9ca3af" }}>Total</span>
+                <span style={{ textAlign: "right", color: "#93c5fd" }}>${payoutRows.reduce((s, r) => s + r.totalPayout, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#fcd34d" }}>${payoutRows.reduce((s, r) => s + r.afterLiq, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#f87171" }}>${payoutRows.reduce((s, r) => s + r.taxSet, 0).toLocaleString()}</span>
+                <span style={{ textAlign: "right", color: "#4ade80" }}>${payoutRows.reduce((s, r) => s + r.traderProfit, 0).toLocaleString()}</span>
               </div>
             )}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #1f2937", paddingTop: 10 }}>
-              <div style={{ fontSize: 12, color: "#9ca3af" }}>Ending Liquidation</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: endingLiq <= 0 ? "#4ade80" : endingLiq < 5000 ? "#f59e0b" : "#f87171" }}>
-                ${endingLiq.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </div>
-            </div>
-          </div>
+          </>
+        )}
+      </div>
 
-          {/* Payouts Received */}
-          {payoutRows.length > 0 && (
-            <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 12 }}>💰 Payouts Received</div>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 6, fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8, padding: "0 8px", marginBottom: 6 }}>
-                <span>Trader</span><span style={{ textAlign: "right" }}>Payout</span><span style={{ textAlign: "right" }}>After Liq</span><span style={{ textAlign: "right" }}>Tax Set Aside</span><span style={{ textAlign: "right" }}>Trader Profit</span>
-              </div>
-              {payoutRows.map((row, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 6, background: "#1f2937", borderRadius: 6, padding: "8px", marginBottom: 4, fontSize: 12, alignItems: "center" }}>
-                  <span style={{ color: "#fff", fontWeight: 600 }}>{row.traderName}</span>
-                  <span style={{ textAlign: "right", color: "#93c5fd" }}>${row.totalPayout.toLocaleString()}</span>
-                  <span style={{ textAlign: "right", color: "#fcd34d" }}>${row.afterLiq.toLocaleString()}</span>
-                  <span style={{ textAlign: "right", color: "#f87171" }}>${row.taxSet.toLocaleString()}</span>
-                  <span style={{ textAlign: "right", fontWeight: 700, color: row.traderProfit >= 0 ? "#4ade80" : "#f87171" }}>${row.traderProfit.toLocaleString()}</span>
-                </div>
-              ))}
-              {payoutRows.length > 1 && (
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1.5fr 1.5fr 1.5fr", gap: 6, borderTop: "1px solid #374151", paddingTop: 8, marginTop: 2, fontSize: 12, fontWeight: 600, padding: "8px" }}>
-                  <span style={{ color: "#9ca3af" }}>Total</span>
-                  <span style={{ textAlign: "right", color: "#93c5fd" }}>${payoutRows.reduce((s, r) => s + r.totalPayout, 0).toLocaleString()}</span>
-                  <span style={{ textAlign: "right", color: "#fcd34d" }}>${payoutRows.reduce((s, r) => s + r.afterLiq, 0).toLocaleString()}</span>
-                  <span style={{ textAlign: "right", color: "#f87171" }}>${payoutRows.reduce((s, r) => s + r.taxSet, 0).toLocaleString()}</span>
-                  <span style={{ textAlign: "right", color: "#4ade80" }}>${payoutRows.reduce((s, r) => s + r.traderProfit, 0).toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+      <SectionHeader title="Evaluation Accounts" color="#8b5cf6" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <StatBox label="RMC Evals" value={rmcEvals} color="#a78bfa" />
+        <StatBox label="TDV Evals" value={tdvEvals} color="#a78bfa" />
+        <StatBox label="X Evals" value={xEvals} color="#a78bfa" />
+        <StatBox label="Active Evals" value={totalActiveEvals} color="#fff" />
+      </div>
+
+      <SectionHeader title="Performance Accounts" color="#3b82f6" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <StatBox label="RMC Perf" value={rmcPerf} color="#93c5fd" />
+        <StatBox label="TDV Perf" value={tdvPerf} color="#93c5fd" />
+        <StatBox label="X Perf" value={xPerf} color="#93c5fd" />
+        <StatBox label="Active Perf" value={totalActivePerf} color="#fff" />
+      </div>
+
+      <SectionHeader title="Live & Payout Accounts" color="#f59e0b" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        <StatBox label="RMC Live" value={rmcLive} color="#fcd34d" />
+        <StatBox label="TDV Live" value={tdvLive} color="#fcd34d" />
+        <StatBox label="X Live" value={xLive} color="#fcd34d" />
+        <StatBox label="Active Live" value={totalActiveLive} color="#fff" />
+      </div>
+
+      <SectionHeader title="Financials" color="#10b981" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+        <StatBox label="Cashed Out Today" value={$$(cashedOut)} color="#4ade80" />
+        <StatBox label="Profit from Others" value={$$(profitFromOthers)} color="#4ade80" />
+      </div>
     </div>
   );
 }
@@ -2676,6 +2739,14 @@ function AccountManagementTab() {
     setLoading(false);
   }
 
+  // Separate state
+  const [sepSelectedId, setSepSelectedId] = useState("");
+  const [sepAccountNumbers, setSepAccountNumbers] = useState([]);
+  const [sepSubmitting, setSepSubmitting] = useState(false);
+
+  const sepSelected = evalAccounts.find(r => r.id === sepSelectedId);
+  const sepN = sepSelected ? (sepSelected.fields["Number of Accounts"] || 1) : 0;
+
   function resetForm() {
     setSelectedEvalId(""); setStartingBalance(""); setDateActivated(today);
     setNumAccounts(1); setActivationFee(""); setContractMultiplier(1); setPerfAccountNumber("");
@@ -2688,6 +2759,7 @@ function AccountManagementTab() {
     setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
     setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
     setCpStageId(""); setCpNotes("");
+    setSepSelectedId(""); setSepAccountNumbers([]);
     setErr(null);
   }
 
@@ -2846,6 +2918,47 @@ function AccountManagementTab() {
     setSubmitting(false);
   }
 
+  async function handleSeparate() {
+    if (!sepSelected || sepN < 2) return;
+    setSepSubmitting(true); setErr(null);
+    try {
+      const f = sepSelected.fields;
+      const baseFields = {
+        "Status": "Active",
+        "Number of Accounts": 1,
+        "Evaluation Account Type": f["Evaluation Account Type"] || [],
+        "Trader": f["Trader"] || [],
+        "Data Provider": f["Data Provider"] || [],
+        "Firm Name": f["Firm Name"] || [],
+        "Trading Day Definition": f["Trading Day Definition"] || null,
+        "Daily Loss Limit": f["Daily Loss Limit"] || null,
+        "Account Weight": f["Account Weight"] || null,
+        "Account Weight Override": f["Account Weight Override"] || null,
+        "Max Trade Size": f["Max Trade Size"] || null,
+        "Drawdown Safety": f["Drawdown Safety"] || null,
+        "Current Balance": f["Current Balance"] || null,
+        "High Water Mark": f["High Water Mark"] || null,
+        "Current Drawdown Left": f["Current Drawdown Left"] || null,
+        "Profit Target": f["Profit Target"] || null,
+        "Date Started": f["Date Started"] || null,
+      };
+      await Promise.all(
+        sepAccountNumbers.map((acctNum, i) =>
+          createRecord(EVAL_TABLE, {
+            ...baseFields,
+            "Name": `${f["Name"] || "Account"} #${i + 1}`,
+            "Account Number": acctNum || null,
+          })
+        )
+      );
+      await updateRecord(EVAL_TABLE, sepSelected.id, { "Status": "Inactive" });
+      setSuccess(`✓ Separated into ${sepN} individual accounts!`);
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSepSubmitting(false);
+  }
+
   async function handleCreatePayout() {
     if (!cpTrader || !cpPerfTypeId || !cpAmountPerAccount) { setErr("Trader, Account Type, and Amount are required."); return; }
     setSubmitting(true); setErr(null);
@@ -2948,6 +3061,7 @@ function AccountManagementTab() {
           <TabBtn id="stage_mgmt">🎯 Stages</TabBtn>
           <TabBtn id="payouts">💰 Payouts</TabBtn>
           <TabBtn id="create_payout">➕ Create Payout</TabBtn>
+          <TabBtn id="separate">✂️ Separate</TabBtn>
         </div>
 
         {/* Trader pills — outside the card */}
@@ -2964,7 +3078,7 @@ function AccountManagementTab() {
             })}
           </div>
         ) : (() => {
-          const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
+          const countMap = activeTab === "passed_evals" || activeTab === "separate" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
           const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
           return (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
@@ -3316,6 +3430,27 @@ function AccountManagementTab() {
             )}
           </>
         )}
+
+        {/* ── SEPARATE ── */}
+        {activeTab === "separate" && (
+          <>
+            {label("Select Account to Separate")}
+            {loading ? <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading...</div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {evalAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).length === 0
+                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No multi-account eval records{traderId ? " for this trader" : ""}.</div>
+                  : evalAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).map(r => (
+                    <div key={r.id} onClick={() => { setSepSelectedId(r.id); setSepAccountNumbers(Array(r.fields["Number of Accounts"] || 1).fill("")); }}
+                      style={{ background: sepSelectedId === r.id ? "#1a2a1a" : "#111827", border: `1px solid ${sepSelectedId === r.id ? "#22c55e" : "#2d3f50"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>×{r.fields["Number of Accounts"]} accounts</div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </>
+        )}
       </div>
       </div>
 
@@ -3433,11 +3568,38 @@ function AccountManagementTab() {
             ))}
           </div>
         )}
+
+        {activeTab === "separate" && sepSelected && (
+          <div style={{ background: C.card, border: "1px solid #22c55e", borderRadius: 12, padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#22c55e", marginBottom: 4 }}>Separate: {sepSelected.fields["Name"]}</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>Enter an account number for each of the {sepN} accounts. The original will be marked inactive.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              {sepAccountNumbers.map((val, i) => (
+                <div key={i}>
+                  {label(`Account ${i + 1} Number`)}
+                  <input
+                    type="text"
+                    placeholder={`e.g. ABC${i + 1}`}
+                    value={val}
+                    onChange={e => setSepAccountNumbers(prev => { const next = [...prev]; next[i] = e.target.value; return next; })}
+                    style={inp}
+                  />
+                </div>
+              ))}
+            </div>
+            {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{err}</div>}
+            {success && <div style={{ color: "#22c55e", fontSize: 12, marginBottom: 10 }}>{success}</div>}
+            <button onClick={handleSeparate} disabled={sepSubmitting}
+              style={{ width: "100%", background: "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "10px 0", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" }}>
+              {sepSubmitting ? "Separating..." : `✂️ Separate into ${sepN} Accounts`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-  
+
 // ── Advance Day Modal ─────────────────────────────────────────────────────────
 
 function AdvanceDayModal({ accounts, onConfirm, onCancel }) {
