@@ -1094,8 +1094,8 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
 
 function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDones }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
-  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && !a.tradeDown && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown)));
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
   const allShown = [...evalAccounts, ...standardPerf, ...livePerf, ...waitingPerf];
   const doneAccounts = allShown.filter(a => dones[a.id]);
@@ -2074,8 +2074,8 @@ function TraderPLTab() {
 }
 
 function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
-  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && !a.tradeDown && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown)));
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
 
   function groupByProvider(accounts, sortFn) {
