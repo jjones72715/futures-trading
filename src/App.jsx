@@ -1094,8 +1094,8 @@ function BreachModal({ account, evalTypeList, onClose, onBreached }) {
 
 function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDones }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && !a.tradeDown && a.status === "Active");
-  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown)));
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
   const allShown = [...evalAccounts, ...standardPerf, ...livePerf, ...waitingPerf];
   const doneAccounts = allShown.filter(a => dones[a.id]);
@@ -1388,7 +1388,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
       );
     }
 
-    const isLivePayout = a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown));
+    const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
 
     if (isLivePayout) {
       const profitPerAcct = a.ddLeft;
@@ -2074,8 +2074,8 @@ function TraderPLTab() {
 }
 
 function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
-  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && !a.tradeDown && a.status === "Active");
-  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown)));
+  const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
+  const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
   const waitingPerf = perfAccounts.filter(a => a.status === "Waiting on Payout");
 
   function groupByProvider(accounts, sortFn) {
@@ -2113,7 +2113,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
       );
     }
 
-    const isLivePayout = a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown));
+    const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
 
     if (isLivePayout) {
       const profitPerAcct = a.ddLeft ?? null;
@@ -2858,7 +2858,6 @@ function AccountManagementTab() {
       if (stageTargetOverride) fields["Stage Target Override"] = parseFloat(stageTargetOverride);
       if (nextStage.stage >= 2) {
         fields["Payout Account"] = true;
-        fields["Trade Down Account"] = true;
       }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
       // Create a received payout record if an amount was entered
@@ -2890,7 +2889,6 @@ function AccountManagementTab() {
     setSubmitting(true); setErr(null);
     try {
       const fields = {
-        "Trade Down Account": true,
         "Payout Account": true,
         "Current Balance": parseFloat(newBalance),
         "High Water Mark": parseFloat(newBalance),
@@ -2904,7 +2902,7 @@ function AccountManagementTab() {
         fields["Trading Days this Cycle"] = parseInt(tradingDays);
       }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
-      setSuccess("✓ Account converted to Trade Down!");
+      setSuccess("✓ Account converted to Payout Account!");
       setTimeout(() => setSuccess(""), 4000);
       resetForm(); loadData();
     } catch (e) { setErr("Failed: " + e.message); }
@@ -3240,8 +3238,8 @@ function AccountManagementTab() {
                     style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                     <span style={{ fontSize: 22 }}>⬇️</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>Convert to Trade Down</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>Mark as Trade Down without requesting payout</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>Convert to Payout Account</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>Move to payout account without requesting payout</div>
                     </div>
                   </div>
                 )}
@@ -3291,7 +3289,7 @@ function AccountManagementTab() {
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                   <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#a78bfa" }}>Convert to Trade Down</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#a78bfa" }}>Convert to Payout Account</span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                   <div>
@@ -3317,7 +3315,7 @@ function AccountManagementTab() {
                 </div>
                 <button onClick={handleConvertTradeDown} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#6d28d9" : "#111827", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
-                  {submitting ? "Saving..." : "⬇️ Convert to Trade Down"}
+                  {submitting ? "Saving..." : "⬇️ Convert to Payout Account"}
                 </button>
               </>
             )}
@@ -3786,7 +3784,7 @@ export default function App() {
       firmRecs.forEach(r => { firmMap[r.id] = r.fields["Name"] || ""; });
 
       try {
-        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Trade Down Account", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Data Provider Override", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage", "Stage Target Override"]);
+        pr = await fetchTable(PERF_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Drawdown to Floor", "Contract Multiplier", "Data Provider", "Data Provider Override", "Payout Account", "Performance Account Type", "Trading Day Type", "Min Profitable Day Amount", "Trading Days this Cycle", "Trading Days Left", "Cycle Start Balance", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Number of Payouts Recieved", "Daily Loss Limit", "Current Stage", "Stage Target Override"]);
         console.log("raw perf records:", pr?.length, pr?.[0]);
       } catch(perfErr) {
         console.error("PERF FETCH ERROR:", perfErr);
@@ -3861,7 +3859,7 @@ export default function App() {
           limit: f["Max Trade Size"] || 0,
           n: f["Number of Accounts"] || 1,
           ddSafety: f["Drawdown Safety"] || 0,
-          tradeDown: f["Trade Down Account"] || false,
+          tradeDown: f["Payout Account"] || false,
           contractMultiplier: f["Contract Multiplier"] || 1,
           payoutAccount: f["Payout Account"] || false,
           dataProvider: dp,
