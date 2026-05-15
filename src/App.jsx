@@ -2890,6 +2890,31 @@ function AccountManagementTab() {
     setSubmitting(false);
   }
 
+  async function handleConvertTradeDown() {
+    if (!selectedPerfId || !newBalance) return;
+    setSubmitting(true); setErr(null);
+    try {
+      const fields = {
+        "Trade Down Account": true,
+        "Current Balance": parseFloat(newBalance),
+        "High Water Mark": parseFloat(newBalance),
+        "Cycle Start Balance": parseFloat(newBalance),
+      };
+      if (contractMultiplier) fields["Contract Multiplier"] = parseFloat(contractMultiplier);
+      if (stageTargetOverride) fields["Stage Target Override"] = parseFloat(stageTargetOverride);
+      if (resetTradingDays) {
+        fields["Trading Days this Cycle"] = tradingDays ? parseInt(tradingDays) : 0;
+      } else if (tradingDays) {
+        fields["Trading Days this Cycle"] = parseInt(tradingDays);
+      }
+      await updateRecord(PERF_TABLE, selectedPerfId, fields);
+      setSuccess("✓ Account converted to Trade Down!");
+      setTimeout(() => setSuccess(""), 4000);
+      resetForm(); loadData();
+    } catch (e) { setErr("Failed: " + e.message); }
+    setSubmitting(false);
+  }
+
   async function handleRequestPayout() {
     if (!selectedPerfId) return;
     setSubmitting(true); setErr(null);
@@ -3215,6 +3240,16 @@ function AccountManagementTab() {
                     <div style={{ fontSize: 11, color: "#6b7280" }}>Mark as Waiting on Payout + log payout record</div>
                   </div>
                 </div>
+                {!(selectedPerf?.fields["Number of Payouts Recieved"] > 0) && (
+                  <div onClick={() => setStageAction("tradedown")}
+                    style={{ background: "#111827", border: "1px solid #2d3f50", borderRadius: 10, padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 22 }}>⬇️</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>Convert to Trade Down</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>Mark as Trade Down without requesting payout</div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3261,6 +3296,41 @@ function AccountManagementTab() {
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#16a34a" : "#111827", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
+                </button>
+              </>
+            )}
+
+            {selectedPerfId && stageAction === "tradedown" && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <button onClick={() => setStageAction("")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#a78bfa" }}>Convert to Trade Down</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div>
+                    {label("New Balance")}
+                    <input type="number" placeholder="Enter new balance..." value={newBalance} onChange={e => setNewBalance(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {label("Contract Multiplier")}
+                    <input type="number" min="1" placeholder="1" value={contractMultiplier} onChange={e => setContractMultiplier(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    {label("Stage Target Override (optional)")}
+                    <input type="number" placeholder={currentStage ? `Default: ${$$(currentStage.target)}` : "Enter override..."} value={stageTargetOverride} onChange={e => setStageTargetOverride(e.target.value)} style={inp} />
+                    {currentStage && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Current stage default target: <strong style={{ color: "#e5e7eb" }}>{$$(currentStage.target)}</strong></div>}
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <input type="checkbox" id="resetDaysTD" checked={resetTradingDays} onChange={e => setResetTradingDays(e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer" }} />
+                      <label htmlFor="resetDaysTD" style={{ fontSize: 12, color: "#9ca3af", cursor: "pointer" }}>Reset Trading Days</label>
+                    </div>
+                    <input type="number" placeholder={resetTradingDays ? "Starting days (0 if blank)" : "Days to carry over..."} value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
+                  </div>
+                </div>
+                <button onClick={handleConvertTradeDown} disabled={!newBalance || submitting}
+                  style={{ width: "100%", background: newBalance ? "#6d28d9" : "#111827", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
+                  {submitting ? "Saving..." : "⬇️ Convert to Trade Down"}
                 </button>
               </>
             )}
@@ -3479,6 +3549,8 @@ function AccountManagementTab() {
             <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", marginBottom: 12 }}>Performance Account</div>
             {[
               ["Name", selectedPerf.fields["Name"]],
+              ["Account #", selectedPerf.fields["Account Number"] || "—"],
+              ["Score", selectedPerf.fields["Score"] ?? "—"],
               ["Status", selectedPerf.fields["Status"]],
               ["Balance", $$(selectedPerf.fields["Current Balance"])],
               ["DD Left", $$(selectedPerf.fields["Current Drawdown Left"])],
