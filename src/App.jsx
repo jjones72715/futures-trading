@@ -2631,13 +2631,11 @@ function AccountManagementTab() {
   const [stageAction, setStageAction] = useState("");
   const [newBalance, setNewBalance] = useState("");
   const [tradingDays, setTradingDays] = useState("");
-  const [tradeDown, setTradeDown] = useState(false);
   const [resetTradingDays, setResetTradingDays] = useState(true);
   const [advancePayoutAmount, setAdvancePayoutAmount] = useState("");
   const [stageTargetOverride, setStageTargetOverride] = useState("");
   const [payoutDateRequested, setPayoutDateRequested] = useState(today);
   const [payoutNumAccounts, setPayoutNumAccounts] = useState("");
-  const [payoutTradeDown, setPayoutTradeDown] = useState(false);
 
   // Payout Management state
   const [selectedPayoutId, setSelectedPayoutId] = useState("");
@@ -2752,10 +2750,10 @@ function AccountManagementTab() {
     setNumAccounts(1); setActivationFee(""); setContractMultiplier(1); setPerfAccountNumber("");
     setSelectedPerfId(""); setStageAction(""); setNewBalance("");
     setTradingDays(""); setResetTradingDays(true);
-    setTradeDown(false); setAdvancePayoutAmount(""); setStageTargetOverride("");
+    setAdvancePayoutAmount(""); setStageTargetOverride("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPostPayoutMultiplier(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts(""); setPayoutTradeDown(false);
+    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPostPayoutMultiplier(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts("");
     setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
     setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
     setCpStageId(""); setCpNotes("");
@@ -2858,11 +2856,8 @@ function AccountManagementTab() {
       };
       if (contractMultiplier) fields["Contract Multiplier"] = parseFloat(contractMultiplier);
       if (stageTargetOverride) fields["Stage Target Override"] = parseFloat(stageTargetOverride);
-      // Auto-set payout account when advancing to stage 2 or higher
       if (nextStage.stage >= 2) {
         fields["Payout Account"] = true;
-      }
-      if (tradeDown) {
         fields["Trade Down Account"] = true;
       }
       await updateRecord(PERF_TABLE, selectedPerfId, fields);
@@ -2896,6 +2891,7 @@ function AccountManagementTab() {
     try {
       const fields = {
         "Trade Down Account": true,
+        "Payout Account": true,
         "Current Balance": parseFloat(newBalance),
         "High Water Mark": parseFloat(newBalance),
         "Cycle Start Balance": parseFloat(newBalance),
@@ -2922,7 +2918,6 @@ function AccountManagementTab() {
       const perf = perfAccounts.find(r => r.id === selectedPerfId);
       const trader = traderList.find(t => t.id === traderId);
       const perfUpdate = { "Status": "Waiting on Payout" };
-      if (payoutTradeDown) perfUpdate["Trade Down Account"] = true;
       await updateRecord(PERF_TABLE, selectedPerfId, perfUpdate);
       // Create payout record
       const dateReq = payoutDateRequested || today;
@@ -3285,14 +3280,6 @@ function AccountManagementTab() {
                     <input type="number" placeholder={resetTradingDays ? "Starting days (0 if blank)" : "Days to carry over..."} value={tradingDays} onChange={e => setTradingDays(e.target.value)} style={inp} />
                   </div>
                 </div>
-                {/* Trade Down section */}
-                <div style={{ marginTop: 12 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="checkbox" checked={tradeDown} onChange={e => setTradeDown(e.target.checked)}
-                      style={{ width: 16, height: 16, cursor: "pointer" }} />
-                    <span style={{ fontSize: 13, color: "#d1d5db" }}>Trade Down Account</span>
-                  </label>
-                </div>
                 <button onClick={handleStageAdvance} disabled={!newBalance || submitting}
                   style={{ width: "100%", background: newBalance ? "#16a34a" : "#111827", color: newBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: newBalance ? "pointer" : "not-allowed" }}>
                   {submitting ? "Saving..." : `Advance to Stage ${nextStage.stage}`}
@@ -3352,11 +3339,6 @@ function AccountManagementTab() {
                   </div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input type="checkbox" checked={payoutTradeDown} onChange={e => setPayoutTradeDown(e.target.checked)}
-                      style={{ width: 16, height: 16, cursor: "pointer" }} />
-                    <span style={{ fontSize: 13, color: "#d1d5db" }}>Trade Down Account</span>
-                  </label>
                 </div>
                 <div style={{ background: "#2d1f00", border: "1px solid #f59e0b", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
                   <div style={{ fontSize: 11, color: "#fde68a" }}>• Sets account to "Waiting on Payout"</div>
