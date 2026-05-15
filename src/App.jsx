@@ -1388,7 +1388,7 @@ function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDone
       );
     }
 
-    const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
+    const isLivePayout = a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown));
 
     if (isLivePayout) {
       const profitPerAcct = a.ddLeft;
@@ -2113,7 +2113,7 @@ function SnapshotTab({ evalAccounts = [], perfAccounts = [], dones = {} }) {
       );
     }
 
-    const isLivePayout = a.status === "Live" || (a.payoutAccount && a.status === "Active");
+    const isLivePayout = a.status === "Live" || (a.status === "Active" && (a.payoutAccount || a.tradeDown));
 
     if (isLivePayout) {
       const profitPerAcct = a.ddLeft ?? null;
