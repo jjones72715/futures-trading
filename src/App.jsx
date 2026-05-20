@@ -2680,8 +2680,8 @@ function AccountManagementTab() {
   async function loadData() {
     setLoading(true);
     try {
-      const [er, pr, payr] = await Promise.all([
-        fetch(`/.netlify/functions/airtable/${BASE}/${EVAL_TABLE}?maxRecords=200`).then(r => r.json()),
+      const [evalRecords, pr, payr] = await Promise.all([
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Trader", "Evaluation Account Type", "Number of Accounts", "Current Balance", "Current Drawdown Left"]),
         fetch(`/.netlify/functions/airtable/${BASE}/${PERF_TABLE}?maxRecords=200`).then(r => r.json()),
         fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=200`).then(r => r.json()),
       ]);
@@ -2692,7 +2692,7 @@ function AccountManagementTab() {
           return Array.isArray(t) && t.includes(traderId);
         });
 
-      const activeEvalRecords = (er.records || []).filter(r => {
+      const activeEvalRecords = evalRecords.filter(r => {
         const status = r.fields["Status"]?.name || r.fields["Status"];
         return status === "Active";
       });
