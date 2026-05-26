@@ -1,0 +1,11 @@
+export const BASE = "app5RPYcCy7hqCu41";
+export const PERF_TABLE = "tblhM1DWRiWXnhSKb";
+export const EVAL_TABLE = "tblWeri8TXWPQY9Dc";
+export const PURCHASE_TABLE = "tblaBys956srO5pca";
+export const TRADERS_TABLE = "tbla0lbJ9z1PAhNy7";
+export const EVAL_TYPE_TABLE = "tbleHzHF5FgskLxs3";
+export const PAYOUT_TABLE = "tblIEpLE5eIV7k6B7";
+export const PERF_TYPES_TABLE = "tbluVaCiyff48ic7L";
+export const PAYOUT_STRATEGIES_TABLE = "tbljLby6v0o6fydOw";
+export const FIRMS_TABLE = "tblR0iLSQZI1xXYa6";
+export const TRADE_ANALYTICS_TABLE = "tbl6HGXopi8uzdl4V";
