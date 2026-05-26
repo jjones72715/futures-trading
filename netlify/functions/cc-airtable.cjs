@@ -1,5 +1,5 @@
 const TOKEN = process.env.AIRTABLE_API_KEY;
-const BASE_URL = 'https://api.airtable.com/v0';
+const BASE_URL = "https://api.airtable.com/v0";
 
 async function fetchAllAirtableRecords(baseId, tableId, rawQuery) {
   const params = new URLSearchParams(rawQuery || '');
