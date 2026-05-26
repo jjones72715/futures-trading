@@ -1,1 +1,1 @@
-export { default } from './CreditCardsApp.jsx';
+export { default } from './CreditCardsApp';
