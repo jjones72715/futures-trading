@@ -13,3 +13,14 @@ export async function fetchTable(tableId, fields) {
   } while (offset);
   return allRecords;
 }
+
+export async function createRecord(tableId, fields) {
+  const res = await fetch(`/.netlify/functions/cc-airtable/${BASE}/${tableId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  const data = await res.json();
+  if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  return data;
+}

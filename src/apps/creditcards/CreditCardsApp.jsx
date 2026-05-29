@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PortfolioTab } from './tabs/PortfolioTab.jsx';
+import { AddCardTab } from './tabs/AddCardTab.jsx';
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio' },
@@ -56,16 +57,12 @@ export default function CreditCardsApp() {
       </div>
 
       <div style={{ padding: '1.5rem 2rem' }}>
-        {tab === 'portfolio' ? (
-          <PortfolioTab />
-        ) : (
+        {tab === 'portfolio' && <PortfolioTab />}
+        {tab === 'add' && <AddCardTab />}
+        {!['portfolio', 'add'].includes(tab) && (
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '40vh',
-            color: 'rgba(255,255,255,0.25)',
-            fontSize: '1.1rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',
           }}>
             Coming Soon
           </div>
