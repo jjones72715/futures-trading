@@ -1,5 +1,5 @@
 exports.handler = async (event) => {
-  const TOKEN = process.env.AIRTABLE_API_KEY;
+  const TOKEN = process.env.AIRTABLE_API_KEY || "patIocMMJeO1lbzlm.d9ea1e76994175893ff166925528aed82f3caea1eb9126a096b16cebade88cd5";
   const BASE_URL = "https://api.airtable.com/v0";
   const path = event.path.replace('/.netlify/functions/cc-airtable', '');
   const url = `${BASE_URL}${path}${event.rawQuery ? '?' + event.rawQuery : ''}`;
