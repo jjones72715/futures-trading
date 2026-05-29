@@ -1,7 +1,7 @@
 const STATUS_COLORS = {
-  'Safe': '#00E676',
-  'Review Soon': '#FFD60A',
-  'Call Retention': '#FF4D4D',
+  '✅ Safe': '#00E676',
+  '⚠️ Review Soon': '#FFD60A',
+  '🚨 Call Retention': '#FF4D4D',
 };
 
 export function StatusBadge({ status }) {

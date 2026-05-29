@@ -9,14 +9,13 @@ import { CardRow } from '../components/CardRow.jsx';
 
 const FIELDS = [
   'Card Name',
-  'Name',
   'Issuer',
   'Personal/Business',
-  'Rewards Program',
-  'Annual Fee',
+  'Program Name (from Rewards Program)',
+  'Annual Fee Amount',
   'Days Until Annual Fee',
   'Annual Fee Status',
-  'Cancel Risk',
+  'Cancel Risk Level',
   'Status',
   'Owner',
 ];
@@ -31,14 +30,14 @@ export function PortfolioTab() {
     setLoading(true);
     fetchTable(PORTFOLIO_TABLE, FIELDS)
       .then(records => {
-        const active = records.filter(r => r.fields['Status'] === 'Active');
+        const active = records.filter(r => r.fields['Status']?.name === 'Active');
         setCards(active);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
-  const totalFees = cards.reduce((sum, c) => sum + (c.fields['Annual Fee'] || 0), 0);
+  const totalFees = cards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
   const dueSoon = cards.filter(c => (c.fields['Days Until Annual Fee'] ?? Infinity) <= 60).length;
 
   const personGroups = Object.entries(PEOPLE).map(([id, name]) => ({
@@ -48,7 +47,7 @@ export function PortfolioTab() {
       .filter(c => {
         const owner = c.fields['Owner'];
         const owners = Array.isArray(owner) ? owner : (owner ? [owner] : []);
-        return owners.includes(id);
+        return owners.some(o => (typeof o === 'object' ? o.id : o) === id);
       })
       .sort((a, b) => {
         const da = a.fields['Days Until Annual Fee'] ?? Infinity;
@@ -88,7 +87,7 @@ export function PortfolioTab() {
       <PersonFilter selected={selectedPerson} onChange={setSelectedPerson} />
 
       {filteredGroups.map(group => {
-        const groupFees = group.cards.reduce((sum, c) => sum + (c.fields['Annual Fee'] || 0), 0);
+        const groupFees = group.cards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
         return (
           <div key={group.id} style={{
             background: '#172033',

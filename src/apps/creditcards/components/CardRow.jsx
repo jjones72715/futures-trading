@@ -8,10 +8,23 @@ const RISK_COLORS = {
   High: '#FF4D4D',
 };
 
+function extractProgramName(field) {
+  if (!field) return '—';
+  if (typeof field === 'string') return field;
+  if (field.valuesByLinkedRecordId) {
+    const vals = Object.values(field.valuesByLinkedRecordId).flat();
+    const name = vals[0]?.name ?? vals[0];
+    return name || '—';
+  }
+  return '—';
+}
+
 export function CardRow({ card }) {
   const f = card.fields;
-  const cardType = f['Personal/Business'];
-  const riskColor = RISK_COLORS[f['Cancel Risk']] ?? 'rgba(255,255,255,0.4)';
+  const issuer = f['Issuer']?.name ?? f['Issuer'] ?? '—';
+  const cardType = f['Personal/Business']?.name ?? f['Personal/Business'];
+  const cancelRisk = f['Cancel Risk Level']?.name ?? f['Cancel Risk Level'];
+  const riskColor = RISK_COLORS[cancelRisk] ?? 'rgba(255,255,255,0.4)';
 
   return (
     <div style={{
@@ -24,10 +37,10 @@ export function CardRow({ card }) {
     }}>
       <div>
         <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>
-          {f['Card Name'] || f['Name'] || '—'}
+          {f['Card Name'] || '—'}
         </div>
         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-          {f['Issuer'] || '—'}
+          {issuer}
         </div>
       </div>
 
@@ -48,11 +61,11 @@ export function CardRow({ card }) {
       </div>
 
       <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)' }}>
-        {f['Rewards Program'] || '—'}
+        {extractProgramName(f['Program Name (from Rewards Program)'])}
       </div>
 
       <div style={{ fontSize: '0.85rem', color: '#fff' }}>
-        {$$(f['Annual Fee'])}
+        {$$(f['Annual Fee Amount'])}
       </div>
 
       <div>
@@ -64,7 +77,7 @@ export function CardRow({ card }) {
       </div>
 
       <div>
-        {f['Cancel Risk'] && (
+        {cancelRisk && (
           <span style={{
             padding: '2px 10px',
             borderRadius: 20,
@@ -74,7 +87,7 @@ export function CardRow({ card }) {
             color: riskColor,
             border: `1px solid ${riskColor}55`,
           }}>
-            {f['Cancel Risk']}
+            {cancelRisk}
           </span>
         )}
       </div>
