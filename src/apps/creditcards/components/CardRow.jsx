@@ -10,20 +10,16 @@ const RISK_COLORS = {
 
 function extractProgramName(field) {
   if (!field) return '—';
+  if (Array.isArray(field)) return field[0] || '—';
   if (typeof field === 'string') return field;
-  if (field.valuesByLinkedRecordId) {
-    const vals = Object.values(field.valuesByLinkedRecordId).flat();
-    const name = vals[0]?.name ?? vals[0];
-    return name || '—';
-  }
   return '—';
 }
 
 export function CardRow({ card }) {
   const f = card.fields;
-  const issuer = f['Issuer']?.name ?? f['Issuer'] ?? '—';
-  const cardType = f['Personal/Business']?.name ?? f['Personal/Business'];
-  const cancelRisk = f['Cancel Risk Level']?.name ?? f['Cancel Risk Level'];
+  const issuer = f['Issuer'] || '—';
+  const cardType = f['Personal/Business'];
+  const cancelRisk = f['Cancel Risk Level'];
   const riskColor = RISK_COLORS[cancelRisk] ?? 'rgba(255,255,255,0.4)';
 
   return (

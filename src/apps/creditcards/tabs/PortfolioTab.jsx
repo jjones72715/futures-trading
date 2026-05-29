@@ -30,7 +30,7 @@ export function PortfolioTab() {
     setLoading(true);
     fetchTable(PORTFOLIO_TABLE, FIELDS)
       .then(records => {
-        const active = records.filter(r => r.fields['Status']?.name === 'Active');
+        const active = records.filter(r => r.fields['Status'] === 'Active');
         setCards(active);
       })
       .catch(e => setError(e.message))
@@ -47,7 +47,7 @@ export function PortfolioTab() {
       .filter(c => {
         const owner = c.fields['Owner'];
         const owners = Array.isArray(owner) ? owner : (owner ? [owner] : []);
-        return owners.some(o => (typeof o === 'object' ? o.id : o) === id);
+        return owners.includes(id);
       })
       .sort((a, b) => {
         const da = a.fields['Days Until Annual Fee'] ?? Infinity;
