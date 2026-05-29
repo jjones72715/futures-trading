@@ -20,6 +20,25 @@ const FIELDS = [
   'Owner',
 ];
 
+function buildIssuerGroups(cards) {
+  const map = {};
+  cards.forEach(card => {
+    const issuer = card.fields['Issuer'] || 'Unknown';
+    if (!map[issuer]) map[issuer] = [];
+    map[issuer].push(card);
+  });
+  return Object.keys(map)
+    .sort((a, b) => a.localeCompare(b))
+    .map(issuer => ({
+      issuer,
+      cards: map[issuer].sort((a, b) => {
+        const da = a.fields['Days Until Annual Fee'] ?? Infinity;
+        const db = b.fields['Days Until Annual Fee'] ?? Infinity;
+        return da - db;
+      }),
+    }));
+}
+
 export function PortfolioTab() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,28 +56,18 @@ export function PortfolioTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  const totalFees = cards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
-  const dueSoon = cards.filter(c => (c.fields['Days Until Annual Fee'] ?? Infinity) <= 60).length;
-
-  const personGroups = Object.entries(PEOPLE).map(([id, name]) => ({
-    id,
-    name,
-    cards: cards
-      .filter(c => {
+  const visibleCards = selectedPerson === ALL_PEOPLE
+    ? cards
+    : cards.filter(c => {
         const owner = c.fields['Owner'];
         const owners = Array.isArray(owner) ? owner : (owner ? [owner] : []);
-        return owners.includes(id);
-      })
-      .sort((a, b) => {
-        const da = a.fields['Days Until Annual Fee'] ?? Infinity;
-        const db = b.fields['Days Until Annual Fee'] ?? Infinity;
-        return da - db;
-      }),
-  })).filter(g => g.cards.length > 0);
+        const personId = Object.entries(PEOPLE).find(([, name]) => name === selectedPerson)?.[0];
+        return personId ? owners.includes(personId) : true;
+      });
 
-  const filteredGroups = selectedPerson === ALL_PEOPLE
-    ? personGroups
-    : personGroups.filter(g => g.name === selectedPerson);
+  const totalFees = visibleCards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
+  const dueSoon = visibleCards.filter(c => (c.fields['Days Until Annual Fee'] ?? Infinity) <= 60).length;
+  const issuerGroups = buildIssuerGroups(visibleCards);
 
   if (loading) {
     return (
@@ -79,17 +88,17 @@ export function PortfolioTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-        <StatCard label="Total Active Cards" value={cards.length} />
+        <StatCard label="Total Active Cards" value={visibleCards.length} />
         <StatCard label="Total Annual Fees" value={$$(totalFees)} accent="#00E676" />
         <StatCard label="Cards Due Soon (≤60d)" value={dueSoon} accent="#FFD60A" />
       </div>
 
       <PersonFilter selected={selectedPerson} onChange={setSelectedPerson} />
 
-      {filteredGroups.map(group => {
+      {issuerGroups.map(group => {
         const groupFees = group.cards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
         return (
-          <div key={group.id} style={{
+          <div key={group.issuer} style={{
             background: '#172033',
             borderRadius: 12,
             border: '1px solid rgba(255,255,255,0.08)',
@@ -102,8 +111,8 @@ export function PortfolioTab() {
               alignItems: 'center',
               justifyContent: 'space-between',
             }}>
-              <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>
-                {group.name}
+              <span style={{ fontWeight: 700, color: '#00D4FF', fontSize: '0.95rem' }}>
+                {group.issuer}
                 <span style={{ marginLeft: 8, fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
                   {group.cards.length} card{group.cards.length !== 1 ? 's' : ''}
                 </span>
@@ -120,7 +129,7 @@ export function PortfolioTab() {
               padding: '0.5rem 1rem',
               borderBottom: '1px solid rgba(255,255,255,0.05)',
             }}>
-              {['Card', 'Type', 'Rewards', 'Annual Fee', 'Days', 'Status', 'Risk', ''].map((h, i) => (
+              {['Card', 'Type', 'Rewards', 'Annual Fee', 'Days', 'AF Status', 'Risk', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {h}
                 </span>
@@ -134,7 +143,7 @@ export function PortfolioTab() {
         );
       })}
 
-      {filteredGroups.length === 0 && (
+      {issuerGroups.length === 0 && (
         <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: '3rem' }}>
           No active cards found.
         </div>
