@@ -54,6 +54,10 @@ export function TraderPLTab() {
     load();
   }, []);
 
+  const selectedTrader = traders.find(t => t.id === traderId);
+  const isRolly = selectedTrader?.name?.toLowerCase().includes("rolly") ||
+                  selectedTrader?.preferredName?.toLowerCase().includes("rolly");
+
   const traderPurchases = purchases.filter(p => {
     const tid = typeof p.trader === "object" ? p.trader?.id : p.trader;
     return tid === traderId && p.status === "Active";
@@ -68,6 +72,15 @@ export function TraderPLTab() {
   const payoutRows = traderPayouts.map(p => {
     const gross = p.totalAmount || 0;
     const tierPct = p.tierPct || 0;
+
+    if (isRolly) {
+      const tierAmt = gross * tierPct;
+      const loanFund = gross * 0.30;
+      const x80 = (gross - tierAmt - loanFund) * 0.80;
+      const profitPerFamily = x80 / 4;
+      return { ...p, gross, tierPct, tierAmt, loanFund, x80, profitPerFamily };
+    }
+
     const afterTier = gross * (1 - tierPct);
     const after65 = afterTier * 0.65;
     const tax = gross * 0.10;
@@ -76,9 +89,20 @@ export function TraderPLTab() {
   }).sort((a, b) => (b.dateReceived || "").localeCompare(a.dateReceived || ""));
 
   const totalPayouts = payoutRows.reduce((s, r) => s + r.gross, 0);
-  const totalTaxes = payoutRows.reduce((s, r) => s + r.tax, 0);
-  const totalProfit = payoutRows.reduce((s, r) => s + r.profit, 0);
-  const totalTraderFees = payoutRows.reduce((s, r) => s + r.afterTier * 0.35, 0);
+
+  // Rolly totals
+  const rollyTotalLoanFund = isRolly ? payoutRows.reduce((s, r) => s + (r.loanFund || 0), 0) : 0;
+  const rollyNetProfit = isRolly ? payoutRows.reduce((s, r) => s + (r.x80 || 0), 0) : 0;
+  const rollyProfitPerFamily = rollyNetProfit / 4;
+  const rollyTraderFees = isRolly ? payoutRows.reduce((s, r) => {
+    const pool = r.gross - (r.tierAmt || 0) - (r.loanFund || 0);
+    return s + pool * 0.20;
+  }, 0) : 0;
+
+  // Standard totals
+  const totalTaxes = payoutRows.reduce((s, r) => s + (r.tax || 0), 0);
+  const totalProfit = payoutRows.reduce((s, r) => s + (r.profit || 0), 0);
+  const totalTraderFees = payoutRows.reduce((s, r) => s + ((r.afterTier || 0) * 0.35), 0);
 
   const C = { card: "#111827", border: "#1f2937" };
   const pill = (active) => ({
@@ -120,11 +144,24 @@ export function TraderPLTab() {
         <>
           {/* Summary row */}
           <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-            {SummaryCard({ label: "Total Spent", value: $$(totalSpent), color: "#f87171" })}
-            {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
-            {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: traders.find(t => t.id === traderId)?.taxAccount ? `Tax Account: ${traders.find(t => t.id === traderId).taxAccount}` : null })}
-            {SummaryCard({ label: "Net Profit", value: $$(totalProfit), color: totalProfit >= 0 ? "#4ade80" : "#f87171" })}
-            {SummaryCard({ label: "Trader Fees", value: $$(totalTraderFees), color: "#a78bfa" })}
+            {isRolly ? (
+              <>
+                {SummaryCard({ label: "Total Spent", value: $$(totalSpent), color: "#f87171" })}
+                {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
+                {SummaryCard({ label: "Total Loan Fund", value: $$(rollyTotalLoanFund), color: "#f87171" })}
+                {SummaryCard({ label: "Net Profit (×80%)", value: $$(rollyNetProfit), color: rollyNetProfit >= 0 ? "#4ade80" : "#f87171" })}
+                {SummaryCard({ label: "Profit Per Family", value: $$(rollyProfitPerFamily), color: "#4ade80" })}
+                {SummaryCard({ label: "Trader Fees", value: $$(rollyTraderFees), color: "#a78bfa" })}
+              </>
+            ) : (
+              <>
+                {SummaryCard({ label: "Total Spent", value: $$(totalSpent), color: "#f87171" })}
+                {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
+                {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: traders.find(t => t.id === traderId)?.taxAccount ? `Tax Account: ${traders.find(t => t.id === traderId).taxAccount}` : null })}
+                {SummaryCard({ label: "Net Profit", value: $$(totalProfit), color: totalProfit >= 0 ? "#4ade80" : "#f87171" })}
+                {SummaryCard({ label: "Trader Fees", value: $$(totalTraderFees), color: "#a78bfa" })}
+              </>
+            )}
           </div>
 
           {/* Payouts breakdown */}
@@ -144,14 +181,20 @@ export function TraderPLTab() {
                       <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb" }}>{r.name || r.dateReceived || "Payout"}</span>
                       <span style={{ fontSize: 11, color: "#6b7280" }}>{r.dateReceived || "—"}</span>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-                      {[
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${isRolly ? 5 : 5}, 1fr)`, gap: 8 }}>
+                      {(isRolly ? [
+                        ["Gross Payout", $$(r.gross), "#60a5fa"],
+                        [`Tier (${Math.round(r.tierPct * 100)}%)`, `−${$$(r.tierAmt)}`, "#f87171"],
+                        ["Loan Fund (30%)", `−${$$(r.loanFund)}`, "#f87171"],
+                        ["× 80%", $$(r.x80), "#60a5fa"],
+                        ["Profit Per Family", $$(r.profitPerFamily), "#4ade80"],
+                      ] : [
                         ["Gross Payout", $$(r.gross), "#60a5fa"],
                         [`Tier (${Math.round(r.tierPct * 100)}%)`, `−${$$(r.gross * r.tierPct)}`, "#f87171"],
                         ["× 65%", $$(r.after65), "#a78bfa"],
                         ["Taxes (10%)", `−${$$(r.tax)}`, "#fbbf24"],
                         ["Profit", $$(r.profit), r.profit >= 0 ? "#4ade80" : "#f87171"],
-                      ].map(([lbl, val, color]) => (
+                      ]).map(([lbl, val, color]) => (
                         <div key={lbl} style={{ textAlign: "center", background: "#0d1117", borderRadius: 8, padding: "10px 6px" }}>
                           <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 5 }}>{lbl}</div>
                           <div style={{ fontSize: 13, fontWeight: 800, color }}>{val}</div>
