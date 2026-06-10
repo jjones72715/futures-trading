@@ -4,6 +4,7 @@ import { HOTELS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
+const HOTEL_BRANDS = ['Hyatt', 'Marriott', 'Hilton', 'IHG', 'Wyndham', 'Best Western', 'Choice Hotels', 'Radisson', 'Other'];
 const HOW_EARNED = ['Anniversary', 'Welcome Offer', 'Spend Threshold', 'Other'];
 const RESET_CYCLES = ['Annual', 'Anniversary', 'Semi-Annual', 'Monthly', 'One-Time'];
 
@@ -12,6 +13,7 @@ const EMPTY = {
   cardId: '',
   personId: '',
   recordType: '',
+  hotelBrand: '',
   howEarned: '',
   spendThreshold: '',
   benefitType: '',
@@ -105,6 +107,7 @@ export function AddHotelBenefitTab() {
     if (form.name.trim())        fields['Name'] = form.name.trim();
     if (form.howEarned)          fields['How Earned'] = form.howEarned;
     if (form.spendThreshold)     fields['Spend Threshold Amount'] = parseFloat(form.spendThreshold);
+    if (form.hotelBrand)         fields['Hotel Brand'] = form.hotelBrand;
     if (form.benefitType.trim()) fields['Benefit Type'] = form.benefitType.trim();
     if (form.resetCycle)         fields['Reset Cycle'] = form.resetCycle;
     if (form.nextResetDate)      fields['Next Reset Date'] = form.nextResetDate;
@@ -136,6 +139,14 @@ export function AddHotelBenefitTab() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {RECORD_TYPES.map(t => pill('recordType', t))}
+        </div>
+      </div>
+
+      {/* Hotel Brand */}
+      <div style={card}>
+        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Hotel Brand</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {HOTEL_BRANDS.map(b => pill('hotelBrand', b))}
         </div>
       </div>
 

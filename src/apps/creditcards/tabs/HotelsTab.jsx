@@ -17,6 +17,7 @@ const FIELDS = [
   'Card',
   'Person',
   'Record Type',
+  'Hotel Brand',
   'Benefit Type',
   'Estimated Value',
   'Expiration Date',
@@ -162,12 +163,12 @@ export function HotelsTab() {
         {/* Header */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr 1.2fr 90px 90px 80px',
+          gridTemplateColumns: '2fr 100px 1fr 1.2fr 90px 90px 80px',
           gap: '0.75rem',
           padding: '0.5rem 1rem',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
-          {['Card', 'Person', 'Benefit Type', 'Est. Value', 'Expires', 'Days Left'].map((h, i) => (
+          {['Card', 'Brand', 'Person', 'Benefit Type', 'Est. Value', 'Expires', 'Days Left'].map((h, i) => (
             <span key={i} style={{
               fontSize: '0.7rem',
               fontWeight: 600,
@@ -191,7 +192,7 @@ export function HotelsTab() {
               key={r.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 1.2fr 90px 90px 80px',
+                gridTemplateColumns: '2fr 100px 1fr 1.2fr 90px 90px 80px',
                 gap: '0.75rem',
                 padding: '0.65rem 1rem',
                 borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -201,6 +202,9 @@ export function HotelsTab() {
             >
               <span style={{ fontSize: '0.85rem', color: expiring ? '#FFD700' : '#fff', fontWeight: 500 }}>
                 {cardIds.length ? cardIds.map(id => cardNames[id] || id).join(', ') : '—'}
+              </span>
+              <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)' }}>
+                {r.fields['Hotel Brand'] || '—'}
               </span>
               <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>
                 {getPersonName(personIds)}
