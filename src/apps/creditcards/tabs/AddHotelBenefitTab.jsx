@@ -15,7 +15,6 @@ const EMPTY = {
   howEarned: '',
   spendThreshold: '',
   benefitType: '',
-  benefitValue: '',
   resetCycle: '',
   nextResetDate: '',
   estimatedValue: '',
@@ -107,7 +106,6 @@ export function AddHotelBenefitTab() {
     if (form.howEarned)          fields['How Earned'] = form.howEarned;
     if (form.spendThreshold)     fields['Spend Threshold Amount'] = parseFloat(form.spendThreshold);
     if (form.benefitType.trim()) fields['Benefit Type'] = form.benefitType.trim();
-    if (form.benefitValue)       fields['Benefit Value'] = parseFloat(form.benefitValue);
     if (form.resetCycle)         fields['Reset Cycle'] = form.resetCycle;
     if (form.nextResetDate)      fields['Next Reset Date'] = form.nextResetDate;
     if (form.estimatedValue)     fields['Estimated Value'] = parseFloat(form.estimatedValue);
@@ -115,12 +113,14 @@ export function AddHotelBenefitTab() {
     if (form.notes.trim())       fields['Notes'] = form.notes.trim();
 
     try {
-      await createRecord(HOTELS_TABLE, fields);
+      const result = await createRecord(HOTELS_TABLE, fields);
+      console.log('Hotel benefit created:', result);
       setSuccess(true);
       setForm(EMPTY);
-      setTimeout(() => setSuccess(false), 5000);
+      setTimeout(() => setSuccess(false), 6000);
     } catch (err) {
-      setError(err.message);
+      console.error('Hotel benefit save error:', err);
+      setError(String(err.message || err));
     } finally {
       setSubmitting(false);
     }
@@ -128,17 +128,6 @@ export function AddHotelBenefitTab() {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 780 }}>
-
-      {success && (
-        <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.85rem 1rem', color: '#00E676', fontWeight: 600 }}>
-          Hotel benefit added successfully!
-        </div>
-      )}
-      {error && (
-        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 10, padding: '0.85rem 1rem', color: '#FF4D4D' }}>
-          {error}
-        </div>
-      )}
 
       {/* Record Type */}
       <div style={card}>
@@ -191,10 +180,6 @@ export function AddHotelBenefitTab() {
             <div>
               <label style={lbl}>Benefit Type</label>
               <input style={inp} value={form.benefitType} onChange={set('benefitType')} placeholder="e.g. Cat 1-4, $250 Statement Credit" />
-            </div>
-            <div>
-              <label style={lbl}>Benefit Value ($)</label>
-              <input style={inp} type="number" min="0" value={form.benefitValue} onChange={set('benefitValue')} placeholder="0" />
             </div>
             <div>
               <label style={lbl}>Estimated Value ($)</label>
@@ -251,6 +236,17 @@ export function AddHotelBenefitTab() {
           placeholder="Any additional notes…"
         />
       </div>
+
+      {success && (
+        <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.85rem 1rem', color: '#00E676', fontWeight: 600 }}>
+          Hotel benefit added successfully!
+        </div>
+      )}
+      {error && (
+        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 10, padding: '0.85rem 1rem', color: '#FF4D4D' }}>
+          {error}
+        </div>
+      )}
 
       <button type="submit" disabled={submitting} style={{
         padding: '0.85rem 2rem', borderRadius: 10, border: 'none',

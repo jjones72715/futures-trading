@@ -18,7 +18,6 @@ const FIELDS = [
   'Person',
   'Record Type',
   'Benefit Type',
-  'Benefit Value',
   'Estimated Value',
   'Expiration Date',
   'Days Until Expiration',
@@ -159,7 +158,7 @@ export function HotelsTab() {
           padding: '0.5rem 1rem',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
-          {['Card', 'Person', 'Benefit Type', 'Value', 'Expires', 'Days Left'].map((h, i) => (
+          {['Card', 'Person', 'Benefit Type', 'Est. Value', 'Expires', 'Days Left'].map((h, i) => (
             <span key={i} style={{
               fontSize: '0.7rem',
               fontWeight: 600,
@@ -201,7 +200,7 @@ export function HotelsTab() {
                 {r.fields['Benefit Type'] || '—'}
               </span>
               <span style={{ fontSize: '0.82rem', color: '#00E676' }}>
-                {num(r.fields['Benefit Value']) != null ? $$(num(r.fields['Benefit Value'])) : '—'}
+                {num(r.fields['Estimated Value']) != null ? $$(num(r.fields['Estimated Value'])) : '—'}
               </span>
               <span style={{ fontSize: '0.82rem', color: expiring ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>
                 {r.fields['Expiration Date'] || '—'}
