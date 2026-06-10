@@ -5,3 +5,4 @@ export const PEOPLE_TABLE = 'tblGTOHsWr4fDDd67';
 export const BANKS_TABLE = 'tblVnRcTlLJ0EAp9N';
 export const CARD_PRODUCTS_TABLE = 'tbloTLQR2DwcqR2Vq';
 export const PRODUCT_CHANGES_TABLE = 'tblIyVI8mUwuZxsnX';
+export const HOTELS_TABLE = 'tblAu5dxcrnVkv3ki';
