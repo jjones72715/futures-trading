@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { createRecord, fetchTable } from '../services/airtable.js';
+import { createRecord, fetchTable, fetchFieldChoices } from '../services/airtable.js';
 import { HOTELS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
-const HOTEL_BRANDS = ['Hyatt', 'Marriott', 'Hilton', 'IHG', 'Wyndham', 'Best Western', 'Choice Hotels', 'Radisson', 'Other'];
 const HOW_EARNED = ['Anniversary', 'Welcome Offer', 'Spend Threshold', 'Other'];
 const RESET_CYCLES = ['Annual', 'Anniversary', 'Semi-Annual', 'Monthly', 'One-Time'];
 
@@ -34,7 +33,7 @@ const lbl = {
   color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase',
   letterSpacing: '0.05em', marginBottom: 5,
 };
-const card = {
+const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
   padding: '1.25rem 1.5rem',
 };
@@ -56,24 +55,39 @@ function PillBtn({ active, onClick, children }) {
 
 export function AddHotelBenefitTab() {
   const [form, setForm] = useState(EMPTY);
-  const [cards, setCards] = useState([]);
-  const [cardsLoading, setCardsLoading] = useState(true);
+  const [allCards, setAllCards] = useState([]);
+  const [hotelBrands, setHotelBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Status'])
-      .then(records => {
-        const active = records
+    Promise.all([
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Status', 'Owner'])
+        .then(records => records
           .filter(r => r.fields['Status'] === 'Active')
-          .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setCards(active);
+          .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+        ),
+      fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand'),
+    ])
+      .then(([cards, brands]) => {
+        setAllCards(cards);
+        setHotelBrands(brands);
       })
-      .catch(() => setCards([]))
-      .finally(() => setCardsLoading(false));
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
+
+  // When person changes, clear card selection
+  function selectPerson(id) {
+    setForm(prev => ({ ...prev, personId: prev.personId === id ? '' : id, cardId: '' }));
+  }
+
+  const filteredCards = form.personId
+    ? allCards.filter(c => c.owners.includes(form.personId))
+    : [];
 
   function set(field) {
     return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
@@ -82,6 +96,7 @@ export function AddHotelBenefitTab() {
   function pill(field, value) {
     return (
       <PillBtn
+        key={value}
         active={form[field] === value}
         onClick={() => setForm(prev => ({ ...prev, [field]: prev[field] === value ? '' : value }))}
       >
@@ -94,9 +109,9 @@ export function AddHotelBenefitTab() {
     e.preventDefault();
     setError(null);
 
+    if (!form.personId)   { setError('Person is required.'); return; }
+    if (!form.cardId)     { setError('Card is required.'); return; }
     if (!form.recordType) { setError('Record Type is required.'); return; }
-    if (!form.cardId) { setError('Card is required.'); return; }
-    if (!form.personId) { setError('Person is required.'); return; }
 
     setSubmitting(true);
     const fields = {
@@ -105,9 +120,9 @@ export function AddHotelBenefitTab() {
       'Person': [form.personId],
     };
     if (form.name.trim())        fields['Name'] = form.name.trim();
+    if (form.hotelBrand)         fields['Hotel Brand'] = form.hotelBrand;
     if (form.howEarned)          fields['How Earned'] = form.howEarned;
     if (form.spendThreshold)     fields['Spend Threshold Amount'] = parseFloat(form.spendThreshold);
-    if (form.hotelBrand)         fields['Hotel Brand'] = form.hotelBrand;
     if (form.benefitType.trim()) fields['Benefit Type'] = form.benefitType.trim();
     if (form.resetCycle)         fields['Reset Cycle'] = form.resetCycle;
     if (form.nextResetDate)      fields['Next Reset Date'] = form.nextResetDate;
@@ -129,11 +144,59 @@ export function AddHotelBenefitTab() {
     }
   }
 
+  if (loading) {
+    return (
+      <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
+        Loading…
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 780 }}>
 
+      {/* Step 1 — Person */}
+      <div style={cardStyle}>
+        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
+          Person <span style={{ color: '#FF4D4D' }}>*</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {Object.entries(PEOPLE).map(([id, name]) => (
+            <PillBtn key={id} active={form.personId === id} onClick={() => selectPerson(id)}>
+              {name}
+            </PillBtn>
+          ))}
+        </div>
+      </div>
+
+      {/* Step 2 — Card (only after person selected) */}
+      {form.personId && (
+        <div style={cardStyle}>
+          <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
+            Card <span style={{ color: '#FF4D4D' }}>*</span>
+          </div>
+          {filteredCards.length === 0 ? (
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.88rem' }}>
+              No active cards found for {PEOPLE[form.personId]}.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {filteredCards.map(c => (
+                <PillBtn
+                  key={c.id}
+                  active={form.cardId === c.id}
+                  onClick={() => setForm(prev => ({ ...prev, cardId: prev.cardId === c.id ? '' : c.id }))}
+                >
+                  {c.name}
+                </PillBtn>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Record Type */}
-      <div style={card}>
+      <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
           Record Type <span style={{ color: '#FF4D4D' }}>*</span>
         </div>
@@ -142,45 +205,16 @@ export function AddHotelBenefitTab() {
         </div>
       </div>
 
-      {/* Hotel Brand */}
-      <div style={card}>
+      {/* Hotel Brand — live from Airtable */}
+      <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Hotel Brand</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {HOTEL_BRANDS.map(b => pill('hotelBrand', b))}
-        </div>
-      </div>
-
-      {/* Card */}
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
-          Card <span style={{ color: '#FF4D4D' }}>*</span>
-        </div>
-        <select style={inp} value={form.cardId} onChange={set('cardId')} disabled={cardsLoading}>
-          <option value="">{cardsLoading ? 'Loading cards…' : '— Select card —'}</option>
-          {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </div>
-
-      {/* Person */}
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
-          Person <span style={{ color: '#FF4D4D' }}>*</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {Object.entries(PEOPLE).map(([id, name]) => (
-            <PillBtn
-              key={id}
-              active={form.personId === id}
-              onClick={() => setForm(prev => ({ ...prev, personId: prev.personId === id ? '' : id }))}
-            >
-              {name}
-            </PillBtn>
-          ))}
+          {hotelBrands.map(b => pill('hotelBrand', b))}
         </div>
       </div>
 
       {/* Benefit Details */}
-      <div style={card}>
+      <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Benefit Details</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
@@ -201,9 +235,9 @@ export function AddHotelBenefitTab() {
       </div>
 
       {/* How Earned */}
-      <div style={card}>
+      <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>How Earned</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {HOW_EARNED.map(h => pill('howEarned', h))}
         </div>
         {form.howEarned === 'Spend Threshold' && (
@@ -215,7 +249,7 @@ export function AddHotelBenefitTab() {
       </div>
 
       {/* Reset & Expiration */}
-      <div style={card}>
+      <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Reset & Expiration</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
@@ -238,7 +272,7 @@ export function AddHotelBenefitTab() {
       </div>
 
       {/* Notes */}
-      <div style={card}>
+      <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Notes</div>
         <textarea
           style={{ ...inp, minHeight: 90, resize: 'vertical' }}

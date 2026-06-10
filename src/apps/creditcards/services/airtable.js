@@ -24,3 +24,11 @@ export async function createRecord(tableId, fields) {
   if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
   return data;
 }
+
+export async function fetchFieldChoices(tableId, fieldName) {
+  const res = await fetch(`/.netlify/functions/cc-airtable/meta/bases/${BASE}/tables`);
+  const data = await res.json();
+  const table = (data.tables || []).find(t => t.id === tableId);
+  const field = (table?.fields || []).find(f => f.name === fieldName);
+  return (field?.options?.choices || []).map(c => c.name);
+}
