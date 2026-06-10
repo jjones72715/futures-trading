@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchTable } from '../services/airtable.js';
-import { HOTELS_TABLE } from '../config/tables.js';
+import { HOTELS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
@@ -38,6 +38,7 @@ function getPersonName(personIds) {
 
 export function HotelsTab() {
   const [records, setRecords] = useState([]);
+  const [cardNames, setCardNames] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPerson, setSelectedPerson] = useState(ALL_PEOPLE);
@@ -45,8 +46,16 @@ export function HotelsTab() {
 
   useEffect(() => {
     setLoading(true);
-    fetchTable(HOTELS_TABLE, FIELDS)
-      .then(data => setRecords(data))
+    Promise.all([
+      fetchTable(HOTELS_TABLE, FIELDS),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name']),
+    ])
+      .then(([hotelData, cardData]) => {
+        const nameMap = {};
+        cardData.forEach(r => { nameMap[r.id] = r.fields['Card Name'] || r.id; });
+        setCardNames(nameMap);
+        setRecords(hotelData);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -175,7 +184,7 @@ export function HotelsTab() {
         {typeFiltered.map(r => {
           const expiring = num(r.fields['Expiring Soon']) === 1;
           const days = num(r.fields['Days Until Expiration']);
-          const cardNames = r.fields['Card'];
+          const cardIds = r.fields['Card'] || [];
           const personIds = r.fields['Person'] || [];
           return (
             <div
@@ -191,7 +200,7 @@ export function HotelsTab() {
               }}
             >
               <span style={{ fontSize: '0.85rem', color: expiring ? '#FFD700' : '#fff', fontWeight: 500 }}>
-                {Array.isArray(cardNames) ? cardNames.join(', ') : (cardNames || '—')}
+                {cardIds.length ? cardIds.map(id => cardNames[id] || id).join(', ') : '—'}
               </span>
               <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>
                 {getPersonName(personIds)}
