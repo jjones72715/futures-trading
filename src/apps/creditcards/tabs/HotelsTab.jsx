@@ -6,6 +6,12 @@ import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 
+function num(v) {
+  if (v == null || typeof v === 'object') return null;
+  const n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
 const FIELDS = [
   'Name',
   'Card',
@@ -63,9 +69,9 @@ export function HotelsTab() {
         return true;
       });
 
-  const expiringSoon = typeFiltered.filter(r => r.fields['Expiring Soon'] === 1);
+  const expiringSoon = typeFiltered.filter(r => num(r.fields['Expiring Soon']) === 1);
   const freeNightCount = typeFiltered.filter(r => r.fields['Record Type'] === 'Free Night').length;
-  const totalEstValue = typeFiltered.reduce((sum, r) => sum + (r.fields['Estimated Value'] || 0), 0);
+  const totalEstValue = typeFiltered.reduce((sum, r) => sum + (num(r.fields['Estimated Value']) || 0), 0);
 
   if (loading) {
     return (
@@ -102,7 +108,7 @@ export function HotelsTab() {
             Expiring Soon
           </span>
           {expiringSoon.map(r => {
-            const days = r.fields['Days Until Expiration'];
+            const days = num(r.fields['Days Until Expiration']);
             const name = r.fields['Name'] || r.fields['Benefit Type'] || 'Benefit';
             return (
               <span key={r.id} style={{ color: '#FFD700', fontSize: '0.82rem' }}>
@@ -168,8 +174,8 @@ export function HotelsTab() {
 
         {/* Rows */}
         {typeFiltered.map(r => {
-          const expiring = r.fields['Expiring Soon'] === 1;
-          const days = r.fields['Days Until Expiration'];
+          const expiring = num(r.fields['Expiring Soon']) === 1;
+          const days = num(r.fields['Days Until Expiration']);
           const cardNames = r.fields['Card'];
           const personIds = r.fields['Person'] || [];
           return (
@@ -195,17 +201,17 @@ export function HotelsTab() {
                 {r.fields['Benefit Type'] || '—'}
               </span>
               <span style={{ fontSize: '0.82rem', color: '#00E676' }}>
-                {r.fields['Benefit Value'] ? $$(r.fields['Benefit Value']) : '—'}
+                {num(r.fields['Benefit Value']) != null ? $$(num(r.fields['Benefit Value'])) : '—'}
               </span>
               <span style={{ fontSize: '0.82rem', color: expiring ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>
                 {r.fields['Expiration Date'] || '—'}
               </span>
               <span style={{
                 fontSize: '0.82rem',
-                color: expiring ? '#FFD700' : (days != null && days <= 90 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)'),
+                color: expiring ? '#FFD700' : (days !== null && days <= 90 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)'),
                 fontWeight: expiring ? 600 : 400,
               }}>
-                {days != null ? days : '—'}
+                {days !== null ? days : '—'}
               </span>
             </div>
           );
