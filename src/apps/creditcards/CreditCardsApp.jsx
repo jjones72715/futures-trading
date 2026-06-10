@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PortfolioTab } from './tabs/PortfolioTab.jsx';
 import { AddCardTab } from './tabs/AddCardTab.jsx';
 import { HotelsTab } from './tabs/HotelsTab.jsx';
+import { AddHotelBenefitTab } from './tabs/AddHotelBenefitTab.jsx';
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio' },
@@ -11,6 +12,7 @@ const TABS = [
   { id: 'actions', label: 'Card Actions' },
   { id: 'recommendations', label: 'Card Recommendations' },
   { id: 'add', label: 'Add Card' },
+  { id: 'add-hotel', label: 'Add Hotel Benefit' },
 ];
 
 export default function CreditCardsApp() {
@@ -62,7 +64,8 @@ export default function CreditCardsApp() {
         {tab === 'portfolio' && <PortfolioTab />}
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'add' && <AddCardTab />}
-        {!['portfolio', 'hotels', 'add'].includes(tab) && (
+        {tab === 'add-hotel' && <AddHotelBenefitTab />}
+        {!['portfolio', 'hotels', 'add', 'add-hotel'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',
