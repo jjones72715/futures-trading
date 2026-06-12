@@ -3,14 +3,6 @@ import { $$ } from "../utils/format.js";
 import { fetchTable, createRecord, updateRecord } from "../services/airtable.js";
 import { PURCHASE_TABLE, EVAL_TABLE, EVAL_TYPE_TABLE, TRADERS_TABLE, PERF_TABLE, PERF_TYPES_TABLE } from "../config/tables.js";
 
-const TRADERS = [
-  { id: "recmziqSnANAPjtuH", name: "Jonathan Jones" },
-  { id: "recG04aHVI38R6HnR", name: "Cherelyn Jones" },
-  { id: "rec0jB7J1Ir1ZspvM", name: "Amanda Seratt" },
-  { id: "reccHyxv7emOGQJsQ", name: "Jefferies Parker (Troy)" },
-  { id: "rec4l8EM9peAdyin4", name: "Judy Jones" },
-  { id: "recvSEg1nPtZCKujB", name: "Rolly Omas Obial" },
-];
 
 export function PurchaseTab() {
   const C = { bg: "#0d1117", card: "#1f2a37", border: "#2d3f50" };
@@ -44,6 +36,7 @@ export function PurchaseTab() {
   const [evalTypeList, setEvalTypeList] = useState([]);
   const [perfTypeListForPurchase, setPerfTypeListForPurchase] = useState([]);
   const [traderList, setTraderList] = useState([]);
+  const [traders, setTraders] = useState([]);
   const [purchaseCountsByTrader, setPurchaseCountsByTrader] = useState({});
   const [evalPriceEdits, setEvalPriceEdits] = useState({});
   const [allowedTraderEdits, setAllowedTraderEdits] = useState([]);
@@ -149,11 +142,15 @@ export function PurchaseTab() {
 
   async function loadTraders() {
     try {
-      const traders = await fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]);
-      setTraderList(traders.map(r => ({
+      const records = await fetchTable(TRADERS_TABLE, ["fldAD382QTLsEtCzD", "fldj6RWdKe0kcOpFu"]);
+      setTraders(records.map(r => ({
         id: r.id,
-        name: r.fields["Name"],
-        preferredName: r.fields["Preferred Name"] || r.fields["Name"].split(" ")[0],
+        name: r.fields["fldAD382QTLsEtCzD"] ?? r.fields["fldj6RWdKe0kcOpFu"] ?? "Unknown",
+      })));
+      setTraderList(records.map(r => ({
+        id: r.id,
+        name: r.fields["fldAD382QTLsEtCzD"] ?? "Unknown",
+        preferredName: r.fields["fldj6RWdKe0kcOpFu"] ?? (r.fields["fldAD382QTLsEtCzD"] ?? "Unknown").split(" ")[0],
       })).sort((a, b) => a.preferredName.localeCompare(b.preferredName)));
     } catch (e) {}
   }
@@ -434,6 +431,7 @@ export function PurchaseTab() {
               <>
                 {selectedEvalTypeForPanel && <EvalTypePricingPanel
                   evalType={selectedEvalTypeForPanel}
+                  traders={traders}
                   evalPriceEdits={evalPriceEdits}
                   setEvalPriceEdits={setEvalPriceEdits}
                   allowedTraderEdits={allowedTraderEdits}
@@ -643,7 +641,7 @@ export function PurchaseTab() {
   );
 }
 
-function EvalTypePricingPanel({ evalType, evalPriceEdits, setEvalPriceEdits, allowedTraderEdits, setAllowedTraderEdits, onSave }) {
+function EvalTypePricingPanel({ evalType, traders, evalPriceEdits, setEvalPriceEdits, allowedTraderEdits, setAllowedTraderEdits, onSave }) {
   const inp = { background: "#111827", border: "1px solid #374151", borderRadius: 6, padding: "6px 10px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
   const valueScoreColor = evalType.valueScore >= 10 ? "#4ade80" : evalType.valueScore >= 5 ? "#fbbf24" : evalType.valueScore ? "#f87171" : "#6b7280";
   const hasPriceEdits = Object.keys(evalPriceEdits).length > 0;
@@ -694,7 +692,7 @@ function EvalTypePricingPanel({ evalType, evalPriceEdits, setEvalPriceEdits, all
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Allowed Traders</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {TRADERS.map(trader => (
+          {traders.map(trader => (
             <label key={trader.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input
                 type="checkbox"
