@@ -42,7 +42,32 @@ async function fetchAllAirtableRecords(baseId, tableId, rawQuery) {
 exports.handler = async (event) => {
   const path = event.path.replace('/.netlify/functions/airtable', '');
   const method = event.httpMethod;
+  const params = new URLSearchParams(event.rawQuery || '');
+  const action = params.get('action');
   const pathParts = path.split('/').filter(Boolean);
+
+  if (action === 'updateEvalType') {
+    const { recordId, newEvalCost, resetEvalCost, activationCost, allowedTraders } = JSON.parse(event.body);
+    const fields = {};
+    if (newEvalCost    !== undefined) fields['fldUdq0uk6K02ogyZ'] = newEvalCost;
+    if (resetEvalCost  !== undefined) fields['fld2lnZop14MFQPAa'] = resetEvalCost;
+    if (activationCost !== undefined) fields['fldW2mpQiod4UJQwe'] = activationCost;
+    if (allowedTraders !== undefined) fields['fldXy6mjxVJ53An62'] = allowedTraders;
+    try {
+      const res = await fetch(
+        `${BASE_URL}/app5RPYcCy7hqCu41/tbleHzHF5FgskLxs3/${recordId}`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        }
+      );
+      const data = await res.json();
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) };
+    } catch (e) {
+      return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+    }
+  }
 
   // Table-level GET: /{baseId}/{tableId} — paginate and filter server-side
   if (method === 'GET' && pathParts.length === 2) {

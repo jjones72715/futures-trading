@@ -3,6 +3,15 @@ import { $$ } from "../utils/format.js";
 import { fetchTable, createRecord, updateRecord } from "../services/airtable.js";
 import { PURCHASE_TABLE, EVAL_TABLE, EVAL_TYPE_TABLE, TRADERS_TABLE, PERF_TABLE, PERF_TYPES_TABLE } from "../config/tables.js";
 
+const TRADERS = [
+  { id: "recmziqSnANAPjtuH", name: "Jonathan Jones" },
+  { id: "recG04aHVI38R6HnR", name: "Cherelyn Jones" },
+  { id: "rec0jB7J1Ir1ZspvM", name: "Amanda Seratt" },
+  { id: "reccHyxv7emOGQJsQ", name: "Jefferies Parker (Troy)" },
+  { id: "rec4l8EM9peAdyin4", name: "Judy Jones" },
+  { id: "recvSEg1nPtZCKujB", name: "Rolly Omas Obial" },
+];
+
 export function PurchaseTab() {
   const C = { bg: "#0d1117", card: "#1f2a37", border: "#2d3f50" };
   const sel = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
@@ -36,6 +45,8 @@ export function PurchaseTab() {
   const [perfTypeListForPurchase, setPerfTypeListForPurchase] = useState([]);
   const [traderList, setTraderList] = useState([]);
   const [purchaseCountsByTrader, setPurchaseCountsByTrader] = useState({});
+  const [evalPriceEdits, setEvalPriceEdits] = useState({});
+  const [allowedTraderEdits, setAllowedTraderEdits] = useState([]);
 
   useEffect(() => {
     loadActivePurchases();
@@ -45,6 +56,27 @@ export function PurchaseTab() {
     loadTraders();
     loadStraightToFundedTypes();
   }, []);
+
+  const selectedEvalTypeForPanel = evalTypeList.find(t => t.id === evalTypeId && !evalTypeId.startsWith("perf:"));
+
+  useEffect(() => {
+    setEvalPriceEdits({});
+    setAllowedTraderEdits(selectedEvalTypeForPanel?.allowedTraders ?? []);
+  }, [evalTypeId]);
+
+  async function handleSaveEvalTypeChanges() {
+    await fetch("/.netlify/functions/airtable?action=updateEvalType", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recordId: selectedEvalTypeForPanel.id,
+        ...evalPriceEdits,
+        allowedTraders: allowedTraderEdits,
+      }),
+    });
+    setEvalPriceEdits({});
+    await loadEvalTypes();
+  }
 
   async function loadActivePurchases() {
     setLoadingActive(true);
@@ -81,8 +113,21 @@ export function PurchaseTab() {
 
   async function loadEvalTypes() {
     try {
-      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight"]);
-      setEvalTypeList(evalTypes.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0, drawdownLimit: r.fields["Drawdown Limit"] || 0, accountWeight: r.fields["Account Weight"] || null })).sort((a, b) => a.name.localeCompare(b.name)));
+      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]);
+      setEvalTypeList(evalTypes.map(r => ({
+        id: r.id,
+        name: r.fields["Name"],
+        accountSize: r.fields["Account Size"] || 0,
+        cost: r.fields["Cost Per Account"] || 0,
+        drawdownLimit: r.fields["Drawdown Limit"] || 0,
+        accountWeight: r.fields["Account Weight"] || null,
+        consistencyPct: r.fields["Consistency %"] ?? null,
+        newEvalCost: r.fields["New Eval Cost"] ?? null,
+        resetEvalCost: r.fields["Reset Eval Cost"] ?? null,
+        activationCost: r.fields["Activation Cost"] ?? null,
+        valueScore: r.fields["Value Score"] ?? null,
+        allowedTraders: (r.fields["Allowed Traders"] ?? []).map(t => typeof t === "object" ? t.id : t),
+      })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {}
   }
 
@@ -387,6 +432,14 @@ export function PurchaseTab() {
 
             {selectedPurchaseId && (
               <>
+                {selectedEvalTypeForPanel && <EvalTypePricingPanel
+                  evalType={selectedEvalTypeForPanel}
+                  evalPriceEdits={evalPriceEdits}
+                  setEvalPriceEdits={setEvalPriceEdits}
+                  allowedTraderEdits={allowedTraderEdits}
+                  setAllowedTraderEdits={setAllowedTraderEdits}
+                  onSave={handleSaveEvalTypeChanges}
+                />}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                   <div>
                     {label("Purchase Date")}
@@ -484,6 +537,15 @@ export function PurchaseTab() {
               </select>
             </div>
 
+            {selectedEvalTypeForPanel && <EvalTypePricingPanel
+              evalType={selectedEvalTypeForPanel}
+              evalPriceEdits={evalPriceEdits}
+              setEvalPriceEdits={setEvalPriceEdits}
+              allowedTraderEdits={allowedTraderEdits}
+              setAllowedTraderEdits={setAllowedTraderEdits}
+              onSave={handleSaveEvalTypeChanges}
+            />}
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
               <div>
                 {label("Date")}
@@ -577,6 +639,85 @@ export function PurchaseTab() {
           });
         })()}
       </div>
+    </div>
+  );
+}
+
+function EvalTypePricingPanel({ evalType, evalPriceEdits, setEvalPriceEdits, allowedTraderEdits, setAllowedTraderEdits, onSave }) {
+  const inp = { background: "#111827", border: "1px solid #374151", borderRadius: 6, padding: "6px 10px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
+  const valueScoreColor = evalType.valueScore >= 10 ? "#4ade80" : evalType.valueScore >= 5 ? "#fbbf24" : evalType.valueScore ? "#f87171" : "#6b7280";
+  const hasPriceEdits = Object.keys(evalPriceEdits).length > 0;
+  const hasTraderEdits = JSON.stringify([...allowedTraderEdits].sort()) !== JSON.stringify([...(evalType.allowedTraders ?? [])].sort());
+  const isDirty = hasPriceEdits || hasTraderEdits;
+
+  return (
+    <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 12 }}>
+        {evalType.name} — Pricing &amp; Settings
+      </div>
+
+      {/* Read-only stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+        {[
+          { label: "Drawdown", value: `$${(evalType.drawdownLimit ?? 0).toLocaleString()}` },
+          { label: "Consistency", value: evalType.consistencyPct != null ? `${Math.round(evalType.consistencyPct * 100)}%` : "100%" },
+          { label: "Value Score", value: evalType.valueScore ?? "—", color: valueScoreColor },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{ background: "#1f2937", borderRadius: 6, padding: "8px 6px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 3 }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: color ?? "#fff" }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Editable price fields */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+        {[
+          { label: "New Eval Cost", key: "newEvalCost" },
+          { label: "Reset Eval Cost", key: "resetEvalCost" },
+          { label: "Activation Cost", key: "activationCost" },
+        ].map(({ label, key }) => (
+          <div key={key}>
+            <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 4 }}>{label}</div>
+            <input
+              type="number"
+              value={evalPriceEdits[key] !== undefined ? evalPriceEdits[key] : (evalType[key] ?? "")}
+              onChange={e => setEvalPriceEdits(prev => ({ ...prev, [key]: e.target.value === "" ? null : Number(e.target.value) }))}
+              style={inp}
+              placeholder="$0"
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Allowed Traders */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Allowed Traders</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {TRADERS.map(trader => (
+            <label key={trader.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={allowedTraderEdits.includes(trader.id)}
+                onChange={e => setAllowedTraderEdits(prev =>
+                  e.target.checked ? [...prev, trader.id] : prev.filter(id => id !== trader.id)
+                )}
+                style={{ accentColor: "#3b82f6", width: 14, height: 14 }}
+              />
+              <span style={{ fontSize: 12, color: "#e5e7eb" }}>{trader.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {isDirty && (
+        <button
+          onClick={onSave}
+          style={{ width: "100%", padding: "8px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+        >
+          Save Eval Type Changes
+        </button>
+      )}
     </div>
   );
 }
