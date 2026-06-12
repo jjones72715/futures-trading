@@ -1,9 +1,10 @@
 import React from "react";
 import { $$ } from "../utils/format.js";
-import { updateRecord, createRecord } from "../services/airtable.js";
-import { EVAL_TABLE, PURCHASE_TABLE } from "../config/tables.js";
+import { updateRecord, createRecord, fetchTable } from "../services/airtable.js";
+import { EVAL_TABLE, PURCHASE_TABLE, EVAL_TYPE_TABLE } from "../config/tables.js";
+import { EvalTypePricingPanel } from "./EvalTypePricingPanel.jsx";
 
-export function BreachModal({ account, evalTypeList, onClose, onBreached }) {
+export function BreachModal({ account, evalTypeList, traders = [], onClose, onBreached }) {
   const today = new Date().toISOString().slice(0, 10);
   const [step, setStep] = React.useState("choice");
   const [evalTypeId, setEvalTypeId] = React.useState(account.accountTypeId || "");
@@ -19,6 +20,46 @@ export function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   const [accountWeightOverride, setAccountWeightOverride] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [err, setErr] = React.useState(null);
+  const [evalPriceEdits, setEvalPriceEdits] = React.useState({});
+  const [allowedTraderEdits, setAllowedTraderEdits] = React.useState([]);
+  const [localEvalTypeList, setLocalEvalTypeList] = React.useState(evalTypeList);
+
+  const selectedEvalTypePricing = localEvalTypeList.find(t => t.id === evalTypeId) ?? null;
+
+  React.useEffect(() => {
+    setEvalPriceEdits({});
+    setAllowedTraderEdits(selectedEvalTypePricing?.allowedTraders ?? []);
+  }, [evalTypeId]);
+
+  async function handleSaveEvalTypeChanges() {
+    if (!selectedEvalTypePricing) return;
+    await fetch("/.netlify/functions/airtable?action=updateEvalType", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recordId: selectedEvalTypePricing.id,
+        ...evalPriceEdits,
+        allowedTraders: allowedTraderEdits,
+      }),
+    });
+    setEvalPriceEdits({});
+    // Refresh eval types locally
+    const rows = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]);
+    setLocalEvalTypeList(rows.map(r => ({
+      id: r.id,
+      name: r.fields["Name"],
+      accountSize: r.fields["Account Size"] || 0,
+      cost: r.fields["Cost Per Account"] || 0,
+      drawdownLimit: r.fields["Drawdown Limit"] || 0,
+      accountWeight: r.fields["Account Weight"] || null,
+      consistencyPct: r.fields["Consistency %"] ?? null,
+      newEvalCost: r.fields["New Eval Cost"] ?? null,
+      resetEvalCost: r.fields["Reset Eval Cost"] ?? null,
+      activationCost: r.fields["Activation Cost"] ?? null,
+      valueScore: r.fields["Value Score"] ?? null,
+      allowedTraders: (r.fields["Allowed Traders"] ?? []).map(t => typeof t === "object" ? t.id : t),
+    })).sort((a, b) => a.name.localeCompare(b.name)));
+  }
 
   async function handleBreach() {
     setSubmitting(true); setErr(null);
@@ -31,7 +72,7 @@ export function BreachModal({ account, evalTypeList, onClose, onBreached }) {
   }
 
   async function handleReset() {
-    const evalType = evalTypeList.find(t => t.id === evalTypeId);
+    const evalType = localEvalTypeList.find(t => t.id === evalTypeId);
     if (!evalType || !costPer || !date) { setErr("Fill in all required fields."); return; }
     setSubmitting(true); setErr(null);
     try {
@@ -75,14 +116,14 @@ export function BreachModal({ account, evalTypeList, onClose, onBreached }) {
     setSubmitting(false);
   }
 
-  const evalType = evalTypeList.find(t => t.id === evalTypeId);
+  const evalType = localEvalTypeList.find(t => t.id === evalTypeId);
   const totalCost = (parseFloat(costPer) || 0) * numAccounts;
   const inp = { background: "#0f172a", border: "1px solid #374151", borderRadius: 6, color: "#fff", fontSize: 13, padding: "7px 10px", width: "100%", outline: "none", boxSizing: "border-box" };
   const lbl = text => <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>{text}</div>;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div style={{ background: "#1f2a37", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 400, maxWidth: "90vw" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#1f2a37", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 440, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
           Account Breached — {account.traderName || account.name}
         </div>
@@ -119,11 +160,24 @@ export function BreachModal({ account, evalTypeList, onClose, onBreached }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <div style={{ gridColumn: "1 / -1" }}>
                 {lbl("Evaluation Type")}
-                <select value={evalTypeId} onChange={e => { setEvalTypeId(e.target.value); const et = evalTypeList.find(t => t.id === e.target.value); if (et) setCostPer(et.cost.toString()); }} style={{ ...inp, cursor: "pointer" }}>
+                <select value={evalTypeId} onChange={e => { setEvalTypeId(e.target.value); const et = localEvalTypeList.find(t => t.id === e.target.value); if (et) setCostPer(et.resetEvalCost != null ? et.resetEvalCost.toString() : et.cost.toString()); }} style={{ ...inp, cursor: "pointer" }}>
                   <option value="">Choose type...</option>
-                  {evalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {localEvalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
+              {selectedEvalTypePricing && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <EvalTypePricingPanel
+                    evalType={selectedEvalTypePricing}
+                    traders={traders}
+                    evalPriceEdits={evalPriceEdits}
+                    setEvalPriceEdits={setEvalPriceEdits}
+                    allowedTraderEdits={allowedTraderEdits}
+                    setAllowedTraderEdits={setAllowedTraderEdits}
+                    onSave={handleSaveEvalTypeChanges}
+                  />
+                </div>
+              )}
               <div>
                 {lbl("Purchase Date")}
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
@@ -147,7 +201,7 @@ export function BreachModal({ account, evalTypeList, onClose, onBreached }) {
               <div style={{ gridColumn: "1 / -1" }}>
                 {lbl("Account Weight Override (optional)")}
                 {(() => {
-                  const et = evalTypeList.find(t => t.id === evalTypeId);
+                  const et = localEvalTypeList.find(t => t.id === evalTypeId);
                   const dd = et?.drawdownLimit || 0;
                   const cp = parseFloat(costPer) || 0;
                   const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;

@@ -1,7 +1,7 @@
 import React from "react";
 import { $$, $$target, lpColor } from "../utils/format.js";
 import { fetchTable, updateRecord } from "../services/airtable.js";
-import { BASE, EVAL_TYPE_TABLE, PERF_TABLE, EVAL_TABLE, PAYOUT_TABLE, PAYOUT_STRATEGIES_TABLE } from "../config/tables.js";
+import { BASE, EVAL_TYPE_TABLE, PERF_TABLE, EVAL_TABLE, PAYOUT_TABLE, PAYOUT_STRATEGIES_TABLE, TRADERS_TABLE } from "../config/tables.js";
 import { BreachModal } from "./BreachModal.jsx";
 
 export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDones }) {
@@ -21,9 +21,30 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
   const [countTradingDays, setCountTradingDays] = React.useState({});
   const [breachModalAccount, setBreachModalAccount] = React.useState(null);
   const [evalTypeList, setEvalTypeList] = React.useState([]);
+  const [traders, setTraders] = React.useState([]);
   React.useEffect(() => {
-    fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight"]).then(rows => {
-      setEvalTypeList(rows.map(r => ({ id: r.id, name: r.fields["Name"], accountSize: r.fields["Account Size"] || 0, cost: r.fields["Cost Per Account"] || 0, drawdownLimit: r.fields["Drawdown Limit"] || 0, accountWeight: r.fields["Account Weight"] || null })).sort((a, b) => a.name.localeCompare(b.name)));
+    Promise.all([
+      fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]),
+      fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]),
+    ]).then(([rows, traderRows]) => {
+      setEvalTypeList(rows.map(r => ({
+        id: r.id,
+        name: r.fields["Name"],
+        accountSize: r.fields["Account Size"] || 0,
+        cost: r.fields["Cost Per Account"] || 0,
+        drawdownLimit: r.fields["Drawdown Limit"] || 0,
+        accountWeight: r.fields["Account Weight"] || null,
+        consistencyPct: r.fields["Consistency %"] ?? null,
+        newEvalCost: r.fields["New Eval Cost"] ?? null,
+        resetEvalCost: r.fields["Reset Eval Cost"] ?? null,
+        activationCost: r.fields["Activation Cost"] ?? null,
+        valueScore: r.fields["Value Score"] ?? null,
+        allowedTraders: (r.fields["Allowed Traders"] ?? []).map(t => typeof t === "object" ? t.id : t),
+      })).sort((a, b) => a.name.localeCompare(b.name)));
+      setTraders(traderRows.map(r => ({
+        id: r.id,
+        name: r.fields["Name"] ?? r.fields["Preferred Name"] ?? "Unknown",
+      })));
     }).catch(() => {});
   }, []);
   const [scoreSaving, setScoreSaving] = React.useState(false);
@@ -519,6 +540,7 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
         <BreachModal
           account={breachModalAccount}
           evalTypeList={evalTypeList}
+          traders={traders}
           onClose={() => setBreachModalAccount(null)}
           onBreached={id => { setBlowns(prev => ({ ...prev, [id]: true })); setTimeout(() => window.location.reload(), 30000); }}
         />
