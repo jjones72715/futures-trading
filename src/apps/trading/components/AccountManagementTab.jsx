@@ -3,23 +3,43 @@ import { $$ } from "../utils/format.js";
 import { fetchTable, createRecord, updateRecord } from "../services/airtable.js";
 import { BASE, EVAL_TABLE, PERF_TABLE, PURCHASE_TABLE, TRADERS_TABLE, EVAL_TYPE_TABLE, PAYOUT_TABLE, PERF_TYPES_TABLE, PAYOUT_STRATEGIES_TABLE } from "../config/tables.js";
 import { PAYOUT_STATUSES } from "../config/constants.js";
+import { EvalTypePricingPanel } from "./EvalTypePricingPanel.jsx";
 
 export function AccountManagementTab() {
   const [evalToPerfMap, setEvalToPerfMap] = useState({});
+  const [evalTypePricingMap, setEvalTypePricingMap] = useState({});
   const [perfTypes, setPerfTypes] = useState([]);
   const [payoutStrategies, setPayoutStrategies] = useState([]);
+  const [traders, setTraders] = useState([]);
+  const [evalPriceEdits, setEvalPriceEdits] = useState({});
+  const [allowedTraderEdits, setAllowedTraderEdits] = useState([]);
+
   useEffect(() => {
     Promise.all([
-      fetchTable(EVAL_TYPE_TABLE, ["Name", "Performance Account Type"]),
+      fetchTable(EVAL_TYPE_TABLE, ["Name", "Performance Account Type", "Drawdown Limit", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]),
       fetchTable(PERF_TYPES_TABLE, ["Name", "Account Size"]),
       fetchTable(PAYOUT_STRATEGIES_TABLE, ["Name", "Account Type", "Stage Number", "Stage Target", "On Completion Go To"]),
-    ]).then(([evalTypeRecords, perfTypeRecords, strategyRecords]) => {
+      fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]),
+    ]).then(([evalTypeRecords, perfTypeRecords, strategyRecords, traderRecords]) => {
       const map = {};
+      const pricingMap = {};
       evalTypeRecords.forEach(r => {
         const pt = r.fields["Performance Account Type"];
         if (Array.isArray(pt) && pt.length > 0) map[r.id] = pt[0].id || pt[0];
+        pricingMap[r.id] = {
+          id: r.id,
+          name: r.fields["Name"] ?? "",
+          drawdownLimit: r.fields["Drawdown Limit"] ?? 0,
+          consistencyPct: r.fields["Consistency %"] ?? null,
+          newEvalCost: r.fields["New Eval Cost"] ?? null,
+          resetEvalCost: r.fields["Reset Eval Cost"] ?? null,
+          activationCost: r.fields["Activation Cost"] ?? null,
+          valueScore: r.fields["Value Score"] ?? null,
+          allowedTraders: (r.fields["Allowed Traders"] ?? []).map(t => typeof t === "object" ? t.id : t),
+        };
       });
       setEvalToPerfMap(map);
+      setEvalTypePricingMap(pricingMap);
       setPerfTypes(perfTypeRecords.map(r => ({
         id: r.id,
         name: r.fields["Name"] || "",
@@ -36,6 +56,10 @@ export function AccountManagementTab() {
           next: r.fields["On Completion Go To"] || "",
         };
       }));
+      setTraders(traderRecords.map(r => ({
+        id: r.id,
+        name: r.fields["Name"] ?? r.fields["Preferred Name"] ?? "Unknown",
+      })));
     });
   }, []);
   const C = { bg: "#0d1117", card: "#1f2a37", border: "#2d3f50" };
@@ -120,6 +144,45 @@ export function AccountManagementTab() {
     }).catch(e => { console.error("[AccountManagementTab] traders error:", e); });
   }, []);
   useEffect(() => { loadData(); }, [traderId, activeTab]);
+
+  useEffect(() => {
+    const etId = selectedEvalId
+      ? evalAccounts.find(r => r.id === selectedEvalId)?.fields["Evaluation Account Type"]?.[0]
+      : null;
+    const pricing = etId ? evalTypePricingMap[etId] : null;
+    setEvalPriceEdits({});
+    setAllowedTraderEdits(pricing?.allowedTraders ?? []);
+  }, [selectedEvalId]);
+
+  async function handleSaveEvalTypeChanges(evalTypeId) {
+    await fetch("/.netlify/functions/airtable?action=updateEvalType", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recordId: evalTypeId,
+        ...evalPriceEdits,
+        allowedTraders: allowedTraderEdits,
+      }),
+    });
+    setEvalPriceEdits({});
+    // Refresh pricing map
+    const updated = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Performance Account Type", "Drawdown Limit", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]);
+    const pricingMap = {};
+    updated.forEach(r => {
+      pricingMap[r.id] = {
+        id: r.id,
+        name: r.fields["Name"] ?? "",
+        drawdownLimit: r.fields["Drawdown Limit"] ?? 0,
+        consistencyPct: r.fields["Consistency %"] ?? null,
+        newEvalCost: r.fields["New Eval Cost"] ?? null,
+        resetEvalCost: r.fields["Reset Eval Cost"] ?? null,
+        activationCost: r.fields["Activation Cost"] ?? null,
+        valueScore: r.fields["Value Score"] ?? null,
+        allowedTraders: (r.fields["Allowed Traders"] ?? []).map(t => typeof t === "object" ? t.id : t),
+      };
+    });
+    setEvalTypePricingMap(pricingMap);
+  }
 
   async function loadData() {
     setLoading(true);
@@ -950,23 +1013,42 @@ export function AccountManagementTab() {
 
       {/* Right info panel */}
       <div>
-        {activeTab === "passed_evals" && selectedEval && (
-          <div style={{ background: C.card, border: "1px solid #8b5cf6", borderRadius: 12, padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Eval Account</div>
-            {[
-              ["Name", selectedEval.fields["Name"]],
-              ["Balance", $$(selectedEval.fields["Current Balance"])],
-              ["DD Left", $$(selectedEval.fields["Current Drawdown Left"])],
-              ["Accounts", `×${selectedEval.fields["Number of Accounts"]}`],
-              ["→ Perf Type", perfType?.name || "Unknown"],
-            ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d3f50" }}>
-                <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
+        {activeTab === "passed_evals" && selectedEval && (() => {
+          const etId = Array.isArray(selectedEval.fields["Evaluation Account Type"])
+            ? selectedEval.fields["Evaluation Account Type"][0]
+            : null;
+          const evalTypePricing = etId ? evalTypePricingMap[etId] : null;
+          return (
+            <>
+              <div style={{ background: C.card, border: "1px solid #8b5cf6", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Eval Account</div>
+                {[
+                  ["Name", selectedEval.fields["Name"]],
+                  ["Balance", $$(selectedEval.fields["Current Balance"])],
+                  ["DD Left", $$(selectedEval.fields["Current Drawdown Left"])],
+                  ["Accounts", `×${selectedEval.fields["Number of Accounts"]}`],
+                  ["→ Perf Type", perfType?.name || "Unknown"],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #2d3f50" }}>
+                    <span style={{ fontSize: 12, color: "#6b7280" }}>{k}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{v}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+              {evalTypePricing && (
+                <EvalTypePricingPanel
+                  evalType={evalTypePricing}
+                  traders={traders}
+                  evalPriceEdits={evalPriceEdits}
+                  setEvalPriceEdits={setEvalPriceEdits}
+                  allowedTraderEdits={allowedTraderEdits}
+                  setAllowedTraderEdits={setAllowedTraderEdits}
+                  onSave={() => handleSaveEvalTypeChanges(evalTypePricing.id)}
+                />
+              )}
+            </>
+          );
+        })()}
 
         {activeTab === "stage_mgmt" && selectedPerf && (
           <div style={{ background: C.card, border: "1px solid #3b82f6", borderRadius: 12, padding: 20 }}>
