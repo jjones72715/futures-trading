@@ -142,15 +142,15 @@ export function PurchaseTab() {
 
   async function loadTraders() {
     try {
-      const records = await fetchTable(TRADERS_TABLE, ["fldAD382QTLsEtCzD", "fldj6RWdKe0kcOpFu"]);
+      const records = await fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]);
       setTraders(records.map(r => ({
         id: r.id,
-        name: r.fields["fldAD382QTLsEtCzD"] ?? r.fields["fldj6RWdKe0kcOpFu"] ?? "Unknown",
+        name: r.fields["Name"] ?? r.fields["Preferred Name"] ?? "Unknown",
       })));
       setTraderList(records.map(r => ({
         id: r.id,
-        name: r.fields["fldAD382QTLsEtCzD"] ?? "Unknown",
-        preferredName: r.fields["fldj6RWdKe0kcOpFu"] ?? (r.fields["fldAD382QTLsEtCzD"] ?? "Unknown").split(" ")[0],
+        name: r.fields["Name"] ?? "Unknown",
+        preferredName: r.fields["Preferred Name"] ?? (r.fields["Name"] ?? "Unknown").split(" ")[0],
       })).sort((a, b) => a.preferredName.localeCompare(b.preferredName)));
     } catch (e) {}
   }
