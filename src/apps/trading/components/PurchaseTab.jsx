@@ -537,6 +537,7 @@ export function PurchaseTab() {
 
             {selectedEvalTypeForPanel && <EvalTypePricingPanel
               evalType={selectedEvalTypeForPanel}
+              traders={traders}
               evalPriceEdits={evalPriceEdits}
               setEvalPriceEdits={setEvalPriceEdits}
               allowedTraderEdits={allowedTraderEdits}
