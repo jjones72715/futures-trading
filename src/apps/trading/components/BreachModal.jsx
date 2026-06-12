@@ -76,6 +76,16 @@ export function BreachModal({ account, evalTypeList, traders = [], onClose, onBr
     if (!evalType || !costPer || !date) { setErr("Fill in all required fields."); return; }
     setSubmitting(true); setErr(null);
     try {
+      // Save any pricing/trader edits back to the eval type record
+      const hasPriceEdits = Object.keys(evalPriceEdits).length > 0;
+      const hasTraderEdits = JSON.stringify([...allowedTraderEdits].sort()) !== JSON.stringify([...(evalType.allowedTraders ?? [])].sort());
+      if (hasPriceEdits || hasTraderEdits) {
+        await fetch("/.netlify/functions/airtable?action=updateEvalType", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recordId: evalTypeId, ...evalPriceEdits, allowedTraders: allowedTraderEdits }),
+        });
+      }
       // Fail the current eval account
       await updateRecord(EVAL_TABLE, account.id, { "Status": "Failed" });
       // Create new eval account
@@ -123,7 +133,7 @@ export function BreachModal({ account, evalTypeList, traders = [], onClose, onBr
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div style={{ background: "#1f2a37", border: "1px solid #374151", borderRadius: 12, padding: 24, width: 440, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#1f2a37", border: "1px solid #374151", borderRadius: 12, padding: 24, width: step === "reset" ? 860 : 440, maxWidth: "97vw", maxHeight: "92vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
           Account Breached — {account.traderName || account.name}
         </div>
@@ -157,16 +167,17 @@ export function BreachModal({ account, evalTypeList, traders = [], onClose, onBr
               <button onClick={() => setStep("choice")} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, padding: 0 }}>←</button>
               <span style={{ fontSize: 13, fontWeight: 600, color: "#f59e0b" }}>Reset Account</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-              <div style={{ gridColumn: "1 / -1" }}>
-                {lbl("Evaluation Type")}
-                <select value={evalTypeId} onChange={e => { setEvalTypeId(e.target.value); const et = localEvalTypeList.find(t => t.id === e.target.value); if (et) setCostPer(et.resetEvalCost != null ? et.resetEvalCost.toString() : et.cost.toString()); }} style={{ ...inp, cursor: "pointer" }}>
-                  <option value="">Choose type...</option>
-                  {localEvalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-              {selectedEvalTypePricing && (
-                <div style={{ gridColumn: "1 / -1" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+              {/* Left: eval type selector + pricing panel */}
+              <div>
+                <div style={{ marginBottom: 14 }}>
+                  {lbl("Evaluation Type")}
+                  <select value={evalTypeId} onChange={e => { setEvalTypeId(e.target.value); const et = localEvalTypeList.find(t => t.id === e.target.value); if (et) setCostPer(et.resetEvalCost != null ? et.resetEvalCost.toString() : et.cost.toString()); }} style={{ ...inp, cursor: "pointer" }}>
+                    <option value="">Choose type...</option>
+                    {localEvalTypeList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                {selectedEvalTypePricing && (
                   <EvalTypePricingPanel
                     evalType={selectedEvalTypePricing}
                     traders={traders}
@@ -175,69 +186,75 @@ export function BreachModal({ account, evalTypeList, traders = [], onClose, onBr
                     allowedTraderEdits={allowedTraderEdits}
                     setAllowedTraderEdits={setAllowedTraderEdits}
                     onSave={handleSaveEvalTypeChanges}
+                    showSave={false}
                   />
+                )}
+              </div>
+              {/* Right: reset form fields */}
+              <div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                  <div>
+                    {lbl("Purchase Date")}
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {lbl("Date Started")}
+                    <input type="date" value={dateStarted} onChange={e => setDateStarted(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {lbl("# of Accounts")}
+                    <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
+                  </div>
+                  <div>
+                    {lbl("Cost Per Account")}
+                    <input type="number" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    {lbl("Account Number (optional)")}
+                    <input type="text" placeholder="e.g. ABC123" value={newAccountNumber} onChange={e => setNewAccountNumber(e.target.value)} style={inp} />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    {lbl("Account Weight Override (optional)")}
+                    {(() => {
+                      const et = localEvalTypeList.find(t => t.id === evalTypeId);
+                      const dd = et?.drawdownLimit || 0;
+                      const cp = parseFloat(costPer) || 0;
+                      const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                      return (
+                        <>
+                          <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
+                          <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 12 }}>
+                            {et?.accountWeight != null && <span style={{ color: "#9ca3af" }}>Current: <strong style={{ color: "#e5e7eb" }}>{et.accountWeight}</strong></span>}
+                            {suggested != null && <span style={{ color: "#60a5fa" }}>Suggested: <strong>{suggested}</strong></span>}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    {lbl("Notes (optional)")}
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
+                  </div>
                 </div>
-              )}
-              <div>
-                {lbl("Purchase Date")}
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
-              </div>
-              <div>
-                {lbl("Date Started")}
-                <input type="date" value={dateStarted} onChange={e => setDateStarted(e.target.value)} style={inp} />
-              </div>
-              <div>
-                {lbl("# of Accounts")}
-                <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
-              </div>
-              <div>
-                {lbl("Cost Per Account")}
-                <input type="number" value={costPer} onChange={e => setCostPer(e.target.value)} style={inp} />
-              </div>
-              <div>
-                {lbl("Account Number (optional)")}
-                <input type="text" placeholder="e.g. ABC123" value={newAccountNumber} onChange={e => setNewAccountNumber(e.target.value)} style={inp} />
-              </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                {lbl("Account Weight Override (optional)")}
-                {(() => {
-                  const et = localEvalTypeList.find(t => t.id === evalTypeId);
-                  const dd = et?.drawdownLimit || 0;
-                  const cp = parseFloat(costPer) || 0;
-                  const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
-                  return (
-                    <>
-                      <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
-                      <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 12 }}>
-                        {et?.accountWeight != null && <span style={{ color: "#9ca3af" }}>Current: <strong style={{ color: "#e5e7eb" }}>{et.accountWeight}</strong></span>}
-                        {suggested != null && <span style={{ color: "#60a5fa" }}>Suggested: <strong>{suggested}</strong></span>}
-                      </div>
-                    </>
-                  );
-                })()}
+                {evalType && (
+                  <div style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12 }}>
+                    <div style={{ color: "#fca5a5" }}>• This account → <strong>Failed</strong></div>
+                    <div style={{ color: "#4ade80" }}>• New eval account → <strong>Active</strong> at {evalType ? `$${evalType.accountSize.toLocaleString()}` : "—"}</div>
+                    <div style={{ color: "#93c5fd" }}>• Trading days → <strong>0</strong></div>
+                  </div>
+                )}
+                {totalCost > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#f87171" }}>${totalCost.toLocaleString()}</span>
+                  </div>
+                )}
+                <button onClick={handleReset} disabled={submitting || !evalTypeId || !costPer || !date}
+                  style={{ width: "100%", background: evalTypeId && costPer && date ? "#d97706" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer" }}>
+                  {submitting ? "Saving..." : `Reset Account${totalCost > 0 ? ` — $${totalCost.toLocaleString()}` : ""}`}
+                </button>
               </div>
             </div>
-            <div style={{ marginBottom: 14 }}>
-              {lbl("Notes (optional)")}
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inp, resize: "vertical", fontFamily: "inherit" }} />
-            </div>
-            {evalType && (
-              <div style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12 }}>
-                <div style={{ color: "#fca5a5" }}>• This account → <strong>Failed</strong></div>
-                <div style={{ color: "#4ade80" }}>• New eval account → <strong>Active</strong> at {evalType ? `$${evalType.accountSize.toLocaleString()}` : "—"}</div>
-                <div style={{ color: "#93c5fd" }}>• Trading days → <strong>0</strong></div>
-              </div>
-            )}
-            {totalCost > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-                <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "#f87171" }}>${totalCost.toLocaleString()}</span>
-              </div>
-            )}
-            <button onClick={handleReset} disabled={submitting || !evalTypeId || !costPer || !date}
-              style={{ width: "100%", background: evalTypeId && costPer && date ? "#d97706" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer" }}>
-              {submitting ? "Saving..." : `Reset Account${totalCost > 0 ? ` — $${totalCost.toLocaleString()}` : ""}`}
-            </button>
           </div>
         )}
       </div>

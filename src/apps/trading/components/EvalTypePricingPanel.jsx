@@ -1,6 +1,6 @@
 import React from "react";
 
-export function EvalTypePricingPanel({ evalType, traders, evalPriceEdits, setEvalPriceEdits, allowedTraderEdits, setAllowedTraderEdits, onSave }) {
+export function EvalTypePricingPanel({ evalType, traders, evalPriceEdits, setEvalPriceEdits, allowedTraderEdits, setAllowedTraderEdits, onSave, showSave = true }) {
   const inp = { background: "#111827", border: "1px solid #374151", borderRadius: 6, padding: "6px 10px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
   const valueScoreColor = evalType.valueScore >= 10 ? "#4ade80" : evalType.valueScore >= 5 ? "#fbbf24" : evalType.valueScore ? "#f87171" : "#6b7280";
   const hasPriceEdits = Object.keys(evalPriceEdits).length > 0;
@@ -67,7 +67,7 @@ export function EvalTypePricingPanel({ evalType, traders, evalPriceEdits, setEva
         </div>
       </div>
 
-      {isDirty && (
+      {isDirty && showSave && (
         <button
           onClick={onSave}
           style={{ width: "100%", padding: "8px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
