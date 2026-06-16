@@ -146,6 +146,22 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
     } catch (e) {}
     setScoreSaving(false);
   }
+  async function submitForToday(a) {
+    try {
+      const ops = [];
+      const sv = scoreInputs[a.id];
+      if (sv !== "" && sv !== undefined && !isNaN(parseFloat(sv))) ops.push(saveScore(a, sv));
+      const bv = newBalanceInputs[a.id];
+      if (bv !== "" && bv !== undefined && !isNaN(parseFloat(bv))) ops.push(saveBalance(a, bv));
+      if (countTradingDays[a.id]) {
+        const table = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+        const field = a.type === "perf" ? "Trading Days this Cycle" : "Trading Days Completed";
+        ops.push(updateRecord(table, a.id, { [field]: (a.tradingDays || 0) + 1 }));
+      }
+      await Promise.all(ops);
+    } catch (e) {}
+    if (onDone) onDone(a.id);
+  }
 
   const [dayCompleting, setDayCompleting] = React.useState(false);
   const [dayCompleted, setDayCompleted] = React.useState(false);
@@ -359,9 +375,9 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
             {onDone ? (
-              <button onClick={() => onDone(a.id)}
-                style={{ background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
-                {isDone ? "✓ Done Today" : "☐ Done Today"}
+              <button onClick={() => submitForToday(a)}
+                style={{ background: isDone ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+                {isDone ? "✓ Submit for Today" : "Submit for Today"}
               </button>
             ) : <div />}
             <button onClick={() => isBlown ? setBlowns(prev => ({ ...prev, [a.id]: false })) : setBreachModalAccount(a)}
@@ -434,9 +450,9 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
           {onDone ? (
-            <button onClick={() => onDone(a.id)}
-              style={{ background: "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
-              {isDone ? "✓ Done Today" : "☐ Done Today"}
+            <button onClick={() => submitForToday(a)}
+              style={{ background: isDone ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 5, padding: "4px 6px", fontSize: 10, cursor: "pointer", color: "#fff", fontWeight: 700 }}>
+              {isDone ? "✓ Submit for Today" : "Submit for Today"}
             </button>
           ) : <div />}
           <button onClick={() => isBlown ? setBlowns(prev => ({ ...prev, [a.id]: false })) : setBreachModalAccount(a)}
@@ -546,9 +562,9 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
         />
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button onClick={submitAllScores} disabled={scoreSaving || dayCompleting}
-          style={{ background: scoreSaved ? "#166534" : "#15803d", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
-          {scoreSaving ? "Saving..." : scoreSaved ? "✓ Saved" : "Submit Scores"}
+        <button onClick={completeDay} disabled={scoreSaving || dayCompleting}
+          style={{ background: dayCompleted ? "#1e3a5f" : "#1d4ed8", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
+          {dayCompleting ? "Completing..." : dayCompleted ? "✓ Day Complete" : "Complete Day"}
         </button>
       </div>
       {TraderFeedSection({ accounts: evalAccounts, color: "#ec4899", title: "Evaluation Accounts" })}
@@ -583,12 +599,6 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
           </div>
         </div>
       )}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-        <button onClick={completeDay} disabled={scoreSaving || dayCompleting}
-          style={{ background: dayCompleted ? "#1e3a5f" : "#1d4ed8", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
-          {dayCompleting ? "Completing..." : dayCompleted ? "✓ Day Complete" : "Complete Day"}
-        </button>
-      </div>
     </div>
   );
 }
