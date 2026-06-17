@@ -1,11 +1,11 @@
 import { fetchTable } from "./airtable.js";
-import { EVAL_TYPE_TABLE, FIRMS_TABLE, PURCHASE_TABLE, TRADERS_TABLE } from "../config/tables.js";
+import { EVAL_TABLE, EVAL_TYPE_TABLE, FIRMS_TABLE, TRADERS_TABLE } from "../config/tables.js";
 
 export async function loadValueRankingsData() {
-  const [evalTypeRecs, firmRecs, purchaseRecs, traderRecs] = await Promise.all([
+  const [evalTypeRecs, firmRecs, evalAccountRecs, traderRecs] = await Promise.all([
     fetchTable(EVAL_TYPE_TABLE, ["Name", "Value Score", "Firm", "Allowed Traders"]),
     fetchTable(FIRMS_TABLE, ["Name", "Data Provider"]),
-    fetchTable(PURCHASE_TABLE, ["Status", "Trader", "Evaluation Account Type"]),
+    fetchTable(EVAL_TABLE, ["Status", "Trader", "Evaluation Account Type"]),
     fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]),
   ]);
 
@@ -18,7 +18,7 @@ export async function loadValueRankingsData() {
     };
   });
 
-  // Build eval type → firm ID map (for purchase exclusion lookup)
+  // Build eval type → firm ID map
   const evalTypeFirmMap = {};
   evalTypeRecs.forEach(r => {
     const firmArr = r.fields["Firm"];
@@ -26,11 +26,12 @@ export async function loadValueRankingsData() {
     if (firmId) evalTypeFirmMap[r.id] = firmId;
   });
 
-  // Build per-trader firm exclusions from active purchases
-  // traderFirmExclusions[traderId] = Set of firmIds where trader has an active purchase
+  // Build per-trader firm exclusions from Active eval accounts
+  // traderFirmExclusions[traderId] = Set of firmIds where trader has an Active eval account
   const traderFirmExclusions = {};
-  purchaseRecs.forEach(r => {
-    if (r.fields["Status"] !== "Active") return;
+  evalAccountRecs.forEach(r => {
+    const status = r.fields["Status"];
+    if (status !== "Active") return;
     const traderArr = r.fields["Trader"];
     const traderIds = Array.isArray(traderArr) ? traderArr.map(t => typeof t === "string" ? t : t?.id).filter(Boolean) : [];
     const evalTypeArr = r.fields["Evaluation Account Type"];
