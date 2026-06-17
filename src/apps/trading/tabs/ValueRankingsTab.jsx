@@ -3,7 +3,7 @@ import { loadValueRankingsData } from "../services/valueRankingsService.js";
 
 const PROVIDER_ORDER = ["DX Feed", "Rithmic", "Tradovate", "Project X"];
 
-function groupByProvider(items) {
+function groupByProvider(items, bestPerFirm = false) {
   const byProvider = {};
   items.forEach(item => {
     const dp = item.dataProvider || "Other";
@@ -11,6 +11,17 @@ function groupByProvider(items) {
     byProvider[dp].push(item);
   });
   Object.values(byProvider).forEach(arr => arr.sort((a, b) => b.score - a.score));
+  if (bestPerFirm) {
+    Object.keys(byProvider).forEach(dp => {
+      const seen = new Set();
+      byProvider[dp] = byProvider[dp].filter(item => {
+        const key = item.firmId || item.name;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    });
+  }
   const providers = Object.keys(byProvider).sort((a, b) => {
     const ia = PROVIDER_ORDER.indexOf(a), ib = PROVIDER_ORDER.indexOf(b);
     if (ia === -1 && ib === -1) return a.localeCompare(b);
@@ -44,13 +55,14 @@ export function ValueRankingsTab() {
   const displayItems = selectedTrader === null
     ? evalTypes
     : evalTypes.filter(e => {
-        if (!e.allowedTraders.includes(selectedTrader)) return false;
+        const tradersAllowed = e.allowedTraders.length === 0 || e.allowedTraders.includes(selectedTrader);
+        if (!tradersAllowed) return false;
         const excluded = traderFirmExclusions[selectedTrader];
         if (excluded && e.firmId && excluded.has(e.firmId)) return false;
         return true;
       });
 
-  const { byProvider, providers } = groupByProvider(displayItems);
+  const { byProvider, providers } = groupByProvider(displayItems, selectedTrader === null);
   const topLimit = selectedTrader === null ? 20 : 5;
   const topN = [...displayItems].sort((a, b) => b.score - a.score).slice(0, topLimit);
 
