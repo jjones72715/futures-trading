@@ -108,6 +108,13 @@ export function PLTab({ evalAccounts, perfAccounts }) {
 
   const cashedOut = dayPayouts.reduce((s, p) => s + (p.totalAmount || 0), 0);
 
+  const payoutAccountsValue = perfAccounts
+    .filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active") || a.status === "Waiting on Payout")
+    .reduce((s, a) => {
+      const acctValue = a.contractMultiplier > 0 ? a.ddLeft * a.n / a.contractMultiplier : a.ddLeft;
+      return s + acctValue;
+    }, 0);
+
   const profitFromOthers = dayPayouts
     .filter(p => OTHER_TRADERS.includes(typeof p.trader === "object" ? p.trader?.id : p.trader))
     .reduce((s, p) => s + (p.totalAmount || 0) * 0.5, 0);
@@ -322,9 +329,10 @@ export function PLTab({ evalAccounts, perfAccounts }) {
       </div>
 
       <SectionHeader title="Financials" color="#10b981" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <StatBox label="Cashed Out Today" value={$$(cashedOut)} color="#4ade80" />
         <StatBox label="Profit from Others" value={$$(profitFromOthers)} color="#4ade80" />
+        <StatBox label="$ in Payout Accounts" value={$$(payoutAccountsValue)} color="#a78bfa" />
       </div>
     </div>
   );
