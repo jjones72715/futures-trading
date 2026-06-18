@@ -36,7 +36,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
     try {
       const [purchaseRecords, payoutRecords] = await Promise.all([
         fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
-        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts", "% Payout Tier"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts", "Payout Tier"]),
       ]);
       setPurchases(purchaseRecords.map(r => ({
         id: r.id,
@@ -54,7 +54,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
         account: Array.isArray(r.fields["Performance Account"]) ? r.fields["Performance Account"][0] : (r.fields["Performance Account"] || null),
         status: r.fields["Status"]?.name || r.fields["Status"] || "",
         numAccounts: r.fields["Number of Accounts"] || 1,
-        payoutTierPct: r.fields["% Payout Tier"] != null ? r.fields["% Payout Tier"] : null,
+        payoutTierPct: r.fields["Payout Tier"] != null ? r.fields["Payout Tier"] : null,
       })));
     } catch (e) {}
     setLoading(false);
