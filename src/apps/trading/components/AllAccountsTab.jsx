@@ -483,6 +483,29 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
       </div>
     );
   }
+  function DoneSubsection({ accounts }) {
+    const done = accounts.filter(a => dones[a.id]);
+    if (done.length === 0) return null;
+    return (
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #1f2937" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#4b5563" }}>Done Today</span>
+          <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 10, padding: "1px 5px", borderRadius: 99 }}>{done.length}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 4 }}>
+          {done.map(a => {
+            const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
+            return (
+              <div key={a.id} style={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 6, padding: "5px 8px", display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked onChange={() => onDone && onDone(a.id)} style={{ width: 13, height: 13, cursor: "pointer", flexShrink: 0, accentColor: "#4b5563" }} />
+                <span style={{ fontSize: 10, fontWeight: 600, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
   function FeedGrid({ accounts, color, title, sortFn }) {
     if (accounts.length === 0) return null;
     const feeds = getFeeds(accounts, sortFn);
@@ -503,6 +526,7 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
             </div>
           ))}
         </div>
+        {DoneSubsection({ accounts })}
       </div>
     );
   }
@@ -547,6 +571,7 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
             </div>
           );
         })}
+        {DoneSubsection({ accounts })}
       </div>
     );
   }
@@ -579,26 +604,6 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
         return lpMax(a) - lpMax(b);
       } })}
       {FeedGrid({ accounts: waitingPerf, color: "#a855f7", title: "Waiting on Payout" })}
-      {doneAccounts.length > 0 && (
-        <div style={{ marginTop: 32, borderTop: "1px solid #1f2937", paddingTop: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <div style={{ width: 3, height: 16, background: "#374151", borderRadius: 99 }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#4b5563" }}>Done Today</span>
-            <span style={{ background: "#1f2937", color: "#4b5563", fontSize: 10, padding: "1px 6px", borderRadius: 99 }}>{doneAccounts.length}</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
-            {doneAccounts.map(a => {
-              const header = [a.traderName || a.name, a.firmName || a.dataProvider || "—"].filter(Boolean).join(" — ");
-              return (
-                <div key={a.id} style={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8, padding: "7px 10px", display: "flex", alignItems: "center", gap: 8 }}>
-                  <input type="checkbox" checked onChange={() => onDone && onDone(a.id)} style={{ width: 14, height: 14, cursor: "pointer", flexShrink: 0, accentColor: "#4b5563" }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{header}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
