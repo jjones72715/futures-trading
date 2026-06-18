@@ -24,8 +24,10 @@ export function PLTab({ evalAccounts, perfAccounts }) {
   useEffect(() => { loadPLData(); }, []);
 
   const handleDateSubmit = () => {
-    if (dateM.length === 2 && dateD.length === 2 && dateY.length === 4) {
-      setSelectedDate(`${dateY}-${dateM}-${dateD}`);
+    const m = dateM.replace(/\D/g, "").padStart(2, "0");
+    const d = dateD.replace(/\D/g, "").padStart(2, "0");
+    if (dateM.length >= 1 && dateD.length >= 1 && dateY.length === 4) {
+      setSelectedDate(`${dateY}-${m}-${d}`);
     }
   };
 
