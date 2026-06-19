@@ -72,7 +72,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
   const totalLiq = startLiq + dayPurchaseCost;
   const fallbackTier = totalLiq <= 5000 ? 0.40 : totalLiq <= 10000 ? 0.50 : totalLiq <= 20000 ? 0.60 : 0.70;
   const liqReduction = dayPayouts.reduce((sum, p) => {
-    const t = p.payoutTierPct != null ? p.payoutTierPct / 100 : fallbackTier;
+    const t = p.payoutTierPct != null ? p.payoutTierPct : fallbackTier;
     return sum + (p.totalAmount || 0) * t;
   }, 0);
   const endingLiq = totalLiq - liqReduction;
@@ -80,7 +80,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
   const payoutRows = dayPayouts.map(p => {
     const traderId = typeof p.trader === "object" ? p.trader?.id : p.trader;
     const traderName = TRADER_NAMES[traderId] ?? p.trader ?? "—";
-    const t = p.payoutTierPct != null ? p.payoutTierPct / 100 : fallbackTier;
+    const t = p.payoutTierPct != null ? p.payoutTierPct : fallbackTier;
     const totalPayout  = Math.round(p.totalAmount || 0);
     const liqRepayment = Math.round(totalPayout * t);
     const afterLiq     = Math.round(totalPayout - liqRepayment);
@@ -244,7 +244,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
               <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#1f2937", borderRadius: 8, padding: "8px 12px", marginBottom: 6, fontSize: 12 }}>
                 <span style={{ color: "#d1d5db" }}>{p.name}</span>
                 <span style={{ color: "#4ade80" }}>${p.totalAmount?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                <span style={{ color: "#9ca3af" }}>× {p.payoutTierPct != null ? p.payoutTierPct : Math.round(fallbackTier * 100)}% = <span style={{ color: "#f87171" }}>-${((p.totalAmount || 0) * (p.payoutTierPct != null ? p.payoutTierPct / 100 : fallbackTier)).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>
+                <span style={{ color: "#9ca3af" }}>× {p.payoutTierPct != null ? Math.round(p.payoutTierPct * 100) : Math.round(fallbackTier * 100)}% = <span style={{ color: "#f87171" }}>-${((p.totalAmount || 0) * (p.payoutTierPct != null ? p.payoutTierPct : fallbackTier)).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>
               </div>
             ))}
           </div>
