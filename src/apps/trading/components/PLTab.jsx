@@ -334,7 +334,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <StatBox label="Cashed Out Today" value={$$(cashedOut)} color="#4ade80" />
         <StatBox label="Profit from Others" value={$$(profitFromOthers)} color="#4ade80" />
-        <StatBox label="$ in Payout Accounts" value={$$(payoutAccountsValue)} color="#a78bfa" />
+        <StatBox label="$ in Payout Accounts" value={$$(payoutAccountsValue / 2)} color="#a78bfa" />
       </div>
     </div>
   );
