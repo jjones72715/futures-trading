@@ -65,7 +65,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
   const dayPurchaseCost = dayPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
 
   // Filter payouts by Date Received
-  const dayPayouts = payouts.filter(p => String(p.dateReceived ?? "").trim().slice(0, 10) === selectedDate);
+  const dayPayouts = selectedDate === "" ? [] : payouts.filter(p => String(p.dateReceived ?? "").trim().slice(0, 10) === selectedDate);
 
   // Liquidation calc
   const startLiq = parseFloat(startingLiquidation) || 0;
