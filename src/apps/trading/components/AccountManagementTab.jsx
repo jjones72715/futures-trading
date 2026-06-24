@@ -422,7 +422,7 @@ export function AccountManagementTab() {
     try {
       const perf = perfAccounts.find(r => r.id === selectedPerfId);
       const trader = traderList.find(t => t.id === traderId);
-      const perfUpdate = { "Status": "Waiting on Payout" };
+      const perfUpdate = { "Status": "Waiting on Payout", "Payout Account": true };
       await updateRecord(PERF_TABLE, selectedPerfId, perfUpdate);
       // Create payout record
       const dateReq = payoutDateRequested || today;
