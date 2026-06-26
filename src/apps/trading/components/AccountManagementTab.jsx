@@ -318,7 +318,7 @@ export function AccountManagementTab() {
         "Status": "Active",
         "Current Balance": parseFloat(startingBalance),
         "High Water Mark": parseFloat(startingBalance),
-        "Cycle Start Balance": parseFloat(startingBalance),
+        "Cycle Start Balance": 0,
         "Date Activated": dateActivated,
         "Number of Accounts": parseInt(numAccounts),
         "Trading Days this Cycle": 0,
