@@ -14,7 +14,6 @@ const EMPTY_FORM = {
   howEarned: '',
   spendThreshold: '',
   benefitType: '',
-  benefitValue: '',
   resetCycle: '',
   estimatedValue: '',
   notes: '',
@@ -126,12 +125,6 @@ function TemplateForm({ form, setForm, allCards, allPeople, onSubmit, onCancel, 
               <input style={inp} value={form.benefitType} onChange={set('benefitType')} placeholder="e.g. Cat 1-4, $250 Statement Credit" />
             </div>
             <div>
-              <label style={lbl}>Benefit Value ($)</label>
-              <input style={inp} type="number" min="0" value={form.benefitValue} onChange={set('benefitValue')} placeholder="0" />
-            </div>
-          </div>
-          <div style={grid2}>
-            <div>
               <label style={lbl}>Estimated Value ($)</label>
               <input style={inp} type="number" min="0" value={form.estimatedValue} onChange={set('estimatedValue')} placeholder="0" />
             </div>
@@ -193,7 +186,6 @@ function recordToForm(r) {
     howEarned: f['How Earned'] || '',
     spendThreshold: f['Spend Threshold Amount'] != null ? String(f['Spend Threshold Amount']) : '',
     benefitType: f['Benefit Type'] || '',
-    benefitValue: f['Benefit Value'] != null ? String(f['Benefit Value']) : '',
     resetCycle: f['Reset Cycle'] || '',
     estimatedValue: f['Estimated Value'] != null ? String(f['Estimated Value']) : '',
     notes: f['Notes'] || '',
@@ -209,7 +201,6 @@ function formToFields(form) {
   if (form.howEarned) fields['How Earned'] = form.howEarned;
   if (form.spendThreshold) fields['Spend Threshold Amount'] = parseFloat(form.spendThreshold);
   if (form.benefitType.trim()) fields['Benefit Type'] = form.benefitType.trim();
-  if (form.benefitValue) fields['Benefit Value'] = parseFloat(form.benefitValue);
   if (form.resetCycle) fields['Reset Cycle'] = form.resetCycle;
   if (form.estimatedValue) fields['Estimated Value'] = parseFloat(form.estimatedValue);
   if (form.notes.trim()) fields['Notes'] = form.notes.trim();
@@ -234,7 +225,7 @@ export function HotelBenefitTemplatesTab() {
       const [tmpl, cards, people] = await Promise.all([
         fetchTable(HOTEL_TEMPLATES_TABLE, [
           'Template Name', 'Card', 'Person', 'Record Type', 'How Earned',
-          'Spend Threshold Amount', 'Benefit Type', 'Benefit Value',
+          'Spend Threshold Amount', 'Benefit Type',
           'Reset Cycle', 'Estimated Value', 'Notes',
         ]),
         fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Status'])

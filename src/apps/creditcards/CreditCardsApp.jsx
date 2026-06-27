@@ -14,7 +14,6 @@ const TABS = [
   { id: 'recommendations', label: 'Card Recommendations' },
   { id: 'add', label: 'Add Card' },
   { id: 'add-hotel', label: 'Add Hotel Benefit' },
-  { id: 'hotel-templates', label: 'Hotel Templates' },
 ];
 
 export default function CreditCardsApp() {
@@ -67,7 +66,17 @@ export default function CreditCardsApp() {
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'add' && <AddCardTab />}
         {tab === 'add-hotel' && <AddHotelBenefitTab onNavigateTemplates={() => setTab('hotel-templates')} />}
-        {tab === 'hotel-templates' && <HotelBenefitTemplatesTab />}
+        {tab === 'hotel-templates' && (
+          <div>
+            <button onClick={() => setTab('add-hotel')} style={{
+              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.85rem',
+              cursor: 'pointer', fontWeight: 600, padding: '0 0 1.25rem 0', display: 'block',
+            }}>
+              ← Back to Add Hotel Benefit
+            </button>
+            <HotelBenefitTemplatesTab />
+          </div>
+        )}
         {!['portfolio', 'hotels', 'add', 'add-hotel', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',

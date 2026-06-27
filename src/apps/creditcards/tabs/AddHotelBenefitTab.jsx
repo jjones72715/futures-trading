@@ -75,7 +75,8 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
       fetchTable(HOTEL_TEMPLATES_TABLE, [
         'Template Name', 'Card', 'Person', 'Record Type', 'How Earned',
         'Spend Threshold Amount', 'Benefit Type', 'Reset Cycle', 'Estimated Value', 'Notes',
-      ]).then(r => r.sort((a, b) => (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || ''))),
+      ]).then(r => r.sort((a, b) =>
+        (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || ''))),
     ])
       .then(([cards, brands, tmpl]) => {
         setAllCards(cards);
@@ -183,7 +184,7 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
 
       {/* Template selector */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
           <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>Load from Template</div>
           {onNavigateTemplates && (
             <button type="button" onClick={onNavigateTemplates} style={{
@@ -194,16 +195,28 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
             </button>
           )}
         </div>
-        <select
-          style={{ ...inp, appearance: 'none' }}
-          defaultValue=""
-          onChange={e => applyTemplate(e.target.value)}
-        >
-          <option value="">— Select a template —</option>
-          {templates.map(t => (
-            <option key={t.id} value={t.id}>{t.fields['Template Name']}</option>
-          ))}
-        </select>
+        {templates.length === 0 ? (
+          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.85rem' }}>
+            No templates yet. Use Manage Templates to create one.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {templates.map(t => (
+              <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="template"
+                  value={t.id}
+                  style={{ accentColor: '#00D4FF', width: 16, height: 16, flexShrink: 0 }}
+                  onChange={() => applyTemplate(t.id)}
+                />
+                <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.88rem' }}>
+                  {t.fields['Template Name']}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Step 1 — Person */}
