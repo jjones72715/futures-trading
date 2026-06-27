@@ -3,6 +3,7 @@ import { PortfolioTab } from './tabs/PortfolioTab.jsx';
 import { AddCardTab } from './tabs/AddCardTab.jsx';
 import { HotelsTab } from './tabs/HotelsTab.jsx';
 import { AddHotelBenefitTab } from './tabs/AddHotelBenefitTab.jsx';
+import { HotelBenefitTemplatesTab } from './tabs/HotelBenefitTemplatesTab.jsx';
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio' },
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'recommendations', label: 'Card Recommendations' },
   { id: 'add', label: 'Add Card' },
   { id: 'add-hotel', label: 'Add Hotel Benefit' },
+  { id: 'hotel-templates', label: 'Hotel Templates' },
 ];
 
 export default function CreditCardsApp() {
@@ -64,8 +66,9 @@ export default function CreditCardsApp() {
         {tab === 'portfolio' && <PortfolioTab />}
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'add' && <AddCardTab />}
-        {tab === 'add-hotel' && <AddHotelBenefitTab />}
-        {!['portfolio', 'hotels', 'add', 'add-hotel'].includes(tab) && (
+        {tab === 'add-hotel' && <AddHotelBenefitTab onNavigateTemplates={() => setTab('hotel-templates')} />}
+        {tab === 'hotel-templates' && <HotelBenefitTemplatesTab />}
+        {!['portfolio', 'hotels', 'add', 'add-hotel', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',

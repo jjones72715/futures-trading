@@ -25,6 +25,26 @@ export async function createRecord(tableId, fields) {
   return data;
 }
 
+export async function updateRecord(tableId, recordId, fields) {
+  const res = await fetch(`/.netlify/functions/cc-airtable/${BASE}/${tableId}/${recordId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  const data = await res.json();
+  if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  return data;
+}
+
+export async function deleteRecord(tableId, recordId) {
+  const res = await fetch(`/.netlify/functions/cc-airtable/${BASE}/${tableId}/${recordId}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  return data;
+}
+
 export async function fetchFieldChoices(tableId, fieldName) {
   const res = await fetch(`/.netlify/functions/cc-airtable/meta/bases/${BASE}/tables`);
   const data = await res.json();

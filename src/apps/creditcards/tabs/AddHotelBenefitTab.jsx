@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createRecord, fetchTable, fetchFieldChoices } from '../services/airtable.js';
-import { HOTELS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
+import { HOTELS_TABLE, PORTFOLIO_TABLE, HOTEL_TEMPLATES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
@@ -53,10 +53,11 @@ function PillBtn({ active, onClick, children }) {
   );
 }
 
-export function AddHotelBenefitTab() {
+export function AddHotelBenefitTab({ onNavigateTemplates }) {
   const [form, setForm] = useState(EMPTY);
   const [allCards, setAllCards] = useState([]);
   const [hotelBrands, setHotelBrands] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -71,14 +72,39 @@ export function AddHotelBenefitTab() {
           .sort((a, b) => a.name.localeCompare(b.name))
         ),
       fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand'),
+      fetchTable(HOTEL_TEMPLATES_TABLE, [
+        'Template Name', 'Card', 'Person', 'Record Type', 'How Earned',
+        'Spend Threshold Amount', 'Benefit Type', 'Reset Cycle', 'Estimated Value', 'Notes',
+      ]).then(r => r.sort((a, b) => (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || ''))),
     ])
-      .then(([cards, brands]) => {
+      .then(([cards, brands, tmpl]) => {
         setAllCards(cards);
         setHotelBrands(brands);
+        setTemplates(tmpl);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  function applyTemplate(templateId) {
+    if (!templateId) return;
+    const rec = templates.find(t => t.id === templateId);
+    if (!rec) return;
+    const f = rec.fields;
+    setForm(prev => ({
+      ...prev,
+      recordType: f['Record Type'] || prev.recordType,
+      howEarned: f['How Earned'] || prev.howEarned,
+      spendThreshold: f['Spend Threshold Amount'] != null ? String(f['Spend Threshold Amount']) : prev.spendThreshold,
+      benefitType: f['Benefit Type'] || prev.benefitType,
+      resetCycle: f['Reset Cycle'] || prev.resetCycle,
+      estimatedValue: f['Estimated Value'] != null ? String(f['Estimated Value']) : prev.estimatedValue,
+      notes: f['Notes'] || prev.notes,
+      // pre-fill card/person only if the form doesn't already have them set
+      cardId: prev.cardId || ((f['Card'] || [])[0] || ''),
+      personId: prev.personId || ((f['Person'] || [])[0] || ''),
+    }));
+  }
 
   // When person changes, clear card selection
   function selectPerson(id) {
@@ -154,6 +180,31 @@ export function AddHotelBenefitTab() {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 780 }}>
+
+      {/* Template selector */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>Load from Template</div>
+          {onNavigateTemplates && (
+            <button type="button" onClick={onNavigateTemplates} style={{
+              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.8rem',
+              cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0,
+            }}>
+              Manage Templates
+            </button>
+          )}
+        </div>
+        <select
+          style={{ ...inp, appearance: 'none' }}
+          defaultValue=""
+          onChange={e => applyTemplate(e.target.value)}
+        >
+          <option value="">— Select a template —</option>
+          {templates.map(t => (
+            <option key={t.id} value={t.id}>{t.fields['Template Name']}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Step 1 — Person */}
       <div style={cardStyle}>
