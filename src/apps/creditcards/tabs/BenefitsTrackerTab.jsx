@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchTable, updateRecord } from '../services/airtable.js';
+import { fetchTable, updateRecord, createRecord } from '../services/airtable.js';
 import { PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
-import { advanceUntilFuture } from '../utils/dates.js';
+import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 
 const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
 
@@ -74,6 +74,8 @@ export function BenefitsTrackerTab() {
   const [cycleFilter, setCycleFilter] = useState('All');
   const [showAll, setShowAll] = useState(false);
   const [toggling, setToggling] = useState({});
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +133,97 @@ export function BenefitsTrackerTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function syncPerks() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      // Fetch all three sources in parallel
+      const [portfolio, defs, existingInst] = await Promise.all([
+        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
+        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle']),
+        fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition']),
+      ]);
+
+      // Build a set of existing card+def combos for O(1) duplicate check
+      const existingKeys = new Set(
+        existingInst.map(r => {
+          const cardId = (r.fields['Card'] || [])[0] || '';
+          const defId = (r.fields['Perk Definition'] || [])[0] || '';
+          return `${cardId}::${defId}`;
+        })
+      );
+
+      // Index defs by Card Product record ID
+      const defsByProductId = {};
+      defs.forEach(def => {
+        const productIds = def.fields['Card Product'] || [];
+        productIds.forEach(pid => {
+          if (!defsByProductId[pid]) defsByProductId[pid] = [];
+          defsByProductId[pid].push(def);
+        });
+      });
+
+      const today = new Date();
+      const creates = [];
+      let skipped = 0;
+      const cardsSeen = new Set();
+
+      for (const card of portfolio) {
+        const cardId = card.id;
+        const productId = (card.fields['Current Product'] || [])[0];
+        if (!productId) continue;
+
+        const matchingDefs = defsByProductId[productId] || [];
+        if (matchingDefs.length === 0) continue;
+
+        const ownerIds = card.fields['Owner'] || [];
+
+        for (const def of matchingDefs) {
+          for (const personId of ownerIds) {
+            const key = `${cardId}::${def.id}`;
+            if (existingKeys.has(key)) {
+              skipped++;
+              continue;
+            }
+            const cycle = def.fields['Reset Cycle'];
+            const nextDate = cycle ? calculateNextResetDate(cycle, today) : null;
+            const instanceFields = {
+              'Perk Definition': [def.id],
+              'Card': [cardId],
+              'Person': [personId],
+              'Used': false,
+            };
+            if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
+            creates.push({ fields: instanceFields, cardId });
+            // Preemptively mark as existing so we don't double-create within this run
+            existingKeys.add(key);
+          }
+        }
+        if (creates.some(c => c.cardId === cardId)) cardsSeen.add(cardId);
+      }
+
+      // Fire all creates (sequentially to avoid rate limits on large portfolios)
+      let added = 0;
+      for (const c of creates) {
+        try {
+          await createRecord(PERK_INSTANCES_TABLE, c.fields);
+          added++;
+          if (creates.some(x => x.cardId === c.cardId)) cardsSeen.add(c.cardId);
+        } catch (e) {
+          console.error('Sync create failed:', e);
+        }
+      }
+
+      setSyncResult({ added, cards: cardsSeen.size, skipped });
+      await load();
+    } catch (e) {
+      console.error('Sync failed:', e);
+      setSyncResult({ error: e.message });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function toggleUsed(record, currentValue) {
     setToggling(prev => ({ ...prev, [record.id]: true }));
@@ -199,10 +292,37 @@ export function BenefitsTrackerTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1100 }}>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', maxWidth: 400 }}>
-        <StatCard label="Available Perks" value={totalAvailable} accent="#00D4FF" />
-        <StatCard label="Total Perks" value={total} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', width: 'fit-content' }}>
+          <StatCard label="Available Perks" value={totalAvailable} accent="#00D4FF" />
+          <StatCard label="Total Perks" value={total} />
+        </div>
+        <button
+          type="button"
+          onClick={syncPerks}
+          disabled={syncing || loading}
+          style={{
+            padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,212,255,0.3)',
+            background: syncing ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.12)',
+            color: syncing ? 'rgba(0,212,255,0.5)' : '#00D4FF',
+            fontWeight: 600, fontSize: '0.82rem', cursor: syncing ? 'not-allowed' : 'pointer',
+            whiteSpace: 'nowrap', alignSelf: 'center', transition: 'all 0.15s',
+          }}
+        >
+          {syncing ? 'Syncing…' : 'Sync Perks to All Cards'}
+        </button>
       </div>
+
+      {syncResult && !syncResult.error && (
+        <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.88rem' }}>
+          {syncResult.added} perk{syncResult.added !== 1 ? 's' : ''} added across {syncResult.cards} card{syncResult.cards !== 1 ? 's' : ''}, {syncResult.skipped} skipped (already exist)
+        </div>
+      )}
+      {syncResult?.error && (
+        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 10, padding: '0.75rem 1rem', color: '#FF4D4D', fontSize: '0.88rem' }}>
+          Sync failed: {syncResult.error}
+        </div>
+      )}
 
       <div style={cardStyle}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
