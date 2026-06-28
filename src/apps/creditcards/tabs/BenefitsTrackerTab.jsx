@@ -83,7 +83,7 @@ export function BenefitsTrackerTab() {
 
     // Step 1 — load defs and instances together
     const [allInst, defs, cards] = await Promise.all([
-      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle']),
+      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits']),
       fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
@@ -303,7 +303,8 @@ export function BenefitsTrackerTab() {
       cardName: cardId ? (cardsById[cardId] || '—') : '—',
       personId: personId || '',
       personName: personId ? (PEOPLE[personId] || '—') : '—',
-      creditAmount: def['Credit Amount'] ?? null,
+      creditAmount: f['Credit Amount'] ?? def['Credit Amount'] ?? null,
+      lastDigits: f['Last Digits'] ?? null,
       resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
       nextResetDate: f['Next Reset Date'] || '',
@@ -462,6 +463,11 @@ export function BenefitsTrackerTab() {
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {row.cardName}
+                  {row.lastDigits != null && (
+                    <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>
+                      ···{row.lastDigits}
+                    </span>
+                  )}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{row.personName}</span>
                 <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>
