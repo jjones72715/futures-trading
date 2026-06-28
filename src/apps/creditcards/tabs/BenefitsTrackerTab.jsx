@@ -142,21 +142,14 @@ export function BenefitsTrackerTab() {
       const [portfolio, defs, existingInst] = await Promise.all([
         fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
         fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score']),
-        fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition']),
+        fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition', 'Label', 'Credit Amount', 'Priority Score']),
       ]);
 
-      // Build a set of existing card+def combos for O(1) duplicate check
-      const existingKeys = new Set(
-        existingInst.map(r => {
-          const cardId = (r.fields['Card'] || [])[0] || '';
-          const defId = (r.fields['Perk Definition'] || [])[0] || '';
-          return `${cardId}::${defId}`;
-        })
-      );
-
-      // Index defs by Card Product record ID
+      // Index defs by record ID and by Card Product record ID
+      const defsById = {};
       const defsByProductId = {};
       defs.forEach(def => {
+        defsById[def.id] = def;
         const productIds = def.fields['Card Product'] || [];
         productIds.forEach(pid => {
           if (!defsByProductId[pid]) defsByProductId[pid] = [];
@@ -164,8 +157,17 @@ export function BenefitsTrackerTab() {
         });
       });
 
+      // Build map of existing instances: key -> instance record (for duplicate check + backfill)
+      const existingByKey = {};
+      existingInst.forEach(r => {
+        const cardId = (r.fields['Card'] || [])[0] || '';
+        const defId = (r.fields['Perk Definition'] || [])[0] || '';
+        if (cardId && defId) existingByKey[`${cardId}::${defId}`] = r;
+      });
+
       const today = new Date();
       const creates = [];
+      const patches = []; // existing instances missing Label/Credit Amount/Priority Score
       let skipped = 0;
       const cardsSeen = new Set();
 
@@ -182,8 +184,17 @@ export function BenefitsTrackerTab() {
         for (const def of matchingDefs) {
           for (const personId of ownerIds) {
             const key = `${cardId}::${def.id}`;
-            if (existingKeys.has(key)) {
-              skipped++;
+            const existing = existingByKey[key];
+            if (existing) {
+              // Check if backfill needed
+              const patch = {};
+              if (!existing.fields['Label']) patch['Label'] = def.fields['Perk Name'] || '';
+              if (existing.fields['Credit Amount'] == null && def.fields['Credit Amount'] != null)
+                patch['Credit Amount'] = def.fields['Credit Amount'];
+              if (existing.fields['Priority Score'] == null && def.fields['Priority Score'] != null)
+                patch['Priority Score'] = def.fields['Priority Score'];
+              if (Object.keys(patch).length > 0) patches.push({ id: existing.id, fields: patch });
+              else skipped++;
               continue;
             }
             const cycle = def.fields['Reset Cycle'];
@@ -199,26 +210,36 @@ export function BenefitsTrackerTab() {
             if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
             if (def.fields['Priority Score'] != null) instanceFields['Priority Score'] = def.fields['Priority Score'];
             creates.push({ fields: instanceFields, cardId });
-            // Preemptively mark as existing so we don't double-create within this run
-            existingKeys.add(key);
+            existingByKey[key] = { id: 'pending', fields: instanceFields };
           }
         }
         if (creates.some(c => c.cardId === cardId)) cardsSeen.add(cardId);
       }
 
-      // Fire all creates (sequentially to avoid rate limits on large portfolios)
+      // Fire creates sequentially to avoid rate limits
       let added = 0;
       for (const c of creates) {
         try {
           await createRecord(PERK_INSTANCES_TABLE, c.fields);
           added++;
-          if (creates.some(x => x.cardId === c.cardId)) cardsSeen.add(c.cardId);
+          cardsSeen.add(c.cardId);
         } catch (e) {
           console.error('Sync create failed:', e);
         }
       }
 
-      setSyncResult({ added, cards: cardsSeen.size, skipped });
+      // Backfill missing fields on existing instances
+      let patched = 0;
+      for (const p of patches) {
+        try {
+          await updateRecord(PERK_INSTANCES_TABLE, p.id, p.fields);
+          patched++;
+        } catch (e) {
+          console.error('Sync patch failed:', e);
+        }
+      }
+
+      setSyncResult({ added, patched, cards: cardsSeen.size, skipped });
       await load();
     } catch (e) {
       console.error('Sync failed:', e);
@@ -329,7 +350,12 @@ export function BenefitsTrackerTab() {
 
       {syncResult && !syncResult.error && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.88rem' }}>
-          {syncResult.added} perk{syncResult.added !== 1 ? 's' : ''} added across {syncResult.cards} card{syncResult.cards !== 1 ? 's' : ''}, {syncResult.skipped} skipped (already exist)
+          {syncResult.added > 0 && `${syncResult.added} perk${syncResult.added !== 1 ? 's' : ''} added`}
+        {syncResult.added > 0 && syncResult.patched > 0 && ', '}
+        {syncResult.patched > 0 && `${syncResult.patched} backfilled (Label/Amount/Priority)`}
+        {(syncResult.added > 0 || syncResult.patched > 0) && syncResult.cards > 0 && ` across ${syncResult.cards} card${syncResult.cards !== 1 ? 's' : ''}`}
+        {syncResult.added === 0 && syncResult.patched === 0 && 'All perks up to date'}
+        {syncResult.skipped > 0 && `, ${syncResult.skipped} already complete`}
         </div>
       )}
       {syncResult?.error && (
