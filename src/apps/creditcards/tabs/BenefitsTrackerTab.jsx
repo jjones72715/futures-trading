@@ -107,7 +107,8 @@ export function BenefitsTrackerTab() {
       await Promise.all(toReset.map(async r => {
         const defId = (r.fields['Perk Definition'] || [])[0];
         const def = defId ? defMap[defId] : null;
-        const cycle = r.fields['Reset Cycle'] || def?.['Reset Cycle'];
+        const rawCycle = r.fields['Reset Cycle'];
+        const cycle = (Array.isArray(rawCycle) ? rawCycle[0] : rawCycle) || def?.['Reset Cycle'];
         const currentDate = r.fields['Next Reset Date'];
         const newDate = cycle && currentDate ? advanceUntilFuture(cycle, currentDate) : null;
 
@@ -205,8 +206,6 @@ export function BenefitsTrackerTab() {
                 patch['Credit Amount'] = def.fields['Credit Amount'];
               if (existing.fields['Priority Score'] == null && def.fields['Priority Score'] != null)
                 patch['Priority Score'] = def.fields['Priority Score'];
-              if (!existing.fields['Reset Cycle'] && def.fields['Reset Cycle'])
-                patch['Reset Cycle'] = def.fields['Reset Cycle'];
               if (Object.keys(patch).length > 0) patches.push({ id: existing.id, fields: patch });
               else skipped++;
               continue;
@@ -223,7 +222,6 @@ export function BenefitsTrackerTab() {
             if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
             if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
             if (def.fields['Priority Score'] != null) instanceFields['Priority Score'] = def.fields['Priority Score'];
-            if (def.fields['Reset Cycle']) instanceFields['Reset Cycle'] = def.fields['Reset Cycle'];
             creates.push({ fields: instanceFields, cardId });
             existingByKey[key] = { id: 'pending', fields: instanceFields };
           }
@@ -306,7 +304,7 @@ export function BenefitsTrackerTab() {
       personId: personId || '',
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       creditAmount: def['Credit Amount'] ?? null,
-      resetCycle: f['Reset Cycle'] || def['Reset Cycle'] || '',
+      resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
       nextResetDate: f['Next Reset Date'] || '',
       used: f['Used'] || false,

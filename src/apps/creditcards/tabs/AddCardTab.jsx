@@ -291,7 +291,6 @@ export function AddCardTab() {
                 'Label': def.fields['Perk Name'] || '',
               };
               if (nextDateStr) instanceFields['Next Reset Date'] = nextDateStr;
-              if (cycle) instanceFields['Reset Cycle'] = cycle;
               if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
               if (def.fields['Priority Score'] != null) instanceFields['Priority Score'] = def.fields['Priority Score'];
               instancePromises.push(createRecord(PERK_INSTANCES_TABLE, instanceFields));
