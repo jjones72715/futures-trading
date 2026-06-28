@@ -83,7 +83,7 @@ export function BenefitsTrackerTab() {
 
     // Step 1 — load defs and instances together
     const [allInst, defs, cards] = await Promise.all([
-      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date']),
+      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score']),
       fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
@@ -141,7 +141,7 @@ export function BenefitsTrackerTab() {
       // Fetch all three sources in parallel
       const [portfolio, defs, existingInst] = await Promise.all([
         fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
-        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle']),
+        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score']),
         fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition']),
       ]);
 
@@ -193,8 +193,11 @@ export function BenefitsTrackerTab() {
               'Card': [cardId],
               'Person': [personId],
               'Used': false,
+              'Label': def.fields['Perk Name'] || '',
             };
             if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
+            if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
+            if (def.fields['Priority Score'] != null) instanceFields['Priority Score'] = def.fields['Priority Score'];
             creates.push({ fields: instanceFields, cardId });
             // Preemptively mark as existing so we don't double-create within this run
             existingKeys.add(key);
@@ -222,6 +225,17 @@ export function BenefitsTrackerTab() {
       setSyncResult({ error: e.message });
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function savePriority(recordId, value) {
+    setInstances(prev => prev.map(r =>
+      r.id === recordId ? { ...r, fields: { ...r.fields, 'Priority Score': value } } : r
+    ));
+    try {
+      await updateRecord(PERK_INSTANCES_TABLE, recordId, { 'Priority Score': value });
+    } catch (e) {
+      console.error('Priority save failed:', e);
     }
   }
 
@@ -257,7 +271,7 @@ export function BenefitsTrackerTab() {
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       creditAmount: def['Credit Amount'] ?? null,
       resetCycle: def['Reset Cycle'] || '',
-      priorityScore: def['Priority Score'] ?? 0,
+      priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
       nextResetDate: f['Next Reset Date'] || '',
       used: f['Used'] || false,
     };
@@ -366,7 +380,7 @@ export function BenefitsTrackerTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr 1.2fr 60px',
+            gridTemplateColumns: '2fr 2fr 1fr 1fr 100px 1fr 1.2fr 60px',
             gap: '0.75rem',
             padding: '0.5rem 1rem',
             fontSize: '0.68rem',
@@ -379,6 +393,7 @@ export function BenefitsTrackerTab() {
             <span>Card</span>
             <span>Person</span>
             <span>Amount</span>
+            <span>Priority</span>
             <span>Cycle</span>
             <span>Next Reset</span>
             <span style={{ textAlign: 'center' }}>Used</span>
@@ -390,7 +405,7 @@ export function BenefitsTrackerTab() {
             return (
               <div key={row.id} style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr 1.2fr 60px',
+                gridTemplateColumns: '2fr 2fr 1fr 1fr 100px 1fr 1.2fr 60px',
                 gap: '0.75rem',
                 alignItems: 'center',
                 padding: '0.75rem 1rem',
@@ -411,6 +426,21 @@ export function BenefitsTrackerTab() {
                 <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>
                   {row.creditAmount != null ? `$${row.creditAmount}` : '—'}
                 </span>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {[1,2,3,4,5].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => savePriority(row.id, n)}
+                      style={{
+                        width: 16, height: 16, borderRadius: '50%', border: 'none',
+                        background: n <= row.priorityScore ? '#00D4FF' : 'rgba(255,255,255,0.12)',
+                        cursor: 'pointer', padding: 0, flexShrink: 0,
+                        transition: 'background 0.1s',
+                      }}
+                    />
+                  ))}
+                </div>
                 <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{row.resetCycle || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: soon ? '#FFD700' : 'rgba(255,255,255,0.5)', fontWeight: soon ? 700 : 400 }}>
                   {fmt(row.nextResetDate)}
