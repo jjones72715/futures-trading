@@ -266,13 +266,15 @@ export function AddCardTab() {
       // Auto-generate perk instances for this card product
       let perksAdded = 0;
       if (form.currentProductId) {
-        const selectedProduct = PRODUCTS.find(p => p.id === form.currentProductId);
-        const productName = selectedProduct?.name || '';
-
-        const allDefs = await fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Reset Cycle', 'Priority Score']);
-        const matchingDefs = allDefs.filter(r => r.fields['Card Type'] === productName);
+        const filter = `FIND("${form.currentProductId}",ARRAYJOIN({Card Product}))`;
+        const matchingDefs = await fetchTable(
+          PERK_DEFINITIONS_TABLE,
+          ['Perk Name', 'Card Type', 'Reset Cycle', 'Priority Score'],
+          { filterByFormula: filter }
+        );
 
         if (matchingDefs.length > 0) {
+
           const today = new Date();
           const instancePromises = [];
           for (const def of matchingDefs) {
