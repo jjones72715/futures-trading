@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchTable, updateRecord, createRecord } from '../services/airtable.js';
+import { fetchTable, updateRecord, createRecord, deleteRecord } from '../services/airtable.js';
 import { PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
@@ -157,6 +157,18 @@ export function BenefitsTrackerTab() {
         });
       });
 
+      // Delete instances with no linked Perk Definition
+      const orphans = existingInst.filter(r => !(r.fields['Perk Definition'] || []).length);
+      let deleted = 0;
+      for (const o of orphans) {
+        try {
+          await deleteRecord(PERK_INSTANCES_TABLE, o.id);
+          deleted++;
+        } catch (e) {
+          console.error('Sync delete failed:', e);
+        }
+      }
+
       // Build map of existing instances: key -> instance record (for duplicate check + backfill)
       const existingByKey = {};
       existingInst.forEach(r => {
@@ -239,7 +251,7 @@ export function BenefitsTrackerTab() {
         }
       }
 
-      setSyncResult({ added, patched, cards: cardsSeen.size, skipped });
+      setSyncResult({ added, patched, deleted, cards: cardsSeen.size, skipped });
       await load();
     } catch (e) {
       console.error('Sync failed:', e);
@@ -350,11 +362,13 @@ export function BenefitsTrackerTab() {
 
       {syncResult && !syncResult.error && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.88rem' }}>
-          {syncResult.added > 0 && `${syncResult.added} perk${syncResult.added !== 1 ? 's' : ''} added`}
+          {syncResult.deleted > 0 && `${syncResult.deleted} orphan${syncResult.deleted !== 1 ? 's' : ''} deleted`}
+        {syncResult.deleted > 0 && (syncResult.added > 0 || syncResult.patched > 0) && ', '}
+        {syncResult.added > 0 && `${syncResult.added} added`}
         {syncResult.added > 0 && syncResult.patched > 0 && ', '}
-        {syncResult.patched > 0 && `${syncResult.patched} backfilled (Label/Amount/Priority)`}
+        {syncResult.patched > 0 && `${syncResult.patched} backfilled`}
         {(syncResult.added > 0 || syncResult.patched > 0) && syncResult.cards > 0 && ` across ${syncResult.cards} card${syncResult.cards !== 1 ? 's' : ''}`}
-        {syncResult.added === 0 && syncResult.patched === 0 && 'All perks up to date'}
+        {syncResult.deleted === 0 && syncResult.added === 0 && syncResult.patched === 0 && 'All perks up to date'}
         {syncResult.skipped > 0 && `, ${syncResult.skipped} already complete`}
         </div>
       )}
