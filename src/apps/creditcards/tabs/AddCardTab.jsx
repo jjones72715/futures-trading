@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { createRecord } from '../services/airtable.js';
-import { PORTFOLIO_TABLE } from '../config/tables.js';
+import { createRecord, fetchTable } from '../services/airtable.js';
+import { PORTFOLIO_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
+import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 
 // Baked-in from Airtable — avoids a fetch on form load
 const PRODUCTS = [
@@ -196,7 +197,7 @@ function autoCardName(ownerIds, productId) {
 export function AddCardTab() {
   const [form, setForm] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const [error, setError] = useState(null);
 
   const filteredProducts = form.issuer
@@ -259,10 +260,48 @@ export function AddCardTab() {
     if (form.cancelRisk)         fields['Cancel Risk Level'] = form.cancelRisk;
 
     try {
-      await createRecord(PORTFOLIO_TABLE, fields);
-      setSuccess(true);
+      const newCard = await createRecord(PORTFOLIO_TABLE, fields);
+      const newCardId = newCard.id;
+
+      // Auto-generate perk instances for this card product
+      let perksAdded = 0;
+      if (form.currentProductId) {
+        const selectedProduct = PRODUCTS.find(p => p.id === form.currentProductId);
+        const productName = selectedProduct?.name || '';
+
+        const allDefs = await fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Reset Cycle', 'Priority Score']);
+        const matchingDefs = allDefs.filter(r => r.fields['Card Type'] === productName);
+
+        if (matchingDefs.length > 0) {
+          const today = new Date();
+          const instancePromises = [];
+          for (const def of matchingDefs) {
+            const cycle = def.fields['Reset Cycle'];
+            const nextDate = cycle ? calculateNextResetDate(cycle, today) : null;
+            const nextDateStr = nextDate ? toAirtableDate(nextDate) : null;
+
+            for (const personId of form.ownerIds) {
+              const instanceFields = {
+                'Perk Definition': [def.id],
+                'Card': [newCardId],
+                'Person': [personId],
+                'Used': false,
+              };
+              if (nextDateStr) instanceFields['Next Reset Date'] = nextDateStr;
+              instancePromises.push(createRecord(PERK_INSTANCES_TABLE, instanceFields));
+            }
+          }
+          const results = await Promise.allSettled(instancePromises);
+          perksAdded = results.filter(r => r.status === 'fulfilled').length;
+        }
+      }
+
+      const msg = perksAdded > 0
+        ? `Card added successfully! ${perksAdded} perk${perksAdded > 1 ? 's' : ''} added automatically.`
+        : 'Card added successfully!';
+      setSuccessMsg(msg);
       setForm(EMPTY);
-      setTimeout(() => setSuccess(false), 5000);
+      setTimeout(() => setSuccessMsg(''), 7000);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -273,9 +312,9 @@ export function AddCardTab() {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 780 }}>
 
-      {success && (
+      {successMsg && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.85rem 1rem', color: '#00E676', fontWeight: 600 }}>
-          Card added successfully!
+          {successMsg}
         </div>
       )}
       {error && (

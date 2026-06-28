@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord } from '../services/airtable.js';
 import { PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
+import { advanceUntilFuture } from '../utils/dates.js';
 
 const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
 
@@ -55,20 +56,33 @@ function isResettingSoon(dateStr) {
   return diff >= 0 && diff <= 7;
 }
 
+function isPastOrToday(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00');
+  return d <= today;
+}
+
 export function BenefitsTrackerTab() {
   const [instances, setInstances] = useState([]);
   const [defsById, setDefsById] = useState({});
   const [cardsById, setCardsById] = useState({});
   const [loading, setLoading] = useState(true);
+  const [resetStatus, setResetStatus] = useState('');
   const [personFilter, setPersonFilter] = useState('All');
   const [cycleFilter, setCycleFilter] = useState('All');
   const [showAll, setShowAll] = useState(false);
-  const [toggling, setToggling] = useState({}); // recordId → true while patching
+  const [toggling, setToggling] = useState({});
 
   const load = useCallback(async () => {
-    const [inst, defs, cards] = await Promise.all([
+    setLoading(true);
+    setResetStatus('Checking for expired perks…');
+
+    // Step 1 — load defs and instances together
+    const [allInst, defs, cards] = await Promise.all([
       fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date']),
-      fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
+      fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
 
@@ -78,9 +92,41 @@ export function BenefitsTrackerTab() {
     const cardMap = {};
     cards.forEach(r => { cardMap[r.id] = r.fields['Card Name'] || r.id; });
 
+    // Step 2 — find instances where Used=true and Next Reset Date is today or past
+    const toReset = allInst.filter(r => {
+      const f = r.fields;
+      if (!f['Used']) return false;
+      return isPastOrToday(f['Next Reset Date']);
+    });
+
+    // Step 3 — advance each and PATCH
+    if (toReset.length > 0) {
+      setResetStatus(`Resetting ${toReset.length} expired perk${toReset.length > 1 ? 's' : ''}…`);
+      await Promise.all(toReset.map(async r => {
+        const defId = (r.fields['Perk Definition'] || [])[0];
+        const def = defId ? defMap[defId] : null;
+        const cycle = def?.['Reset Cycle'];
+        const currentDate = r.fields['Next Reset Date'];
+        const newDate = cycle && currentDate ? advanceUntilFuture(cycle, currentDate) : null;
+
+        const patch = { 'Used': false };
+        if (newDate) patch['Next Reset Date'] = newDate;
+
+        try {
+          await updateRecord(PERK_INSTANCES_TABLE, r.id, patch);
+          // Update local record so render reflects reset state without re-fetch
+          r.fields['Used'] = false;
+          if (newDate) r.fields['Next Reset Date'] = newDate;
+        } catch (e) {
+          console.error('Reset failed for', r.id, e);
+        }
+      }));
+    }
+
+    setResetStatus('');
     setDefsById(defMap);
     setCardsById(cardMap);
-    setInstances(inst);
+    setInstances(allInst);
     setLoading(false);
   }, []);
 
@@ -89,7 +135,6 @@ export function BenefitsTrackerTab() {
   async function toggleUsed(record, currentValue) {
     setToggling(prev => ({ ...prev, [record.id]: true }));
     const newVal = !currentValue;
-    // Optimistic update
     setInstances(prev => prev.map(r =>
       r.id === record.id ? { ...r, fields: { ...r.fields, 'Used': newVal } } : r
     ));
@@ -97,7 +142,6 @@ export function BenefitsTrackerTab() {
       await updateRecord(PERK_INSTANCES_TABLE, record.id, { 'Used': newVal });
     } catch (e) {
       console.error('Toggle failed:', e);
-      // Revert
       setInstances(prev => prev.map(r =>
         r.id === record.id ? { ...r, fields: { ...r.fields, 'Used': currentValue } } : r
       ));
@@ -106,7 +150,6 @@ export function BenefitsTrackerTab() {
     }
   }
 
-  // Enrich instances with def data
   const enriched = instances.map(r => {
     const f = r.fields;
     const defId = (f['Perk Definition'] || [])[0];
@@ -127,7 +170,6 @@ export function BenefitsTrackerTab() {
     };
   });
 
-  // Filter
   const filtered = enriched.filter(row => {
     if (personFilter !== 'All' && row.personName !== personFilter) return false;
     if (cycleFilter !== 'All' && row.resetCycle !== cycleFilter) return false;
@@ -135,7 +177,6 @@ export function BenefitsTrackerTab() {
     return true;
   });
 
-  // Sort: priority desc, then next reset date asc
   const sorted = [...filtered].sort((a, b) => {
     if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore;
     if (!a.nextResetDate && !b.nextResetDate) return 0;
@@ -144,23 +185,25 @@ export function BenefitsTrackerTab() {
     return a.nextResetDate.localeCompare(b.nextResetDate);
   });
 
-  const totalUnused = enriched.filter(r => !r.used).length;
+  const totalAvailable = enriched.filter(r => !r.used).length;
   const total = enriched.length;
 
   if (loading) {
-    return <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Loading…</div>;
+    return (
+      <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
+        {resetStatus || 'Loading…'}
+      </div>
+    );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1100 }}>
 
-      {/* Stat row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', maxWidth: 400 }}>
-        <StatCard label="Unused Perks" value={totalUnused} accent="#00D4FF" />
+        <StatCard label="Available Perks" value={totalAvailable} accent="#00D4FF" />
         <StatCard label="Total Perks" value={total} />
       </div>
 
-      {/* Filters */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -179,38 +222,28 @@ export function BenefitsTrackerTab() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Show</span>
-            <button
-              type="button"
-              onClick={() => setShowAll(false)}
-              style={{
-                padding: '5px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
-                background: !showAll ? '#00D4FF' : 'rgba(255,255,255,0.06)',
-                color: !showAll ? '#0B1220' : 'rgba(255,255,255,0.6)',
-                fontWeight: !showAll ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem',
-              }}
-            >Available Only</button>
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              style={{
-                padding: '5px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
-                background: showAll ? '#00D4FF' : 'rgba(255,255,255,0.06)',
-                color: showAll ? '#0B1220' : 'rgba(255,255,255,0.6)',
-                fontWeight: showAll ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem',
-              }}
-            >Show All</button>
+            <button type="button" onClick={() => setShowAll(false)} style={{
+              padding: '5px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+              background: !showAll ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+              color: !showAll ? '#0B1220' : 'rgba(255,255,255,0.6)',
+              fontWeight: !showAll ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem',
+            }}>Available Only</button>
+            <button type="button" onClick={() => setShowAll(true)} style={{
+              padding: '5px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+              background: showAll ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+              color: showAll ? '#0B1220' : 'rgba(255,255,255,0.6)',
+              fontWeight: showAll ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem',
+            }}>Show All</button>
           </div>
         </div>
       </div>
 
-      {/* Perk list */}
       {sorted.length === 0 ? (
         <div style={{ ...cardStyle, color: 'rgba(255,255,255,0.35)', textAlign: 'center', padding: '3rem' }}>
           No perks match the current filters.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Header row */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr 1.2fr 60px',
@@ -235,25 +268,20 @@ export function BenefitsTrackerTab() {
             const soon = isResettingSoon(row.nextResetDate);
             const dimmed = showAll && row.used;
             return (
-              <div
-                key={row.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr 1.2fr 60px',
-                  gap: '0.75rem',
-                  alignItems: 'center',
-                  padding: '0.75rem 1rem',
-                  borderRadius: 10,
-                  background: soon ? 'rgba(255,215,0,0.06)' : '#172033',
-                  border: soon ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.06)',
-                  opacity: dimmed ? 0.4 : 1,
-                  transition: 'opacity 0.15s',
-                }}
-              >
+              <div key={row.id} style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr 1.2fr 60px',
+                gap: '0.75rem',
+                alignItems: 'center',
+                padding: '0.75rem 1rem',
+                borderRadius: 10,
+                background: soon ? 'rgba(255,215,0,0.06)' : '#172033',
+                border: soon ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                opacity: dimmed ? 0.4 : 1,
+                transition: 'opacity 0.15s',
+              }}>
                 <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
-                  {soon && (
-                    <span style={{ marginRight: 6, fontSize: '0.75rem', color: '#FFD700', fontWeight: 700 }}>⚡</span>
-                  )}
+                  {soon && <span style={{ marginRight: 6, fontSize: '0.75rem', color: '#FFD700', fontWeight: 700 }}>⚡</span>}
                   {row.perkName}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -264,11 +292,7 @@ export function BenefitsTrackerTab() {
                   {row.creditAmount != null ? `$${row.creditAmount}` : '—'}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{row.resetCycle || '—'}</span>
-                <span style={{
-                  fontSize: '0.82rem',
-                  color: soon ? '#FFD700' : 'rgba(255,255,255,0.5)',
-                  fontWeight: soon ? 700 : 400,
-                }}>
+                <span style={{ fontSize: '0.82rem', color: soon ? '#FFD700' : 'rgba(255,255,255,0.5)', fontWeight: soon ? 700 : 400 }}>
                   {fmt(row.nextResetDate)}
                 </span>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
