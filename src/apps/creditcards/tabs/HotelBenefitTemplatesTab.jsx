@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { fetchTable, createRecord, updateRecord, deleteRecord } from '../services/airtable.js';
-import { HOTEL_TEMPLATES_TABLE, PORTFOLIO_TABLE, PEOPLE_TABLE } from '../config/tables.js';
+import { fetchTable, createRecord, updateRecord, deleteRecord, fetchFieldChoices } from '../services/airtable.js';
+import { HOTEL_TEMPLATES_TABLE, PORTFOLIO_TABLE, PEOPLE_TABLE, HOTELS_TABLE } from '../config/tables.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
 const HOW_EARNED = ['Anniversary', 'Welcome Offer', 'Spend Threshold', 'Other'];
@@ -8,6 +8,8 @@ const RESET_CYCLES = ['Annual', 'Anniversary', 'Semi-Annual', 'Monthly', 'One-Ti
 
 const EMPTY_FORM = {
   templateName: '',
+  nameLabel: '',
+  hotelBrand: '',
   cardId: '',
   personId: '',
   recordType: '',
@@ -49,7 +51,7 @@ function PillBtn({ active, onClick, children }) {
   );
 }
 
-function TemplateForm({ form, setForm, allCards, allPeople, onSubmit, onCancel, submitting, error }) {
+function TemplateForm({ form, setForm, allCards, allPeople, hotelBrands, onSubmit, onCancel, submitting, error }) {
   function set(field) {
     return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
   }
@@ -79,6 +81,25 @@ function TemplateForm({ form, setForm, allCards, allPeople, onSubmit, onCancel, 
           required
         />
       </div>
+
+      <div style={cardStyle}>
+        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Name / Label (optional)</div>
+        <input
+          style={inp}
+          value={form.nameLabel}
+          onChange={set('nameLabel')}
+          placeholder="e.g. Hilton Free Night Cert"
+        />
+      </div>
+
+      {hotelBrands.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Hotel Brand</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {hotelBrands.map(b => pill('hotelBrand', b))}
+          </div>
+        </div>
+      )}
 
       <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Card (optional)</div>
@@ -180,6 +201,8 @@ function recordToForm(r) {
   const f = r.fields;
   return {
     templateName: f['Template Name'] || '',
+    nameLabel: f['Name / Label'] || '',
+    hotelBrand: f['Hotel Brand'] || '',
     cardId: (f['Card'] || [])[0] || '',
     personId: (f['Person'] || [])[0] || '',
     recordType: f['Record Type'] || '',
@@ -195,6 +218,8 @@ function recordToForm(r) {
 function formToFields(form) {
   const fields = {};
   if (form.templateName.trim()) fields['Template Name'] = form.templateName.trim();
+  if (form.nameLabel.trim()) fields['Name / Label'] = form.nameLabel.trim();
+  if (form.hotelBrand) fields['Hotel Brand'] = form.hotelBrand;
   if (form.cardId) fields['Card'] = [form.cardId];
   if (form.personId) fields['Person'] = [form.personId];
   if (form.recordType) fields['Record Type'] = form.recordType;
@@ -211,6 +236,7 @@ export function HotelBenefitTemplatesTab() {
   const [templates, setTemplates] = useState([]);
   const [allCards, setAllCards] = useState([]);
   const [allPeople, setAllPeople] = useState([]);
+  const [hotelBrands, setHotelBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list'); // 'list' | 'add' | 'edit'
   const [editRecord, setEditRecord] = useState(null);
@@ -222,9 +248,9 @@ export function HotelBenefitTemplatesTab() {
   async function load() {
     setLoading(true);
     try {
-      const [tmpl, cards, people] = await Promise.all([
+      const [tmpl, cards, people, brands] = await Promise.all([
         fetchTable(HOTEL_TEMPLATES_TABLE, [
-          'Template Name', 'Card', 'Person', 'Record Type', 'How Earned',
+          'Template Name', 'Name / Label', 'Hotel Brand', 'Card', 'Person', 'Record Type', 'How Earned',
           'Spend Threshold Amount', 'Benefit Type',
           'Reset Cycle', 'Estimated Value', 'Notes',
         ]),
@@ -235,10 +261,12 @@ export function HotelBenefitTemplatesTab() {
         fetchTable(PEOPLE_TABLE, ['Name'])
           .then(r => r.map(x => ({ id: x.id, name: x.fields['Name'] || x.id }))
             .sort((a, b) => a.name.localeCompare(b.name))),
+        fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand'),
       ]);
       setTemplates(tmpl.sort((a, b) => (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || '')));
       setAllCards(cards);
       setAllPeople(people);
+      setHotelBrands(brands);
     } catch (e) {
       console.error(e);
     } finally {
@@ -321,6 +349,7 @@ export function HotelBenefitTemplatesTab() {
           setForm={setForm}
           allCards={allCards}
           allPeople={allPeople}
+          hotelBrands={hotelBrands}
           onSubmit={handleSubmit}
           onCancel={cancel}
           submitting={submitting}
@@ -364,10 +393,12 @@ export function HotelBenefitTemplatesTab() {
                     {f['Template Name'] || '—'}
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {f['Hotel Brand'] && <Chip>{f['Hotel Brand']}</Chip>}
                     {f['Record Type'] && <Chip>{f['Record Type']}</Chip>}
                     {f['How Earned'] && <Chip>{f['How Earned']}</Chip>}
                     {f['Reset Cycle'] && <Chip>{f['Reset Cycle']}</Chip>}
                     {f['Benefit Type'] && <Chip dim>{f['Benefit Type']}</Chip>}
+                    {f['Name / Label'] && <Chip dim>{f['Name / Label']}</Chip>}
                     {f['Estimated Value'] != null && <Chip accent>${f['Estimated Value'].toFixed(0)}</Chip>}
                   </div>
                 </div>

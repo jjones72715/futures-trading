@@ -73,7 +73,7 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
         ),
       fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand'),
       fetchTable(HOTEL_TEMPLATES_TABLE, [
-        'Template Name', 'Card', 'Person', 'Record Type', 'How Earned',
+        'Template Name', 'Name / Label', 'Hotel Brand', 'Card', 'Person', 'Record Type', 'How Earned',
         'Spend Threshold Amount', 'Benefit Type', 'Reset Cycle', 'Estimated Value', 'Notes',
       ]).then(r => r.sort((a, b) =>
         (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || ''))),
@@ -94,6 +94,8 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
     const f = rec.fields;
     setForm(prev => ({
       ...prev,
+      name: f['Name / Label'] || prev.name,
+      hotelBrand: f['Hotel Brand'] || prev.hotelBrand,
       recordType: f['Record Type'] || prev.recordType,
       howEarned: f['How Earned'] || prev.howEarned,
       spendThreshold: f['Spend Threshold Amount'] != null ? String(f['Spend Threshold Amount']) : prev.spendThreshold,
@@ -101,7 +103,6 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
       resetCycle: f['Reset Cycle'] || prev.resetCycle,
       estimatedValue: f['Estimated Value'] != null ? String(f['Estimated Value']) : prev.estimatedValue,
       notes: f['Notes'] || prev.notes,
-      // pre-fill card/person only if the form doesn't already have them set
       cardId: prev.cardId || ((f['Card'] || [])[0] || ''),
       personId: prev.personId || ((f['Person'] || [])[0] || ''),
     }));
