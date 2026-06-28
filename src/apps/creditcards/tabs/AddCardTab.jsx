@@ -269,7 +269,7 @@ export function AddCardTab() {
         const filter = `FIND("${form.currentProductId}",ARRAYJOIN({Card Product}))`;
         const matchingDefs = await fetchTable(
           PERK_DEFINITIONS_TABLE,
-          ['Perk Name', 'Card Type', 'Reset Cycle', 'Priority Score'],
+          ['Perk Name', 'Card Type', 'Reset Cycle', 'Credit Amount', 'Priority Score'],
           { filterByFormula: filter }
         );
 
@@ -288,8 +288,12 @@ export function AddCardTab() {
                 'Card': [newCardId],
                 'Person': [personId],
                 'Used': false,
+                'Label': def.fields['Perk Name'] || '',
               };
               if (nextDateStr) instanceFields['Next Reset Date'] = nextDateStr;
+              if (cycle) instanceFields['Reset Cycle'] = cycle;
+              if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
+              if (def.fields['Priority Score'] != null) instanceFields['Priority Score'] = def.fields['Priority Score'];
               instancePromises.push(createRecord(PERK_INSTANCES_TABLE, instanceFields));
             }
           }

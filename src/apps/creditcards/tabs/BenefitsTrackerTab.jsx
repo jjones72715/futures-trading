@@ -83,7 +83,7 @@ export function BenefitsTrackerTab() {
 
     // Step 1 — load defs and instances together
     const [allInst, defs, cards] = await Promise.all([
-      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score']),
+      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle']),
       fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
@@ -107,7 +107,7 @@ export function BenefitsTrackerTab() {
       await Promise.all(toReset.map(async r => {
         const defId = (r.fields['Perk Definition'] || [])[0];
         const def = defId ? defMap[defId] : null;
-        const cycle = def?.['Reset Cycle'];
+        const cycle = r.fields['Reset Cycle'] || def?.['Reset Cycle'];
         const currentDate = r.fields['Next Reset Date'];
         const newDate = cycle && currentDate ? advanceUntilFuture(cycle, currentDate) : null;
 
@@ -142,7 +142,7 @@ export function BenefitsTrackerTab() {
       const [portfolio, defs, existingInst] = await Promise.all([
         fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
         fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score']),
-        fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition', 'Label', 'Credit Amount', 'Priority Score']),
+        fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition', 'Label', 'Credit Amount', 'Priority Score', 'Reset Cycle']),
       ]);
 
       // Index defs by record ID and by Card Product record ID
@@ -205,6 +205,8 @@ export function BenefitsTrackerTab() {
                 patch['Credit Amount'] = def.fields['Credit Amount'];
               if (existing.fields['Priority Score'] == null && def.fields['Priority Score'] != null)
                 patch['Priority Score'] = def.fields['Priority Score'];
+              if (!existing.fields['Reset Cycle'] && def.fields['Reset Cycle'])
+                patch['Reset Cycle'] = def.fields['Reset Cycle'];
               if (Object.keys(patch).length > 0) patches.push({ id: existing.id, fields: patch });
               else skipped++;
               continue;
@@ -221,6 +223,7 @@ export function BenefitsTrackerTab() {
             if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
             if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
             if (def.fields['Priority Score'] != null) instanceFields['Priority Score'] = def.fields['Priority Score'];
+            if (def.fields['Reset Cycle']) instanceFields['Reset Cycle'] = def.fields['Reset Cycle'];
             creates.push({ fields: instanceFields, cardId });
             existingByKey[key] = { id: 'pending', fields: instanceFields };
           }
@@ -303,7 +306,7 @@ export function BenefitsTrackerTab() {
       personId: personId || '',
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       creditAmount: def['Credit Amount'] ?? null,
-      resetCycle: def['Reset Cycle'] || '',
+      resetCycle: f['Reset Cycle'] || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
       nextResetDate: f['Next Reset Date'] || '',
       used: f['Used'] || false,
