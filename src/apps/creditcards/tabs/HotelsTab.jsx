@@ -12,6 +12,32 @@ function num(v) {
   return isFinite(n) ? n : null;
 }
 
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00');
+  return Math.round((d - today) / (1000 * 60 * 60 * 24));
+}
+
+function sortByDate(records, dateField) {
+  return [...records].sort((a, b) => {
+    const da = a.fields[dateField];
+    const db = b.fields[dateField];
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.localeCompare(db);
+  });
+}
+
+function urgencyStyle(days) {
+  if (days === null) return {};
+  if (days <= 30) return { background: 'rgba(255,215,0,0.08)', borderLeft: '3px solid #FFD700' };
+  if (days <= 90) return { background: 'rgba(255,140,0,0.06)', borderLeft: '3px solid #FF8C00' };
+  return {};
+}
+
 function extractSelectName(v) {
   if (!v) return null;
   if (Array.isArray(v)) return v[0]?.name || v[0] || null;
@@ -132,8 +158,8 @@ export function HotelsTab() {
   const visibleHotels = filterByPerson(hotelRecords, 'Person').filter(r => showUsed || !r.fields['Used']);
   const visibleCredits = filterByPerson(perkCredits, 'Person').filter(r => showUsed || !r.fields['Used']);
 
-  const freeNights = visibleHotels.filter(r => extractSelectName(r.fields['Record Type']) === 'Free Night');
-  const hotelCredits = visibleCredits; // already filtered by Credit Type = Hotel Credit
+  const freeNights = sortByDate(visibleHotels.filter(r => extractSelectName(r.fields['Record Type']) === 'Free Night'), 'Expiration Date');
+  const hotelCredits = sortByDate(visibleCredits, 'Next Reset Date');
 
   const expiringSoon = visibleHotels.filter(r => num(r.fields['Expiring Soon']) === 1);
 
@@ -190,20 +216,23 @@ export function HotelsTab() {
           {freeNights.length === 0 ? (
             <div style={{ padding: '1.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem' }}>No free nights found.</div>
           ) : freeNights.map(r => {
-            const expiring = num(r.fields['Expiring Soon']) === 1;
-            const days = num(r.fields['Days Until Expiration']);
+            const days = num(r.fields['Days Until Expiration']) ?? daysUntil(r.fields['Expiration Date']);
+            const urgent = days !== null && days <= 30;
+            const warning = !urgent && days !== null && days <= 90;
             const cardIds = r.fields['Card'] || [];
             const personIds = r.fields['Person'] || [];
             const used = r.fields['Used'] || false;
+            const highlight = urgencyStyle(days);
+            const dateColor = urgent ? '#FFD700' : warning ? '#FF8C00' : 'rgba(255,255,255,0.6)';
             return (
-              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 100px 1fr 1.2fr 90px 90px 80px 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: expiring ? 'rgba(255,215,0,0.05)' : 'transparent', alignItems: 'center', opacity: used ? 0.4 : 1 }}>
-                <span style={{ fontSize: '0.85rem', color: expiring ? '#FFD700' : '#fff', fontWeight: 500 }}>{cardIds.map(id => cardNames[id] || id).join(', ') || '—'}</span>
+              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 100px 1fr 1.2fr 90px 90px 80px 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1, ...highlight }}>
+                <span style={{ fontSize: '0.85rem', color: urgent ? '#FFD700' : warning ? '#FF8C00' : '#fff', fontWeight: 500 }}>{cardIds.map(id => cardNames[id] || id).join(', ') || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)' }}>{r.fields['Hotel Brand'] || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{getPersonName(personIds)}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{r.fields['Benefit Type'] || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: '#00E676' }}>{num(r.fields['Estimated Value']) != null ? $$(num(r.fields['Estimated Value'])) : '—'}</span>
-                <span style={{ fontSize: '0.82rem', color: expiring ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>{r.fields['Expiration Date'] || '—'}</span>
-                <span style={{ fontSize: '0.82rem', color: expiring ? '#FFD700' : (days !== null && days <= 90 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)'), fontWeight: expiring ? 600 : 400 }}>{days !== null ? days : '—'}</span>
+                <span style={{ fontSize: '0.82rem', color: dateColor, fontWeight: (urgent || warning) ? 600 : 400 }}>{r.fields['Expiration Date'] || '—'}</span>
+                <span style={{ fontSize: '0.82rem', color: dateColor, fontWeight: (urgent || warning) ? 600 : 400 }}>{days !== null ? days : '—'}</span>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <input type="checkbox" checked={used} disabled={!!toggling[r.id]} onChange={() => toggleHotelUsed(r)} style={{ width: 18, height: 18, accentColor: '#00D4FF', cursor: 'pointer' }} />
                 </div>
@@ -229,13 +258,18 @@ export function HotelsTab() {
             const personIds = r.fields['Person'] || [];
             const used = r.fields['Used'] || false;
             const nextReset = r.fields['Next Reset Date'];
+            const days = daysUntil(nextReset);
+            const urgent = days !== null && days <= 30;
+            const warning = !urgent && days !== null && days <= 90;
+            const highlight = urgencyStyle(days);
+            const dateColor = urgent ? '#FFD700' : warning ? '#FF8C00' : 'rgba(255,255,255,0.6)';
             return (
-              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 100px 1.2fr 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1 }}>
-                <span style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 500 }}>{cardIds.map(id => cardNames[id] || id).join(', ') || '—'}</span>
+              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 100px 1.2fr 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1, ...highlight }}>
+                <span style={{ fontSize: '0.85rem', color: urgent ? '#FFD700' : warning ? '#FF8C00' : '#fff', fontWeight: 500 }}>{cardIds.map(id => cardNames[id] || id).join(', ') || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{r.fields['Label'] || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{getPersonName(personIds)}</span>
                 <span style={{ fontSize: '0.82rem', color: '#00D4FF', fontWeight: 700 }}>{r.fields['Credit Amount'] != null ? `$${r.fields['Credit Amount']}` : '—'}</span>
-                <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)' }}>{nextReset || '—'}</span>
+                <span style={{ fontSize: '0.82rem', color: dateColor, fontWeight: (urgent || warning) ? 600 : 400 }}>{nextReset || '—'}</span>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <input type="checkbox" checked={used} disabled={!!toggling[r.id]} onChange={() => togglePerkUsed(r)} style={{ width: 18, height: 18, accentColor: '#00D4FF', cursor: 'pointer' }} />
                 </div>
