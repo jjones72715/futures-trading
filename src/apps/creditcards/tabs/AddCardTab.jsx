@@ -255,7 +255,7 @@ export function AddCardTab() {
     if (form.annualFee !== '')   fields['Annual Fee Amount'] = parseFloat(form.annualFee);
     if (form.annualFeeMonth)     fields['Annual Fee Post Month'] = parseInt(form.annualFeeMonth);
     if (form.statementCloseDay)  fields['Statement Close Day'] = parseInt(form.statementCloseDay);
-    if (form.last4)              fields['Last 4/Last 5 (AMEX)'] = parseInt(form.last4);
+    if (form.last4)              fields['Last 4/Last 5 (AMEX)'] = form.last4;
     if (form.rewardsProgramId)   fields['Rewards Program'] = [form.rewardsProgramId];
     if (form.cancelRisk)         fields['Cancel Risk Level'] = form.cancelRisk;
 
