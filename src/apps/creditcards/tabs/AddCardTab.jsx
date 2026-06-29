@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createRecord, fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, BANKS_TABLE, REWARDS_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -52,24 +52,36 @@ export function AddCardTab() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchTable(CARD_PRODUCTS_TABLE, ['Product Name', 'Issuer', 'Annual Fee', 'Rewards Program'])
-      .then(records => {
-        const mapped = records
-          .map(r => ({
+    Promise.all([
+      fetchTable(CARD_PRODUCTS_TABLE, ['Product Name', 'Annual Fee', 'Issuer', 'Rewards Program']),
+      fetchTable(BANKS_TABLE, ['Bank Name']),
+      fetchTable(REWARDS_TABLE, ['Name']),
+    ]).then(([productRecords, bankRecords, rewardRecords]) => {
+      const bankMap = {};
+      bankRecords.forEach(r => { bankMap[r.id] = r.fields['Bank Name']; });
+      const rewardsMap = {};
+      rewardRecords.forEach(r => { rewardsMap[r.id] = r.fields['Name']; });
+
+      const mapped = productRecords
+        .map(r => {
+          const issuerId = r.fields['Issuer']?.[0];
+          const rpId = r.fields['Rewards Program']?.[0];
+          return {
             id: r.id,
             name: r.fields['Product Name'] || '',
             fee: r.fields['Annual Fee'] ?? 0,
-            bank: r.fields['Issuer']?.[0]?.name || '',
-            bankId: r.fields['Issuer']?.[0]?.id || '',
-            rpId: r.fields['Rewards Program']?.[0]?.id || '',
-            rpName: r.fields['Rewards Program']?.[0]?.name || '',
-          }))
-          .filter(p => p.name && p.bank)
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setProducts(mapped);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingProducts(false));
+            bank: bankMap[issuerId] || '',
+            bankId: issuerId || '',
+            rpId: rpId || '',
+            rpName: rewardsMap[rpId] || '',
+          };
+        })
+        .filter(p => p.name && p.bank)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setProducts(mapped);
+    })
+    .catch(() => {})
+    .finally(() => setLoadingProducts(false));
   }, []);
 
   const allBanks = [...new Set(products.map(p => p.bank))].sort();
