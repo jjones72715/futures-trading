@@ -305,7 +305,7 @@ export function BenefitsTrackerTab() {
       personId: personId || '',
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       creditAmount: f['Credit Amount'] ?? def['Credit Amount'] ?? null,
-      creditType: f['Credit Type'] ? (typeof f['Credit Type'] === 'object' ? f['Credit Type'].name : f['Credit Type']) : null,
+      creditType: (() => { const ct = f['Credit Type']; if (!ct) return null; if (Array.isArray(ct)) return ct[0]?.name || ct[0] || null; if (typeof ct === 'object') return ct.name || null; return ct; })(),
       lastDigits: f['Last Digits'] ?? null,
       resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
