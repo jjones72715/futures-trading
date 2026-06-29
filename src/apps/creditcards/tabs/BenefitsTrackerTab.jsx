@@ -72,6 +72,7 @@ export function BenefitsTrackerTab() {
   const [resetStatus, setResetStatus] = useState('');
   const [personFilter, setPersonFilter] = useState('All');
   const [cycleFilter, setCycleFilter] = useState('All');
+  const [creditTypeFilter, setCreditTypeFilter] = useState('All');
   const [showAll, setShowAll] = useState(false);
   const [toggling, setToggling] = useState({});
   const [syncing, setSyncing] = useState(false);
@@ -83,7 +84,7 @@ export function BenefitsTrackerTab() {
 
     // Step 1 — load defs and instances together
     const [allInst, defs, cards] = await Promise.all([
-      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits']),
+      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits', 'Credit Type']),
       fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Type', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
@@ -304,6 +305,7 @@ export function BenefitsTrackerTab() {
       personId: personId || '',
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       creditAmount: f['Credit Amount'] ?? def['Credit Amount'] ?? null,
+      creditType: f['Credit Type'] ?? null,
       lastDigits: f['Last Digits'] ?? null,
       resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
@@ -312,9 +314,12 @@ export function BenefitsTrackerTab() {
     };
   });
 
+  const creditTypes = ['All', ...new Set(enriched.map(r => r.creditType).filter(Boolean)).values()].sort((a, b) => a === 'All' ? -1 : a.localeCompare(b));
+
   const filtered = enriched.filter(row => {
     if (personFilter !== 'All' && row.personName !== personFilter) return false;
     if (cycleFilter !== 'All' && row.resetCycle !== cycleFilter) return false;
+    if (creditTypeFilter !== 'All' && row.creditType !== creditTypeFilter) return false;
     if (!showAll && row.used) return false;
     return true;
   });
@@ -396,6 +401,14 @@ export function BenefitsTrackerTab() {
               <PillBtn key={c} active={cycleFilter === c} onClick={() => setCycleFilter(c)}>{c}</PillBtn>
             ))}
           </div>
+          {creditTypes.length > 1 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Type</span>
+              {creditTypes.map(t => (
+                <PillBtn key={t} active={creditTypeFilter === t} onClick={() => setCreditTypeFilter(t)}>{t}</PillBtn>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Show</span>
             <button type="button" onClick={() => setShowAll(false)} style={{
@@ -457,10 +470,17 @@ export function BenefitsTrackerTab() {
                 opacity: dimmed ? 0.4 : 1,
                 transition: 'opacity 0.15s',
               }}>
-                <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
-                  {soon && <span style={{ marginRight: 6, fontSize: '0.75rem', color: '#FFD700', fontWeight: 700 }}>⚡</span>}
-                  {row.perkName}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
+                    {soon && <span style={{ marginRight: 6, fontSize: '0.75rem', color: '#FFD700', fontWeight: 700 }}>⚡</span>}
+                    {row.perkName}
+                  </span>
+                  {row.creditType && (
+                    <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>
+                      {row.creditType}
+                    </span>
+                  )}
+                </div>
                 <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {row.cardName}
                   {row.lastDigits != null && (
