@@ -16,7 +16,6 @@ const TABS = [
   { id: 'recommendations', label: 'Card Recommendations' },
   { id: 'add', label: 'Add Card' },
   { id: 'add-hotel', label: 'Add Hotel Benefit' },
-  { id: 'hotel-templates', label: 'Hotel Templates' },
 ];
 
 export default function CreditCardsApp() {
