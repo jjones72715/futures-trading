@@ -177,8 +177,12 @@ export function HotelsTab() {
 
   const visible = showUsed ? personFiltered : personFiltered.filter(r => !r.fields['Used']);
 
-  const freeNights = visible.filter(r => r.fields['Record Type'] === 'Free Night');
-  const hotelCredits = visible.filter(r => r.fields['Record Type'] === 'Hotel Credit');
+  function recordType(r) {
+    const rt = r.fields['Record Type'];
+    return rt ? (typeof rt === 'object' ? rt.name : rt) : '';
+  }
+  const freeNights = visible.filter(r => recordType(r) === 'Free Night');
+  const hotelCredits = visible.filter(r => recordType(r) === 'Hotel Credit');
 
   const expiringSoon = visible.filter(r => num(r.fields['Expiring Soon']) === 1);
   const totalEstValue = visible.reduce((sum, r) => sum + (num(r.fields['Estimated Value']) || 0), 0);
