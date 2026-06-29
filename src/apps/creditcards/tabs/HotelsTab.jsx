@@ -136,10 +136,6 @@ export function HotelsTab() {
   const hotelCredits = visibleCredits; // already filtered by Credit Type = Hotel Credit
 
   const expiringSoon = visibleHotels.filter(r => num(r.fields['Expiring Soon']) === 1);
-  const totalEstValue = [
-    ...freeNights.reduce((sum, r) => sum + (num(r.fields['Estimated Value']) || 0), 0),
-    ...hotelCredits.map(r => r.fields['Credit Amount'] || 0),
-  ].reduce((a, b) => a + b, 0);
 
   if (loading) return <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Loading hotel benefits…</div>;
   if (error) return <div style={{ padding: '2rem', color: '#FF4D4D' }}>Error: {error}</div>;
