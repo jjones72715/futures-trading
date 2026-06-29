@@ -141,8 +141,6 @@ const REWARDS_PROGRAMS = [
   { id: 'reczjUhLxLhxvr5sq', name: 'Wyndham Rewards' },
 ];
 
-// Only these values are valid for the Portfolio Issuer singleSelect field
-const VALID_PORTFOLIO_ISSUERS = new Set(['American Express', 'Barclays', 'Capital One', 'Chase', 'Citi']);
 
 const ALL_BANKS = [...new Set(PRODUCTS.map(p => p.bank))].sort();
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -248,7 +246,7 @@ export function AddCardTab() {
       'Status': form.status,
       'Owner': form.ownerIds,
     };
-    if (form.issuer && VALID_PORTFOLIO_ISSUERS.has(form.issuer)) fields['Issuer'] = form.issuer;
+    if (form.issuer) fields['Issuer'] = form.issuer;
     if (form.personalBusiness)   fields['Personal/Business'] = form.personalBusiness;
     if (form.currentProductId)   fields['Current Product'] = [form.currentProductId];
     if (form.openDate)           fields['Open Date'] = form.openDate;
