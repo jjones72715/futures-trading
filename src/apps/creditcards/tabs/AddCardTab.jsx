@@ -168,7 +168,7 @@ export function AddCardTab() {
         const filter = `FIND("${form.currentProductId}",ARRAYJOIN({Card Product}))`;
         const matchingDefs = await fetchTable(
           PERK_DEFINITIONS_TABLE,
-          ['Perk Name', 'Card Type', 'Reset Cycle', 'Credit Amount', 'Priority Score'],
+          ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score'],
           { filterByFormula: filter }
         );
 

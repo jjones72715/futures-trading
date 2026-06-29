@@ -305,7 +305,7 @@ export function BenefitsTrackerTab() {
       personId: personId || '',
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       creditAmount: f['Credit Amount'] ?? def['Credit Amount'] ?? null,
-      creditType: f['Credit Type'] ?? null,
+      creditType: f['Credit Type'] ? (typeof f['Credit Type'] === 'object' ? f['Credit Type'].name : f['Credit Type']) : null,
       lastDigits: f['Last Digits'] ?? null,
       resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
@@ -314,7 +314,7 @@ export function BenefitsTrackerTab() {
     };
   });
 
-  const creditTypes = ['All', ...new Set(enriched.map(r => r.creditType).filter(Boolean)).values()].sort((a, b) => a === 'All' ? -1 : a.localeCompare(b));
+  const creditTypes = ['All', ...[...new Set(enriched.map(r => r.creditType).filter(Boolean))].sort()];
 
   const filtered = enriched.filter(row => {
     if (personFilter !== 'All' && row.personName !== personFilter) return false;
