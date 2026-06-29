@@ -1,162 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createRecord, fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
-
-const BANKS = {
-  'American Express': 'recmOSLhOAYVqi09z',
-  'Barclays': 'recirpPT41J9yWOso',
-  'Bank of America': 'recUwpGOntDp5O9Pn',
-  'Capital One': 'reci7K7HYue3nEx7e',
-  'Cardless': 'recuAO5OVmsDNWW6D',
-  'Chase': 'recgw2ngVEO8gBpoq',
-  'Citi': 'rec9ePERLvVM24fqx',
-  'Discover': 'rec2BUeHI8gDyNcya',
-  'Mercury': 'rec8clRqXmQ4EjDEI',
-  'U.S. Bank': 'recRyPOXcDNKrWK53',
-  'Wells Fargo': 'recRKg9TA1IQpRkmH',
-};
-
-// Baked-in from Airtable — avoids a fetch on form load
-const PRODUCTS = [
-  { id: 'recnxBW7eVc4CtQ2Y', name: 'AA Red', fee: 99, bank: 'Barclays', rpId: 'rec55IJ1WaYQmpeu8' },
-  { id: 'rechmgMCYxoRkY5Om', name: 'AAdvantage Business Card', fee: 99, bank: 'Citi', rpId: 'rec55IJ1WaYQmpeu8' },
-  { id: 'rec1DsnGwWXeypPiI', name: 'AAdvantage Executive Card', fee: 595, bank: 'Citi', rpId: 'rec55IJ1WaYQmpeu8' },
-  { id: 'reczcwvCDEUGLKkxx', name: 'AAdvantage Globe Card', fee: 350, bank: 'Citi', rpId: 'rec55IJ1WaYQmpeu8' },
-  { id: 'rec0rSBC6c20j2XSY', name: 'AAdvantage Mile Up Card', fee: 0, bank: 'Citi', rpId: 'rec55IJ1WaYQmpeu8' },
-  { id: 'recBZ1QCLxfnFrpsO', name: 'AAdvantage Platinum Select', fee: 99, bank: 'Citi', rpId: 'rec55IJ1WaYQmpeu8' },
-  { id: 'rectLpaEVePqAsMzT', name: 'Aer Lingus Card', fee: 95, bank: 'Chase', rpId: 'rec76U3fn4IPPgJEX' },
-  { id: 'rec2h4Dbzttky2FxR', name: 'Aeroplan Card', fee: 95, bank: 'Chase', rpId: 'recVYmtytrNTEuNs8' },
-  { id: 'rec68g2J1nx242idu', name: 'Air France/KLM Card', fee: 89, bank: 'Bank of America', rpId: 'recj0D9sIyA6xLrDK' },
-  { id: 'recJjUDd9iZPjib8W', name: 'Altitude Connect Card', fee: 0, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recogOrJfY7NsoI7c', name: 'Altitude Go Card', fee: 0, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recyzPOvmEoawdye5', name: 'Altitude Reserve Card', fee: 400, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recarklxP7aJp0fZl', name: 'Amex Business Gold', fee: 375, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'recP0Fkz9HZsLAaBI', name: 'Amex Business Green', fee: 95, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'rec2x86ypeE8g9RtY', name: 'Amex Business Platinum', fee: 895, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'recFC4YKM7TYDn2oq', name: 'Amex Gold', fee: 325, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'receZOXZeDUtGeoJS', name: 'Amex Green', fee: 150, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'recNcffVXplx0wr2X', name: 'Amex Platinum', fee: 895, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'recQb3rU8mSrNV3l3', name: 'Atmos Ascent Card', fee: 95, bank: 'Bank of America', rpId: 'recKOeD2LeTE2umQ2' },
-  { id: 'recUMNurkZLbXxBtL', name: 'Atmos Business Card', fee: 95, bank: 'Bank of America', rpId: 'recKOeD2LeTE2umQ2' },
-  { id: 'recxMv4Ip4LOsChlk', name: 'Atmos Summit Card', fee: 395, bank: 'Bank of America', rpId: 'recKOeD2LeTE2umQ2' },
-  { id: 'recynJvlC4isNG9CS', name: 'Autograph Card', fee: 0, bank: 'Wells Fargo', rpId: 'recNtJU89S1XzM2oi' },
-  { id: 'recUmBqJLn2dVTsrJ', name: 'Autograph Journey Card', fee: 95, bank: 'Wells Fargo', rpId: 'recNtJU89S1XzM2oi' },
-  { id: 'rec9SVlC07lHEtdKd', name: 'Bank of America Customized Cash Rewards', fee: 0, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'rec5Z4D40ABESaS0g', name: 'Bank of America Premium Rewards', fee: 95, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recmUKR6jTRoA5I4h', name: 'Bank of America Premium Rewards Elite', fee: 550, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recVPx81NIKrYrPdn', name: 'Bank of America Travel Rewards', fee: 0, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'reckawZ1L94DF3tPF', name: 'Bank of America Unlimited Cash Rewards', fee: 0, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recdh7Rmh5GUmPvn3', name: 'Best Western Card', fee: 89, bank: 'Mercury', rpId: 'recQBrBYWXeCoUDDR' },
-  { id: 'rec7QwlahhDIBhuWZ', name: 'Bilt Blue Card', fee: 0, bank: 'Cardless', rpId: 'recpgINanUGsm06PB' },
-  { id: 'recN6VeeDWHXgjKbE', name: 'Bilt Odsidian Card', fee: 95, bank: 'Cardless', rpId: 'recpgINanUGsm06PB' },
-  { id: 'recns9ZiVvGgXIQXz', name: 'Bilt Palladium Card', fee: 495, bank: 'Cardless', rpId: 'recpgINanUGsm06PB' },
-  { id: 'recg82ZL6tATjga0S', name: 'Blue Business Plus', fee: 0, bank: 'American Express', rpId: 'recoRV4OeBwFuxgAC' },
-  { id: 'recbC3jxkmmqYAXoZ', name: 'BOA Travel Rewards Business', fee: 0, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recqOoxQrLL9ymFdr', name: 'Bonvoy', fee: 0, bank: 'American Express', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'recwb0QUMnhiPf3Yl', name: 'Bonvoy Bevy', fee: 250, bank: 'American Express', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'rec9qkZ6fkmAtHqv8', name: 'Bonvoy Brilliant', fee: 650, bank: 'American Express', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'recWzxsrYLZKXsI5I', name: 'Bonvoy Business', fee: 125, bank: 'American Express', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'recZ5tK0dIUYnPeFx', name: 'British Airways Card', fee: 95, bank: 'Chase', rpId: 'rec76U3fn4IPPgJEX' },
-  { id: 'rec7RM1MtPRiEswdK', name: 'Business Advantage Unlimited Card', fee: 0, bank: 'Bank of America', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recZAIvyd6KiANA2Z', name: 'Business Altitude Connect Card', fee: 95, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recmknd2TO85NgjIU', name: 'Business Altitude Power Card', fee: 195, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recEmlTTaXRB6PUEt', name: 'Business Leverage Card', fee: 95, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recIvHgSaPXS7RkUp', name: 'Chase Freedom (Legacy)', fee: 0, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recooimoqT4NgnEUr', name: 'Chase Freedom Flex', fee: 0, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recTPPFBiVazBFQFp', name: 'Chase Freedom Unlimited', fee: 0, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recydhNjtNPSdJBM3', name: 'Chase Sapphire Business', fee: 795, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recgtMKAR7T9n2QFO', name: 'Chase Sapphire Preferred', fee: 95, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recW0ZNmsK6apxq0a', name: 'Chase Sapphire Reserve', fee: 795, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recLyySLtkHcXFNXa', name: 'Choice Privileges Card', fee: 0, bank: 'Wells Fargo', rpId: 'recgZCguJJSeTkS3T' },
-  { id: 'recUh67VZYOXMdjd9', name: 'Choice Privileges Select Card', fee: 95, bank: 'Wells Fargo', rpId: 'recgZCguJJSeTkS3T' },
-  { id: 'rec6cv5Qr5qYwe6Mw', name: 'Custom Cash Card', fee: 0, bank: 'Citi', rpId: 'recxHZ1Zyd6EHgkcd' },
-  { id: 'recS2cGSHe11BkzRc', name: 'Discover Card', fee: 0, bank: 'Discover', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recB9AAD2EXLSdFgA', name: 'Double Cash Card', fee: 0, bank: 'Citi', rpId: 'recxHZ1Zyd6EHgkcd' },
-  { id: 'recxaRF3OYuU7AhU8', name: 'Hilton Aspire', fee: 550, bank: 'American Express', rpId: 'recSKJfk2KVcCqRKG' },
-  { id: 'recCfU3PGyv0xeRDg', name: 'Hilton Business', fee: 195, bank: 'American Express', rpId: 'recSKJfk2KVcCqRKG' },
-  { id: 'recOxMypidnrPk7wk', name: 'Hilton Free', fee: 0, bank: 'American Express', rpId: 'recSKJfk2KVcCqRKG' },
-  { id: 'rec7VXIrrlT2LEdiq', name: 'Hilton Surpass', fee: 150, bank: 'American Express', rpId: 'recSKJfk2KVcCqRKG' },
-  { id: 'rec8NZbaS9uBSCajh', name: 'Hyatt Business Card', fee: 199, bank: 'Chase', rpId: 'reclzb13sunBKONLc' },
-  { id: 'reclzMh4kvNNI7ZM6', name: 'Iberia Card', fee: 95, bank: 'Chase', rpId: 'rec76U3fn4IPPgJEX' },
-  { id: 'recPpVtBoy3E7QRmp', name: 'IHG Premier Business', fee: 99, bank: 'Chase', rpId: 'rec5Ey6PfbSqs09WW' },
-  { id: 'rectaurhW2VSUo7Ox', name: 'IHG Premier Card', fee: 99, bank: 'Chase', rpId: 'rec5Ey6PfbSqs09WW' },
-  { id: 'recvFGw0L79WdKjVh', name: 'IHG Traveler', fee: 0, bank: 'Chase', rpId: 'rec5Ey6PfbSqs09WW' },
-  { id: 'reccOQNsLH1rco8gi', name: 'Ink Business Cash', fee: 0, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recKaKSPSzhIDVbx6', name: 'Ink Business Preferred', fee: 95, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recIOH0r0opsMEGwz', name: 'Ink Business Premier', fee: 195, bank: 'Chase', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'rec78MKDDWWET4Nnr', name: 'Ink Business Unlimited', fee: 0, bank: 'Chase', rpId: 'reckXeIUYBdb6t1mi' },
-  { id: 'recRsomfYxu0XVqnp', name: 'JetBlue Business Card', fee: 99, bank: 'Barclays', rpId: 'rec639FwT4wR3st0K' },
-  { id: 'rech6SLp0cckwtx1h', name: 'JetBlue Card', fee: 0, bank: 'Barclays', rpId: 'rec639FwT4wR3st0K' },
-  { id: 'recyWrFLOvH5Ps63d', name: 'JetBlue Plus Card', fee: 99, bank: 'Barclays', rpId: 'rec639FwT4wR3st0K' },
-  { id: 'recGiMfq5OU0elSqG', name: 'JetBlue Premier Card', fee: 499, bank: 'Barclays', rpId: 'rec639FwT4wR3st0K' },
-  { id: 'recmh94PmYNphPof5', name: 'Lifemiles Card', fee: 99, bank: 'Cardless', rpId: 'recpF7WLSm4xCJ8Sm' },
-  { id: 'recc5VJTCmdo4to4E', name: 'Lifemiles Elite Card', fee: 249, bank: 'Cardless', rpId: 'recpF7WLSm4xCJ8Sm' },
-  { id: 'recav4ohWqXaU4C0q', name: 'Marriott Bonvoy Bold', fee: 0, bank: 'Chase', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'rec2V88hGAUvzz4iS', name: 'Marriott Bonvoy Boundless', fee: 95, bank: 'Chase', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'recvq7kWq6cjcwBST', name: 'Marriott Bonvoy Bountiful', fee: 250, bank: 'Chase', rpId: 'recCrkqmUVPxcvoSR' },
-  { id: 'recDBIXjAjQbXF6Bo', name: 'Savor Cash Card', fee: 0, bank: 'Capital One', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recKT6aYDKKMfYasM', name: 'SavorOne Card', fee: 39, bank: 'Capital One', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recOG8NM8urHvalRB', name: 'Signify Business Cash', fee: 0, bank: 'Wells Fargo', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recaTHRjpFpjmKctc', name: 'Southwest Performance Business', fee: 299, bank: 'Chase', rpId: 'recwN2LICpUqtRyWP' },
-  { id: 'recf98sHtWYO3srcR', name: 'Southwest Premier', fee: 149, bank: 'Chase', rpId: 'recwN2LICpUqtRyWP' },
-  { id: 'recIB8WdVC2IIohJl', name: 'Southwest Premier Business', fee: 149, bank: 'Chase', rpId: 'recwN2LICpUqtRyWP' },
-  { id: 'recnqdUPyIjp979SG', name: 'Southwest Priority', fee: 229, bank: 'Chase', rpId: 'recwN2LICpUqtRyWP' },
-  { id: 'rec8YEAkt5bI7C7QD', name: 'Southwest Rewards Plus', fee: 99, bank: 'Chase', rpId: 'recwN2LICpUqtRyWP' },
-  { id: 'recvr78qCLigELkM1', name: 'Spark Cash Card', fee: 95, bank: 'Capital One', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'rec0TCfJBgQybsSa7', name: 'Spark Cash Plus Card', fee: 150, bank: 'Capital One', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'reckbjNKctZ2rhG7d', name: 'Spark Cash Select', fee: 0, bank: 'Capital One', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recn8OpGL942xLc4I', name: 'Spark Miles', fee: 95, bank: 'Capital One', rpId: 'recL2Huh7e9Uh14o4' },
-  { id: 'recT7PURf6Kkxb77l', name: 'Spark Miles Select', fee: 0, bank: 'Capital One', rpId: 'recL2Huh7e9Uh14o4' },
-  { id: 'rec6R932NEC5UidoW', name: 'Strata Card', fee: 0, bank: 'Citi', rpId: 'recxHZ1Zyd6EHgkcd' },
-  { id: 'recJJ0y02Z8Iv4iNm', name: 'Strata Elite Card', fee: 595, bank: 'Citi', rpId: 'recxHZ1Zyd6EHgkcd' },
-  { id: 'reca0WvpGGg0NkzTP', name: 'Strata Premier Card', fee: 95, bank: 'Citi', rpId: 'recxHZ1Zyd6EHgkcd' },
-  { id: 'recYVeDhyt0czqfth', name: 'Triple Cash Business Card', fee: 0, bank: 'U.S. Bank', rpId: 'recsJ9CLOzTWRVRNm' },
-  { id: 'recz8Omf2ntlgeWJK', name: 'United Business Card', fee: 150, bank: 'Chase', rpId: 'recdOXsN7ckt3EZF0' },
-  { id: 'recS4wzyRDPTSLrSS', name: 'United Club Business Card', fee: 695, bank: 'Chase', rpId: 'recdOXsN7ckt3EZF0' },
-  { id: 'recEd29vRnHmrQlt5', name: 'United Club Card', fee: 695, bank: 'Chase', rpId: 'recdOXsN7ckt3EZF0' },
-  { id: 'rec5IW6nSAqjro4Nm', name: 'United Explorer Card', fee: 150, bank: 'Chase', rpId: 'recdOXsN7ckt3EZF0' },
-  { id: 'recDQBbMhjYWaAcvK', name: 'United Gateway Card', fee: 0, bank: 'Chase', rpId: 'recdOXsN7ckt3EZF0' },
-  { id: 'reczEggdDbqYR12yt', name: 'United Quest Card', fee: 350, bank: 'Chase', rpId: 'recdOXsN7ckt3EZF0' },
-  { id: 'recX92iE2zH9OyLhx', name: 'Venture Card', fee: 95, bank: 'Capital One', rpId: 'recL2Huh7e9Uh14o4' },
-  { id: 'reclIv2w9Csi6b8Ap', name: 'Venture X Business Card', fee: 395, bank: 'Capital One', rpId: 'recL2Huh7e9Uh14o4' },
-  { id: 'recCAScs1cSrZff4M', name: 'Venture X Card', fee: 395, bank: 'Capital One', rpId: 'recL2Huh7e9Uh14o4' },
-  { id: 'recGqWiKLuLcQjSNU', name: 'VentureOne Card', fee: 0, bank: 'Capital One', rpId: 'recL2Huh7e9Uh14o4' },
-  { id: 'recSO40Ib0pI6OJVP', name: 'World of Hyatt Credit Card', fee: 95, bank: 'Chase', rpId: 'reclzb13sunBKONLc' },
-  { id: 'recn9RjAn2dENIQE5', name: 'Wyndham Earner Business Card', fee: 95, bank: 'Barclays', rpId: 'reczjUhLxLhxvr5sq' },
-  { id: 'reciOo605ZjWKoDqG', name: 'Wyndham Earner Card', fee: 0, bank: 'Barclays', rpId: 'reczjUhLxLhxvr5sq' },
-  { id: 'recB1bLzSiSpiCbYh', name: 'Wyndham Earner Plus Card', fee: 75, bank: 'Barclays', rpId: 'reczjUhLxLhxvr5sq' },
-];
-
-const REWARDS_PROGRAMS = [
-  { id: 'recVYmtytrNTEuNs8', name: 'Aeroplan' },
-  { id: 'rec55IJ1WaYQmpeu8', name: 'American Airlines' },
-  { id: 'recKOeD2LeTE2umQ2', name: 'Atmos' },
-  { id: 'recNtJU89S1XzM2oi', name: 'Autograph Rewards' },
-  { id: 'rec76U3fn4IPPgJEX', name: 'Avios' },
-  { id: 'recQBrBYWXeCoUDDR', name: 'Best Western' },
-  { id: 'recpgINanUGsm06PB', name: 'Bilt' },
-  { id: 'recL2Huh7e9Uh14o4', name: 'Capital One Miles' },
-  { id: 'recsJ9CLOzTWRVRNm', name: 'Cash Back' },
-  { id: 'recgZCguJJSeTkS3T', name: 'Choice' },
-  { id: 'recSKJfk2KVcCqRKG', name: 'Hilton' },
-  { id: 'reclzb13sunBKONLc', name: 'Hyatt' },
-  { id: 'rec5Ey6PfbSqs09WW', name: 'IHG' },
-  { id: 'recj0D9sIyA6xLrDK', name: 'KLM' },
-  { id: 'recpF7WLSm4xCJ8Sm', name: 'Lifemiles' },
-  { id: 'recCrkqmUVPxcvoSR', name: 'Marriott' },
-  { id: 'recoRV4OeBwFuxgAC', name: 'Membership Rewards' },
-  { id: 'recwN2LICpUqtRyWP', name: 'Southwest' },
-  { id: 'recxHZ1Zyd6EHgkcd', name: 'ThankYou Points' },
-  { id: 'rec639FwT4wR3st0K', name: 'TrueBlue' },
-  { id: 'reckXeIUYBdb6t1mi', name: 'Ultimate Rewards' },
-  { id: 'recdOXsN7ckt3EZF0', name: 'United Airlines' },
-  { id: 'reczjUhLxLhxvr5sq', name: 'Wyndham Rewards' },
-];
-
-
-const ALL_BANKS = [...new Set(PRODUCTS.map(p => p.bank))].sort();
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const RISK_LEVELS = ['Low', 'Medium', 'High'];
 
@@ -197,23 +43,51 @@ function pillBtn(active, onClick, children) {
   );
 }
 
-function autoCardName(ownerIds, productId) {
-  const nickname = ownerIds.length > 0 ? PEOPLE[ownerIds[0]] : '';
-  const product = PRODUCTS.find(p => p.id === productId);
-  if (!nickname && !product) return '';
-  if (!nickname) return product.name;
-  if (!product) return '';
-  return `${nickname} - ${product.name}`;
-}
-
 export function AddCardTab() {
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [form, setForm] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    fetchTable(CARD_PRODUCTS_TABLE, ['Product Name', 'Issuer', 'Annual Fee', 'Rewards Program'])
+      .then(records => {
+        const mapped = records
+          .map(r => ({
+            id: r.id,
+            name: r.fields['Product Name'] || '',
+            fee: r.fields['Annual Fee'] ?? 0,
+            bank: r.fields['Issuer']?.[0]?.name || '',
+            bankId: r.fields['Issuer']?.[0]?.id || '',
+            rpId: r.fields['Rewards Program']?.[0]?.id || '',
+            rpName: r.fields['Rewards Program']?.[0]?.name || '',
+          }))
+          .filter(p => p.name && p.bank)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setProducts(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  const allBanks = [...new Set(products.map(p => p.bank))].sort();
+  const rewardsPrograms = [...new Map(
+    products.filter(p => p.rpId).map(p => [p.rpId, { id: p.rpId, name: p.rpName }])
+  ).values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  function autoCardName(ownerIds, productId) {
+    const nickname = ownerIds.length > 0 ? PEOPLE[ownerIds[0]] : '';
+    const product = products.find(p => p.id === productId);
+    if (!nickname && !product) return '';
+    if (!nickname) return product.name;
+    if (!product) return '';
+    return `${nickname} - ${product.name}`;
+  }
+
   const filteredProducts = form.issuer
-    ? PRODUCTS.filter(p => p.bank === form.issuer)
+    ? products.filter(p => p.bank === form.issuer)
     : [];
 
   function toggleOwner(id) {
@@ -238,7 +112,7 @@ export function AddCardTab() {
   }
 
   function selectProduct(productId) {
-    const product = PRODUCTS.find(p => p.id === productId);
+    const product = products.find(p => p.id === productId);
     setForm(prev => ({
       ...prev,
       currentProductId: productId,
@@ -260,7 +134,8 @@ export function AddCardTab() {
       'Status': form.status,
       'Owner': form.ownerIds,
     };
-    if (form.issuer && BANKS[form.issuer]) fields['Issuer'] = [BANKS[form.issuer]];
+    const selectedProduct = products.find(p => p.id === form.currentProductId);
+    if (selectedProduct?.bankId) fields['Issuer'] = [selectedProduct.bankId];
     if (form.personalBusiness)   fields['Personal/Business'] = form.personalBusiness;
     if (form.currentProductId)   fields['Current Product'] = [form.currentProductId];
     if (form.openDate)           fields['Open Date'] = form.openDate;
@@ -326,6 +201,10 @@ export function AddCardTab() {
     }
   }
 
+  if (loadingProducts) {
+    return <div style={{ color: '#9ca3af', padding: '2rem', fontSize: '0.9rem' }}>Loading card products…</div>;
+  }
+
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 780 }}>
 
@@ -356,7 +235,7 @@ export function AddCardTab() {
       <div style={card}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Issuer</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {ALL_BANKS.map(bank =>
+          {allBanks.map(bank =>
             pillBtn(form.issuer === bank, () => selectIssuer(bank), bank)
           )}
         </div>
@@ -446,7 +325,7 @@ export function AddCardTab() {
                 <label style={lbl}>Rewards Program</label>
                 <select style={inp} value={form.rewardsProgramId} onChange={e => setForm(p => ({ ...p, rewardsProgramId: e.target.value }))}>
                   <option value="">— None —</option>
-                  {REWARDS_PROGRAMS.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  {rewardsPrograms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
               <div>
