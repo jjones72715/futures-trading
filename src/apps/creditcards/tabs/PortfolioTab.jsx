@@ -7,6 +7,26 @@ import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { CardRow } from '../components/CardRow.jsx';
 
+const BANK_NAMES = {
+  'recmOSLhOAYVqi09z': 'American Express',
+  'recirpPT41J9yWOso': 'Barclays',
+  'recUwpGOntDp5O9Pn': 'Bank of America',
+  'reci7K7HYue3nEx7e': 'Capital One',
+  'recuAO5OVmsDNWW6D': 'Cardless',
+  'recgw2ngVEO8gBpoq': 'Chase',
+  'rec9ePERLvVM24fqx': 'Citi',
+  'rec2BUeHI8gDyNcya': 'Discover',
+  'rec8clRqXmQ4EjDEI': 'Mercury',
+  'recRyPOXcDNKrWK53': 'U.S. Bank',
+  'recRKg9TA1IQpRkmH': 'Wells Fargo',
+};
+
+function resolveIssuer(raw) {
+  if (!raw) return 'Unknown';
+  if (Array.isArray(raw)) return BANK_NAMES[raw[0]] || raw[0] || 'Unknown';
+  return BANK_NAMES[raw] || raw;
+}
+
 const FIELDS = [
   'Card Name',
   'Issuer',
@@ -23,7 +43,7 @@ const FIELDS = [
 function buildIssuerGroups(cards) {
   const map = {};
   cards.forEach(card => {
-    const issuer = card.fields['Issuer'] || 'Unknown';
+    const issuer = resolveIssuer(card.fields['Issuer']);
     if (!map[issuer]) map[issuer] = [];
     map[issuer].push(card);
   });

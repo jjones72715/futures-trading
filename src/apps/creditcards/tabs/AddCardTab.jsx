@@ -4,6 +4,20 @@ import { PORTFOLIO_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '.
 import { PEOPLE } from '../config/constants.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 
+const BANKS = {
+  'American Express': 'recmOSLhOAYVqi09z',
+  'Barclays': 'recirpPT41J9yWOso',
+  'Bank of America': 'recUwpGOntDp5O9Pn',
+  'Capital One': 'reci7K7HYue3nEx7e',
+  'Cardless': 'recuAO5OVmsDNWW6D',
+  'Chase': 'recgw2ngVEO8gBpoq',
+  'Citi': 'rec9ePERLvVM24fqx',
+  'Discover': 'rec2BUeHI8gDyNcya',
+  'Mercury': 'rec8clRqXmQ4EjDEI',
+  'U.S. Bank': 'recRyPOXcDNKrWK53',
+  'Wells Fargo': 'recRKg9TA1IQpRkmH',
+};
+
 // Baked-in from Airtable — avoids a fetch on form load
 const PRODUCTS = [
   { id: 'recnxBW7eVc4CtQ2Y', name: 'AA Red', fee: 99, bank: 'Barclays', rpId: 'rec55IJ1WaYQmpeu8' },
@@ -246,7 +260,7 @@ export function AddCardTab() {
       'Status': form.status,
       'Owner': form.ownerIds,
     };
-    if (form.issuer) fields['Issuer'] = form.issuer;
+    if (form.issuer && BANKS[form.issuer]) fields['Issuer'] = [BANKS[form.issuer]];
     if (form.personalBusiness)   fields['Personal/Business'] = form.personalBusiness;
     if (form.currentProductId)   fields['Current Product'] = [form.currentProductId];
     if (form.openDate)           fields['Open Date'] = form.openDate;

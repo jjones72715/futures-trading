@@ -2,6 +2,20 @@ import { $$ } from '../utils/format.js';
 import { StatusBadge } from './StatusBadge.jsx';
 import { AnnualFeeBadge } from './AnnualFeeBadge.jsx';
 
+const BANK_NAMES = {
+  'recmOSLhOAYVqi09z': 'American Express',
+  'recirpPT41J9yWOso': 'Barclays',
+  'recUwpGOntDp5O9Pn': 'Bank of America',
+  'reci7K7HYue3nEx7e': 'Capital One',
+  'recuAO5OVmsDNWW6D': 'Cardless',
+  'recgw2ngVEO8gBpoq': 'Chase',
+  'rec9ePERLvVM24fqx': 'Citi',
+  'rec2BUeHI8gDyNcya': 'Discover',
+  'rec8clRqXmQ4EjDEI': 'Mercury',
+  'recRyPOXcDNKrWK53': 'U.S. Bank',
+  'recRKg9TA1IQpRkmH': 'Wells Fargo',
+};
+
 const RISK_COLORS = {
   Low: '#00E676',
   Medium: '#FFD60A',
@@ -17,7 +31,9 @@ function extractProgramName(field) {
 
 export function CardRow({ card }) {
   const f = card.fields;
-  const issuer = f['Issuer'] || '—';
+  const issuerRaw = f['Issuer'];
+  const issuerKey = Array.isArray(issuerRaw) ? issuerRaw[0] : issuerRaw;
+  const issuer = (issuerKey && BANK_NAMES[issuerKey]) || issuerKey || '—';
   const cardType = f['Personal/Business'];
   const cancelRisk = f['Cancel Risk Level'];
   const riskColor = RISK_COLORS[cancelRisk] ?? 'rgba(255,255,255,0.4)';
