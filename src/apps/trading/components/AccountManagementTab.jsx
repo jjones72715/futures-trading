@@ -306,7 +306,7 @@ export function AccountManagementTab() {
       alert("Performance account type not found. Please wait a moment and try again.");
       return;
     }
-    if (!selectedEvalId || !perfTypeId || !startingBalance || !dateActivated) return;
+    if (!selectedEvalId || !perfTypeId || !dateActivated) return;
     setSubmitting(true); setErr(null);
     try {
       const trader = traderList.find(t => t.id === traderId);
@@ -316,9 +316,9 @@ export function AccountManagementTab() {
       const perfFields = {
         "Name": `${trader?.name?.split(" ")[0]} - ${pt?.name}`,
         "Status": "Active",
-        "Current Balance": parseFloat(startingBalance),
-        "High Water Mark": parseFloat(startingBalance),
-        "Cycle Start Balance": parseFloat(startingBalance),
+        "Current Balance": 0,
+        "High Water Mark": 0,
+        "Cycle Start Balance": 0,
         "Date Activated": dateActivated,
         "Number of Accounts": parseInt(numAccounts),
         "Trading Days this Cycle": 0,
@@ -669,10 +669,6 @@ export function AccountManagementTab() {
                     <input type="number" min="1" value={numAccounts} onChange={e => setNumAccounts(e.target.value)} style={inp} />
                   </div>
                   <div>
-                    {label("Starting Balance")}
-                    <input type="number" value={startingBalance} onChange={e => setStartingBalance(e.target.value)} style={inp} />
-                  </div>
-                  <div>
                     {label("Activation Fee Per Account")}
                     <input type="number" placeholder="0.00" value={activationFee} onChange={e => setActivationFee(e.target.value)} style={inp} />
                   </div>
@@ -686,8 +682,8 @@ export function AccountManagementTab() {
                   </div>
                 </div>
 
-                <button onClick={handleConvertEval} disabled={!startingBalance || submitting}
-                  style={{ width: "100%", background: startingBalance ? "#7c3aed" : "#111827", color: startingBalance ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: startingBalance ? "pointer" : "not-allowed" }}>
+                <button onClick={handleConvertEval} disabled={submitting}
+                  style={{ width: "100%", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                   {submitting ? "Converting..." : "✓ Convert to Performance Account"}
                 </button>
               </>
