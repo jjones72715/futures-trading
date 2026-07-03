@@ -95,16 +95,12 @@ export function BenefitsTrackerTab() {
     const cardMap = {};
     cards.forEach(r => { cardMap[r.id] = r.fields['Card Name'] || r.id; });
 
-    // Step 2 — find instances where Used=true and Next Reset Date is today or past
-    const toReset = allInst.filter(r => {
-      const f = r.fields;
-      if (!f['Used']) return false;
-      return isPastOrToday(f['Next Reset Date']);
-    });
+    // Step 2 — find instances where Next Reset Date is past (regardless of Used state)
+    const toReset = allInst.filter(r => isPastOrToday(r.fields['Next Reset Date']));
 
-    // Step 3 — advance each and PATCH
+    // Step 3 — advance date forward; clear Used only if it was true
     if (toReset.length > 0) {
-      setResetStatus(`Resetting ${toReset.length} expired perk${toReset.length > 1 ? 's' : ''}…`);
+      setResetStatus(`Advancing ${toReset.length} expired perk${toReset.length > 1 ? 's' : ''}…`);
       await Promise.all(toReset.map(async r => {
         const defId = (r.fields['Perk Definition'] || [])[0];
         const def = defId ? defMap[defId] : null;
@@ -113,13 +109,14 @@ export function BenefitsTrackerTab() {
         const currentDate = r.fields['Next Reset Date'];
         const newDate = cycle && currentDate ? advanceUntilFuture(cycle, currentDate) : null;
 
-        const patch = { 'Used': false };
+        const patch = {};
+        if (r.fields['Used']) patch['Used'] = false;
         if (newDate) patch['Next Reset Date'] = newDate;
+        if (!Object.keys(patch).length) return;
 
         try {
           await updateRecord(PERK_INSTANCES_TABLE, r.id, patch);
-          // Update local record so render reflects reset state without re-fetch
-          r.fields['Used'] = false;
+          if (r.fields['Used']) r.fields['Used'] = false;
           if (newDate) r.fields['Next Reset Date'] = newDate;
         } catch (e) {
           console.error('Reset failed for', r.id, e);
