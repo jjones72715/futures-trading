@@ -1,10 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchTable, updateRecord } from '../services/airtable.js';
+import { fetchTable, updateRecord, createRecord } from '../services/airtable.js';
 import { SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
 import { $$ } from '../utils/format.js';
+
+const EMPTY_SIGNUP_FORM = { personId: '', cardId: '', description: '', spendTarget: '', approvalDate: '', bonusWindow: '' };
+const EMPTY_SPEND_FORM = { personId: '', cardId: '', description: '', annualTarget: '', resetDate: '' };
+
+const inp = {
+  width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 8, padding: '0.6rem 0.75rem', color: '#fff', fontSize: '0.88rem',
+  outline: 'none', boxSizing: 'border-box',
+};
+const lbl = {
+  display: 'block', fontSize: '0.7rem', fontWeight: 600,
+  color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase',
+  letterSpacing: '0.05em', marginBottom: 5,
+};
+const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' };
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -40,6 +55,157 @@ function PillBtn({ active, onClick, children }) {
     }}>
       {children}
     </button>
+  );
+}
+
+function AddBonusButton({ onClick }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <button type="button" onClick={onClick} style={{
+        padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(0,212,255,0.3)',
+        background: 'rgba(0,212,255,0.12)', color: '#00D4FF', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
+      }}>
+        + Add Bonus
+      </button>
+    </div>
+  );
+}
+
+function PersonCardPicker({ personId, cardId, cards, onSelectPerson, onSelectCard }) {
+  const filteredCards = personId ? cards.filter(c => c.owners.includes(personId)) : [];
+  return (
+    <>
+      <div>
+        <label style={lbl}>Person <span style={{ color: '#FF4D4D' }}>*</span></label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {Object.entries(PEOPLE).map(([id, name]) => (
+            <PillBtn key={id} active={personId === id} onClick={() => onSelectPerson(id)}>{name}</PillBtn>
+          ))}
+        </div>
+      </div>
+
+      {personId && (
+        <div>
+          <label style={lbl}>Card <span style={{ color: '#FF4D4D' }}>*</span></label>
+          {filteredCards.length === 0 ? (
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>No cards found for this person.</div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {filteredCards.map(c => (
+                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{c.name}</PillBtn>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function FormActions({ submitting, onCancel, error }) {
+  return (
+    <>
+      {error && (
+        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#FF4D4D', fontSize: '0.82rem' }}>
+          {error}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button type="submit" disabled={submitting} style={{
+          padding: '0.6rem 1.5rem', borderRadius: 8, border: 'none',
+          background: submitting ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+          color: '#0B1220', fontWeight: 700, fontSize: '0.85rem',
+          cursor: submitting ? 'not-allowed' : 'pointer',
+        }}>
+          {submitting ? 'Saving…' : 'Add Bonus'}
+        </button>
+        <button type="button" onClick={onCancel} style={{
+          padding: '0.6rem 1.5rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
+          background: 'none', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+        }}>
+          Cancel
+        </button>
+      </div>
+    </>
+  );
+}
+
+function AddSignupBonusForm({ cards, form, setForm, onSubmit, onCancel, submitting, error }) {
+  function set(field) {
+    return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  }
+  return (
+    <form onSubmit={onSubmit} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>New Sign-Up Bonus</div>
+
+      <PersonCardPicker
+        personId={form.personId}
+        cardId={form.cardId}
+        cards={cards}
+        onSelectPerson={id => setForm(prev => ({ ...prev, personId: prev.personId === id ? '' : id, cardId: '' }))}
+        onSelectCard={id => setForm(prev => ({ ...prev, cardId: prev.cardId === id ? '' : id }))}
+      />
+
+      <div>
+        <label style={lbl}>Bonus Description</label>
+        <input style={inp} value={form.description} onChange={set('description')} placeholder="e.g. $900 spend for 100k points" />
+      </div>
+
+      <div style={grid2}>
+        <div>
+          <label style={lbl}>Spend Target ($) <span style={{ color: '#FF4D4D' }}>*</span></label>
+          <input style={inp} type="number" min="0" value={form.spendTarget} onChange={set('spendTarget')} placeholder="0" />
+        </div>
+        <div>
+          <label style={lbl}>Bonus Window (months) <span style={{ color: '#FF4D4D' }}>*</span></label>
+          <input style={inp} type="number" min="1" value={form.bonusWindow} onChange={set('bonusWindow')} placeholder="3" />
+        </div>
+      </div>
+
+      <div>
+        <label style={lbl}>Card Approval Date <span style={{ color: '#FF4D4D' }}>*</span></label>
+        <input style={{ ...inp, maxWidth: 200 }} type="date" value={form.approvalDate} onChange={set('approvalDate')} />
+      </div>
+
+      <FormActions submitting={submitting} onCancel={onCancel} error={error} />
+    </form>
+  );
+}
+
+function AddSpendBonusForm({ cards, form, setForm, onSubmit, onCancel, submitting, error }) {
+  function set(field) {
+    return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  }
+  return (
+    <form onSubmit={onSubmit} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>New Spend Bonus</div>
+
+      <PersonCardPicker
+        personId={form.personId}
+        cardId={form.cardId}
+        cards={cards}
+        onSelectPerson={id => setForm(prev => ({ ...prev, personId: prev.personId === id ? '' : id, cardId: '' }))}
+        onSelectCard={id => setForm(prev => ({ ...prev, cardId: prev.cardId === id ? '' : id }))}
+      />
+
+      <div>
+        <label style={lbl}>Bonus Description</label>
+        <input style={inp} value={form.description} onChange={set('description')} placeholder="e.g. $25k annual spend bonus" />
+      </div>
+
+      <div style={grid2}>
+        <div>
+          <label style={lbl}>Annual Spend Target ($) <span style={{ color: '#FF4D4D' }}>*</span></label>
+          <input style={inp} type="number" min="0" value={form.annualTarget} onChange={set('annualTarget')} placeholder="0" />
+        </div>
+        <div>
+          <label style={lbl}>Reset Date <span style={{ color: '#FF4D4D' }}>*</span></label>
+          <input style={inp} type="date" value={form.resetDate} onChange={set('resetDate')} />
+        </div>
+      </div>
+
+      <FormActions submitting={submitting} onCancel={onCancel} error={error} />
+    </form>
   );
 }
 
@@ -244,8 +410,19 @@ export function BonusesTab() {
   const [signupBonuses, setSignupBonuses] = useState([]);
   const [spendBonuses, setSpendBonuses] = useState([]);
   const [cardNameById, setCardNameById] = useState({});
+  const [portfolioCards, setPortfolioCards] = useState([]);
   const [monthInputs, setMonthInputs] = useState({});
   const [savingKey, setSavingKey] = useState(null);
+
+  const [showAddSignup, setShowAddSignup] = useState(false);
+  const [signupForm, setSignupForm] = useState(EMPTY_SIGNUP_FORM);
+  const [addSignupSubmitting, setAddSignupSubmitting] = useState(false);
+  const [addSignupError, setAddSignupError] = useState(null);
+
+  const [showAddSpend, setShowAddSpend] = useState(false);
+  const [spendForm, setSpendForm] = useState(EMPTY_SPEND_FORM);
+  const [addSpendSubmitting, setAddSpendSubmitting] = useState(false);
+  const [addSpendError, setAddSpendError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -254,10 +431,15 @@ export function BonusesTab() {
     const [signup, spend, cards] = await Promise.all([
       fetchTable(SIGNUP_BONUSES_TABLE, SIGNUP_FIELDS),
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner']),
     ]);
 
     setCardNameById(Object.fromEntries(cards.map(r => [r.id, r.fields['Card Name'] || r.id])));
+    setPortfolioCards(
+      cards
+        .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
 
     const toReset = spend.filter(r => isPastOrToday(r.fields['Reset Date']));
     if (toReset.length > 0) {
@@ -310,6 +492,68 @@ export function BonusesTab() {
     } catch (e) {
       console.error('Toggle failed', e);
       setter(prev => prev.map(r => r.id === recordId ? { ...r, fields: { ...r.fields, [field]: currentValue } } : r));
+    }
+  }
+
+  async function handleAddSignup(e) {
+    e.preventDefault();
+    setAddSignupError(null);
+    if (!signupForm.personId) { setAddSignupError('Person is required.'); return; }
+    if (!signupForm.cardId) { setAddSignupError('Card is required.'); return; }
+    if (!signupForm.spendTarget) { setAddSignupError('Spend Target is required.'); return; }
+    if (!signupForm.approvalDate) { setAddSignupError('Card Approval Date is required.'); return; }
+    if (!signupForm.bonusWindow) { setAddSignupError('Bonus Window is required.'); return; }
+
+    setAddSignupSubmitting(true);
+    const fields = {
+      'Card': [signupForm.cardId],
+      'Person': [signupForm.personId],
+      'Spend Target': parseFloat(signupForm.spendTarget),
+      'Card Approval Date': signupForm.approvalDate,
+      'Bonus Window': parseInt(signupForm.bonusWindow, 10),
+    };
+    if (signupForm.description.trim()) fields['Bonus Description'] = signupForm.description.trim();
+
+    try {
+      const result = await createRecord(SIGNUP_BONUSES_TABLE, fields);
+      setSignupBonuses(prev => [...prev, result]);
+      setSignupForm(EMPTY_SIGNUP_FORM);
+      setShowAddSignup(false);
+    } catch (err) {
+      console.error('Add sign-up bonus failed', err);
+      setAddSignupError(String(err.message || err));
+    } finally {
+      setAddSignupSubmitting(false);
+    }
+  }
+
+  async function handleAddSpend(e) {
+    e.preventDefault();
+    setAddSpendError(null);
+    if (!spendForm.personId) { setAddSpendError('Person is required.'); return; }
+    if (!spendForm.cardId) { setAddSpendError('Card is required.'); return; }
+    if (!spendForm.annualTarget) { setAddSpendError('Annual Spend Target is required.'); return; }
+    if (!spendForm.resetDate) { setAddSpendError('Reset Date is required.'); return; }
+
+    setAddSpendSubmitting(true);
+    const fields = {
+      'Card': [spendForm.cardId],
+      'Person': [spendForm.personId],
+      'Annual Spend Target': parseFloat(spendForm.annualTarget),
+      'Reset Date': spendForm.resetDate,
+    };
+    if (spendForm.description.trim()) fields['Bonus Description'] = spendForm.description.trim();
+
+    try {
+      const result = await createRecord(SPEND_BONUSES_TABLE, fields);
+      setSpendBonuses(prev => [...prev, result]);
+      setSpendForm(EMPTY_SPEND_FORM);
+      setShowAddSpend(false);
+    } catch (err) {
+      console.error('Add spend bonus failed', err);
+      setAddSpendError(String(err.message || err));
+    } finally {
+      setAddSpendSubmitting(false);
     }
   }
 
@@ -428,6 +672,20 @@ export function BonusesTab() {
             <StatCard label="Total Remaining Spend" value={$$(signupActiveRemaining)} accent="#00E676" />
           </div>
 
+          {!showAddSignup && <AddBonusButton onClick={() => setShowAddSignup(true)} />}
+
+          {showAddSignup && (
+            <AddSignupBonusForm
+              cards={portfolioCards}
+              form={signupForm}
+              setForm={setSignupForm}
+              onSubmit={handleAddSignup}
+              onCancel={() => { setShowAddSignup(false); setSignupForm(EMPTY_SIGNUP_FORM); setAddSignupError(null); }}
+              submitting={addSignupSubmitting}
+              error={addSignupError}
+            />
+          )}
+
           {signupSorted.length === 0 ? (
             <div style={{ ...cardStyle, textAlign: 'center', color: 'rgba(255,255,255,0.35)' }}>
               No sign-up bonuses match the current filters.
@@ -454,6 +712,20 @@ export function BonusesTab() {
             <StatCard label="Active Bonuses" value={spendActiveCount} accent="#00D4FF" />
             <StatCard label="Total Remaining Spend" value={$$(spendActiveRemaining)} accent="#00E676" />
           </div>
+
+          {!showAddSpend && <AddBonusButton onClick={() => setShowAddSpend(true)} />}
+
+          {showAddSpend && (
+            <AddSpendBonusForm
+              cards={portfolioCards}
+              form={spendForm}
+              setForm={setSpendForm}
+              onSubmit={handleAddSpend}
+              onCancel={() => { setShowAddSpend(false); setSpendForm(EMPTY_SPEND_FORM); setAddSpendError(null); }}
+              submitting={addSpendSubmitting}
+              error={addSpendError}
+            />
+          )}
 
           {spendSorted.length === 0 ? (
             <div style={{ ...cardStyle, textAlign: 'center', color: 'rgba(255,255,255,0.35)' }}>
