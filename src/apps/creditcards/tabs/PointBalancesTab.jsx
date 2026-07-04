@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { fetchTable, fetchFieldChoiceColors } from '../services/airtable.js';
+import { fetchTable, fetchFieldChoiceColors, updateRecord } from '../services/airtable.js';
 import { REWARDS_TABLE, CARD_PRODUCTS_TABLE, PORTFOLIO_TABLE, POINT_BALANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
-import { isStaleDays } from '../utils/dates.js';
+import { isStaleDays, toAirtableDate } from '../utils/dates.js';
 import { resolveProgramColor } from '../utils/airtableColors.js';
 
 const PERSON_ID_BY_NAME = Object.fromEntries(Object.entries(PEOPLE).map(([id, name]) => [name, id]));
@@ -58,7 +58,13 @@ const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem',
 };
 
-export function PointBalancesTab() {
+const inp = {
+  width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 6, padding: '0.35rem 0.5rem', color: '#fff', fontSize: '0.82rem',
+  outline: 'none', boxSizing: 'border-box',
+};
+
+export function PointBalancesTab({ onNavigateAddBalance }) {
   const [view, setView] = useState('balances');
   const [loading, setLoading] = useState(true);
   const [programs, setPrograms] = useState([]);
@@ -68,9 +74,19 @@ export function PointBalancesTab() {
   const [programColors, setProgramColors] = useState({});
   const [personFilter, setPersonFilter] = useState('All');
   const [balancesOnly, setBalancesOnly] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editBalance, setEditBalance] = useState('');
+  const [editExpiration, setEditExpiration] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
-    Promise.all([
+    load();
+  }, []);
+
+  function load() {
+    setLoading(true);
+    return Promise.all([
       fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
@@ -86,7 +102,42 @@ export function PointBalancesTab() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  function startEdit(row) {
+    setSaveError(null);
+    setEditingId(row.id);
+    setEditBalance(row.currentBalance != null ? String(row.currentBalance) : '');
+    setEditExpiration(row.expirationDate || '');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setSaveError(null);
+  }
+
+  async function saveEdit(row) {
+    setSaveError(null);
+    if (editBalance === '' || isNaN(parseFloat(editBalance))) {
+      setSaveError('Enter a valid balance.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const fields = {
+        'Current Balance': parseFloat(editBalance),
+        'Last Updated': toAirtableDate(new Date()),
+      };
+      if (editExpiration) fields['Expiration Date'] = editExpiration;
+      const updated = await updateRecord(POINT_BALANCES_TABLE, row.id, fields);
+      setBalances(prev => prev.map(b => (b.id === row.id ? updated : b)));
+      setEditingId(null);
+    } catch (err) {
+      setSaveError(String(err.message || err));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const programById = Object.fromEntries(programs.map(p => [p.id, p]));
 
@@ -274,15 +325,25 @@ export function PointBalancesTab() {
                   <PillBtn key={name} active={personFilter === name} onClick={() => setPersonFilter(name)}>{name}</PillBtn>
                 ))}
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={balancesOnly}
-                  onChange={e => setBalancesOnly(e.target.checked)}
-                  style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
-                />
-                Show Balances Only
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={balancesOnly}
+                    onChange={e => setBalancesOnly(e.target.checked)}
+                    style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
+                  />
+                  Show Balances Only
+                </label>
+                {onNavigateAddBalance && (
+                  <button type="button" onClick={onNavigateAddBalance} style={{
+                    background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.82rem',
+                    cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0, whiteSpace: 'nowrap',
+                  }}>
+                    + Add Balance
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -293,7 +354,7 @@ export function PointBalancesTab() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{
-                display: 'grid', gridTemplateColumns: '1.4fr 0.9fr 1fr 0.85fr 1.1fr 1.6fr 1fr 1fr 1fr', gap: '0.6rem',
+                display: 'grid', gridTemplateColumns: '1.3fr 0.85fr 0.9fr 0.8fr 1fr 1.4fr 0.9fr 0.9fr 0.7fr 90px', gap: '0.6rem',
                 padding: '0.5rem 1rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)',
                 textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
               }}>
@@ -306,6 +367,7 @@ export function PointBalancesTab() {
                 <span>Last Updated</span>
                 <span>Expires</span>
                 <span>Days</span>
+                <span></span>
               </div>
               {balancesSorted.map((row, i) => {
                 const color = resolveProgramColor(row.programName, programColors, i);
@@ -314,33 +376,98 @@ export function PointBalancesTab() {
                 const stale = isStaleDays(row.lastUpdated, 60);
                 const days = row.daysUntilExpiration;
                 const daysColor = days != null && days < 14 ? '#FF4D4D' : days != null && days < 60 ? '#FFD700' : 'rgba(255,255,255,0.5)';
+                const isEditing = editingId === row.id;
                 return (
-                  <div key={row.id} style={{
-                    display: 'grid', gridTemplateColumns: '1.4fr 0.9fr 1fr 0.85fr 1.1fr 1.6fr 1fr 1fr 1fr', gap: '0.6rem',
-                    alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10,
-                    background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
-                  }}>
-                    <span><ProgramBadge name={row.programName} color={color} /></span>
-                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{ownerNames}</span>
-                    <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{fmt(row.currentBalance)}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>
-                    <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{fmtDollar(row.programValue)}</span>
-                    <span
-                      title={cardNames.join(', ')}
-                      style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                      {cardNames.length === 0 ? '—' : cardNames.join(', ')}
-                    </span>
-                    <span
-                      title={stale ? 'No update in over 60 days' : ''}
-                      style={{ fontSize: '0.82rem', color: stale ? '#FFD700' : 'rgba(255,255,255,0.5)', fontWeight: stale ? 700 : 400 }}
-                    >
-                      {fmtDate(row.lastUpdated)}
-                    </span>
-                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{fmtDate(row.expirationDate)}</span>
-                    <span style={{ fontSize: '0.82rem', color: daysColor, fontWeight: days != null && days < 60 ? 700 : 400 }}>
-                      {days != null ? days : '—'}
-                    </span>
+                  <div key={row.id}>
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1.3fr 0.85fr 0.9fr 0.8fr 1fr 1.4fr 0.9fr 0.9fr 0.7fr 90px', gap: '0.6rem',
+                      alignItems: 'center', padding: '0.75rem 1rem', borderRadius: isEditing ? '10px 10px 0 0' : 10,
+                      background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
+                    }}>
+                      <span><ProgramBadge name={row.programName} color={color} /></span>
+                      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{ownerNames}</span>
+                      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{fmt(row.currentBalance)}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>
+                      <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{fmtDollar(row.programValue)}</span>
+                      <span
+                        title={cardNames.join(', ')}
+                        style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {cardNames.length === 0 ? '—' : cardNames.join(', ')}
+                      </span>
+                      <span
+                        title={stale ? 'No update in over 60 days' : ''}
+                        style={{ fontSize: '0.82rem', color: stale ? '#FFD700' : 'rgba(255,255,255,0.5)', fontWeight: stale ? 700 : 400 }}
+                      >
+                        {fmtDate(row.lastUpdated)}
+                      </span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{fmtDate(row.expirationDate)}</span>
+                      <span style={{ fontSize: '0.82rem', color: daysColor, fontWeight: days != null && days < 60 ? 700 : 400 }}>
+                        {days != null ? days : '—'}
+                      </span>
+                      <span>
+                        {!isEditing && (
+                          <button type="button" onClick={() => startEdit(row)} style={{
+                            padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(0,212,255,0.4)',
+                            background: 'rgba(0,212,255,0.1)', color: '#00D4FF', fontWeight: 600,
+                            fontSize: '0.76rem', cursor: 'pointer', whiteSpace: 'nowrap',
+                          }}>
+                            Update
+                          </button>
+                        )}
+                      </span>
+                    </div>
+
+                    {isEditing && (
+                      <div style={{
+                        display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end',
+                        padding: '0.85rem 1rem', borderRadius: '0 0 10px 10px',
+                        background: '#111a2b', border: '1px solid rgba(0,212,255,0.25)', borderTop: 'none',
+                      }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            New Balance
+                          </label>
+                          <input
+                            style={{ ...inp, width: 130 }}
+                            type="number"
+                            min="0"
+                            autoFocus
+                            value={editBalance}
+                            onChange={e => setEditBalance(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Expiration Date
+                          </label>
+                          <input
+                            style={{ ...inp, width: 150 }}
+                            type="date"
+                            value={editExpiration}
+                            onChange={e => setEditExpiration(e.target.value)}
+                          />
+                        </div>
+                        <button type="button" onClick={() => saveEdit(row)} disabled={saving} style={{
+                          padding: '0.5rem 1.1rem', borderRadius: 8, border: 'none',
+                          background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+                          color: '#0B1220', fontWeight: 700, fontSize: '0.82rem',
+                          cursor: saving ? 'not-allowed' : 'pointer',
+                        }}>
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button type="button" onClick={cancelEdit} disabled={saving} style={{
+                          padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
+                          background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600,
+                          fontSize: '0.82rem', cursor: 'pointer',
+                        }}>
+                          Cancel
+                        </button>
+                        {saveError && (
+                          <span style={{ color: '#FF4D4D', fontSize: '0.8rem' }}>{saveError}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

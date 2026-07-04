@@ -6,6 +6,7 @@ import { AddHotelBenefitTab } from './tabs/AddHotelBenefitTab.jsx';
 import { HotelBenefitTemplatesTab } from './tabs/HotelBenefitTemplatesTab.jsx';
 import { BenefitsTrackerTab } from './tabs/BenefitsTrackerTab.jsx';
 import { PointBalancesTab } from './tabs/PointBalancesTab.jsx';
+import { AddPointBalanceTab } from './tabs/AddPointBalanceTab.jsx';
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio' },
@@ -65,11 +66,22 @@ export default function CreditCardsApp() {
 
       <div style={{ padding: '1.5rem 2rem' }}>
         {tab === 'portfolio' && <PortfolioTab />}
-        {tab === 'point-balances' && <PointBalancesTab />}
+        {tab === 'point-balances' && <PointBalancesTab onNavigateAddBalance={() => setTab('add-balance')} />}
         {tab === 'benefits' && <BenefitsTrackerTab />}
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'add' && <AddCardTab />}
         {tab === 'add-hotel' && <AddHotelBenefitTab onNavigateTemplates={() => setTab('hotel-templates')} />}
+        {tab === 'add-balance' && (
+          <div>
+            <button onClick={() => setTab('point-balances')} style={{
+              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.85rem',
+              cursor: 'pointer', fontWeight: 600, padding: '0 0 1.25rem 0', display: 'block',
+            }}>
+              ← Back to Point Balances
+            </button>
+            <AddPointBalanceTab />
+          </div>
+        )}
         {tab === 'hotel-templates' && (
           <div>
             <button onClick={() => setTab('add-hotel')} style={{
@@ -81,7 +93,7 @@ export default function CreditCardsApp() {
             <HotelBenefitTemplatesTab />
           </div>
         )}
-        {!['portfolio', 'point-balances', 'benefits', 'hotels', 'add', 'add-hotel', 'hotel-templates'].includes(tab) && (
+        {!['portfolio', 'point-balances', 'benefits', 'hotels', 'add', 'add-hotel', 'add-balance', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',
