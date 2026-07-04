@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord, createRecord } from '../services/airtable.js';
-import { SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
+import { SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
 import { $$ } from '../utils/format.js';
 
 const EMPTY_SIGNUP_FORM = { personId: '', cardId: '', description: '', spendTarget: '', approvalDate: '', bonusWindow: '' };
-const EMPTY_SPEND_FORM = { personId: '', cardId: '', description: '', annualTarget: '', resetDate: '' };
+const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetDate: '' };
 
 const inp = {
   width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
@@ -172,21 +172,35 @@ function AddSignupBonusForm({ cards, form, setForm, onSubmit, onCancel, submitti
   );
 }
 
-function AddSpendBonusForm({ cards, form, setForm, onSubmit, onCancel, submitting, error }) {
+function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSubmit, onCancel, submitting, error }) {
   function set(field) {
     return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
   }
+  const holders = form.productId ? (productHolders[form.productId] || []) : [];
   return (
     <form onSubmit={onSubmit} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>New Spend Bonus</div>
+      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', marginTop: -8 }}>
+        Pick the card product — a bonus is created for every active card of that product, one per person.
+      </div>
 
-      <PersonCardPicker
-        personId={form.personId}
-        cardId={form.cardId}
-        cards={cards}
-        onSelectPerson={id => setForm(prev => ({ ...prev, personId: prev.personId === id ? '' : id, cardId: '' }))}
-        onSelectCard={id => setForm(prev => ({ ...prev, cardId: prev.cardId === id ? '' : id }))}
-      />
+      <div>
+        <label style={lbl}>Card Product <span style={{ color: '#FF4D4D' }}>*</span></label>
+        <select style={inp} value={form.productId} onChange={set('productId')}>
+          <option value="">— Select card product —</option>
+          {productOptions.map(p => (
+            <option key={p.id} value={p.id}>{p.name} ({p.count} card{p.count > 1 ? 's' : ''})</option>
+          ))}
+        </select>
+      </div>
+
+      {form.productId && (
+        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.55)' }}>
+          Will create a bonus for: {holders.length > 0
+            ? holders.map(h => PEOPLE[h.personId] || h.personId).join(', ')
+            : 'no active cards found for this product'}
+        </div>
+      )}
 
       <div>
         <label style={lbl}>Bonus Description</label>
@@ -411,6 +425,8 @@ export function BonusesTab() {
   const [spendBonuses, setSpendBonuses] = useState([]);
   const [cardNameById, setCardNameById] = useState({});
   const [portfolioCards, setPortfolioCards] = useState([]);
+  const [productOptions, setProductOptions] = useState([]);
+  const [productHolders, setProductHolders] = useState({});
   const [monthInputs, setMonthInputs] = useState({});
   const [savingKey, setSavingKey] = useState(null);
 
@@ -428,16 +444,34 @@ export function BonusesTab() {
     setLoading(true);
     setResetStatus('');
 
-    const [signup, spend, cards] = await Promise.all([
+    const [signup, spend, cards, products] = await Promise.all([
       fetchTable(SIGNUP_BONUSES_TABLE, SIGNUP_FIELDS),
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Current Product', 'Status']),
+      fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
     ]);
 
     setCardNameById(Object.fromEntries(cards.map(r => [r.id, r.fields['Card Name'] || r.id])));
     setPortfolioCards(
       cards
         .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+
+    const productNameById = Object.fromEntries(products.map(p => [p.id, p.fields['Product Name'] || p.id]));
+    const holdersByProduct = {};
+    cards.forEach(r => {
+      if (r.fields['Status'] !== 'Active') return;
+      const productId = (r.fields['Current Product'] || [])[0];
+      const personId = (r.fields['Owner'] || [])[0];
+      if (!productId || !personId) return;
+      if (!holdersByProduct[productId]) holdersByProduct[productId] = [];
+      holdersByProduct[productId].push({ cardId: r.id, personId });
+    });
+    setProductHolders(holdersByProduct);
+    setProductOptions(
+      Object.keys(holdersByProduct)
+        .map(id => ({ id, name: productNameById[id] || id, count: holdersByProduct[id].length }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
 
@@ -530,23 +564,27 @@ export function BonusesTab() {
   async function handleAddSpend(e) {
     e.preventDefault();
     setAddSpendError(null);
-    if (!spendForm.personId) { setAddSpendError('Person is required.'); return; }
-    if (!spendForm.cardId) { setAddSpendError('Card is required.'); return; }
+    if (!spendForm.productId) { setAddSpendError('Card Product is required.'); return; }
     if (!spendForm.annualTarget) { setAddSpendError('Annual Spend Target is required.'); return; }
     if (!spendForm.resetDate) { setAddSpendError('Reset Date is required.'); return; }
 
+    const holders = productHolders[spendForm.productId] || [];
+    if (holders.length === 0) { setAddSpendError('No active cards found for this product.'); return; }
+
     setAddSpendSubmitting(true);
-    const fields = {
-      'Card': [spendForm.cardId],
-      'Person': [spendForm.personId],
+    const baseFields = {
       'Annual Spend Target': parseFloat(spendForm.annualTarget),
       'Reset Date': spendForm.resetDate,
     };
-    if (spendForm.description.trim()) fields['Bonus Description'] = spendForm.description.trim();
+    if (spendForm.description.trim()) baseFields['Bonus Description'] = spendForm.description.trim();
 
     try {
-      const result = await createRecord(SPEND_BONUSES_TABLE, fields);
-      setSpendBonuses(prev => [...prev, result]);
+      const created = await Promise.all(holders.map(h => createRecord(SPEND_BONUSES_TABLE, {
+        ...baseFields,
+        'Card': [h.cardId],
+        'Person': [h.personId],
+      })));
+      setSpendBonuses(prev => [...prev, ...created]);
       setSpendForm(EMPTY_SPEND_FORM);
       setShowAddSpend(false);
     } catch (err) {
@@ -717,7 +755,8 @@ export function BonusesTab() {
 
           {showAddSpend && (
             <AddSpendBonusForm
-              cards={portfolioCards}
+              productOptions={productOptions}
+              productHolders={productHolders}
               form={spendForm}
               setForm={setSpendForm}
               onSubmit={handleAddSpend}
