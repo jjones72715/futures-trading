@@ -19,7 +19,7 @@ export async function createRecord(tableId, fields) {
   const res = await fetch(`/.netlify/functions/cc-airtable/${BASE}/${tableId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields, typecast: true }),
   });
   const data = await res.json();
   if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
@@ -30,7 +30,7 @@ export async function updateRecord(tableId, recordId, fields) {
   const res = await fetch(`/.netlify/functions/cc-airtable/${BASE}/${tableId}/${recordId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields, typecast: true }),
   });
   const data = await res.json();
   if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);

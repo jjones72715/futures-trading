@@ -6,6 +6,7 @@ import { AddHotelBenefitTab } from './tabs/AddHotelBenefitTab.jsx';
 import { HotelBenefitTemplatesTab } from './tabs/HotelBenefitTemplatesTab.jsx';
 import { BenefitsTrackerTab } from './tabs/BenefitsTrackerTab.jsx';
 import { PointBalancesTab } from './tabs/PointBalancesTab.jsx';
+import { AddRewardsProgramTab } from './tabs/AddRewardsProgramTab.jsx';
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio' },
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'recommendations', label: 'Card Recommendations' },
   { id: 'add', label: 'Add Card' },
   { id: 'add-hotel', label: 'Add Hotel Benefit' },
+  { id: 'add-rewards', label: 'Add Rewards Program' },
 ];
 
 export default function CreditCardsApp() {
@@ -70,6 +72,7 @@ export default function CreditCardsApp() {
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'add' && <AddCardTab />}
         {tab === 'add-hotel' && <AddHotelBenefitTab onNavigateTemplates={() => setTab('hotel-templates')} />}
+        {tab === 'add-rewards' && <AddRewardsProgramTab />}
         {tab === 'hotel-templates' && (
           <div>
             <button onClick={() => setTab('add-hotel')} style={{
@@ -81,7 +84,7 @@ export default function CreditCardsApp() {
             <HotelBenefitTemplatesTab />
           </div>
         )}
-        {!['portfolio', 'point-balances', 'benefits', 'hotels', 'add', 'add-hotel', 'hotel-templates'].includes(tab) && (
+        {!['portfolio', 'point-balances', 'benefits', 'hotels', 'add', 'add-hotel', 'add-rewards', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',
