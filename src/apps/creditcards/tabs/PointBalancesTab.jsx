@@ -74,7 +74,7 @@ export function PointBalancesTab() {
       fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
-      fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
+      fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Value Per Point', 'Program Value', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
       fetchFieldChoiceColors(REWARDS_TABLE, 'Program Name'),
     ])
       .then(([programRows, cardProductRows, portfolioRows, balanceRows, colors]) => {
@@ -104,7 +104,10 @@ export function PointBalancesTab() {
   const enrichedBalances = balances.map(b => {
     const programId = (b.fields['Program'] || [])[0];
     const program = programById[programId];
-    const valuePerPoint = program?.fields['Value Per Point'] ?? null;
+    // "Value Per Point" is an Airtable lookup field, which the REST API always
+    // returns as an array even though each balance links to a single program.
+    const valuePerPointLookup = b.fields['Value Per Point'];
+    const valuePerPoint = Array.isArray(valuePerPointLookup) ? valuePerPointLookup[0] ?? null : valuePerPointLookup ?? null;
     const currentBalance = b.fields['Current Balance'] ?? 0;
     return {
       id: b.id,
@@ -112,7 +115,7 @@ export function PointBalancesTab() {
       ownerIds: b.fields['Person'] || [],
       currentBalance,
       valuePerPoint,
-      programValue: valuePerPoint != null ? currentBalance * valuePerPoint : null,
+      programValue: b.fields['Program Value'] ?? null,
       cardIds: b.fields['Credit Card Portfolio'] || [],
       lastUpdated: b.fields['Last Updated'] || '',
       expirationDate: b.fields['Expiration Date'] || '',
