@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { fetchTable, updateRecord } from '../services/airtable.js';
-import { REWARDS_TABLE } from '../config/tables.js';
+import { fetchTable, fetchFieldChoiceColors } from '../services/airtable.js';
+import { REWARDS_TABLE, CARD_PRODUCTS_TABLE, PORTFOLIO_TABLE, POINT_BALANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
-import { toAirtableDate, isStale } from '../utils/dates.js';
+import { isStaleDays } from '../utils/dates.js';
+import { resolveProgramColor } from '../utils/airtableColors.js';
 
 const PERSON_ID_BY_NAME = Object.fromEntries(Object.entries(PEOPLE).map(([id, name]) => [name, id]));
 
@@ -13,20 +14,12 @@ function fmt(n) {
 
 function fmtDollar(n) {
   if (n == null) return '—';
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtVPP(n) {
   if (n == null) return '—';
   return `$${Number(n).toFixed(3)}`;
-}
-
-function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(dateStr + 'T00:00:00');
-  return Math.round((d - today) / (1000 * 60 * 60 * 24));
 }
 
 function fmtDate(dateStr) {
@@ -35,121 +28,123 @@ function fmtDate(dateStr) {
   return `${parseInt(m)}/${parseInt(d)}/${y}`;
 }
 
-const PROGRAM_COLORS = [
-  '#00D4FF', '#FFD700', '#FF6B6B', '#4ECDC4', '#A78BFA',
-  '#F97316', '#34D399', '#FB7185', '#60A5FA', '#FBBF24',
-];
-
-function programBadgeColor(name, index) {
-  return PROGRAM_COLORS[index % PROGRAM_COLORS.length];
+function PillBtn({ active, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      padding: '5px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+      background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+      color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+      fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem',
+      transition: 'all 0.15s', whiteSpace: 'nowrap',
+    }}>
+      {children}
+    </button>
+  );
 }
 
-const inp = {
-  width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 6, padding: '0.35rem 0.5rem', color: '#fff', fontSize: '0.82rem',
-  outline: 'none', boxSizing: 'border-box',
+function ProgramBadge({ name, color }) {
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: 12,
+      background: color + '22', color, fontWeight: 700, fontSize: '0.82rem',
+      border: `1px solid ${color}44`,
+    }}>
+      {name}
+    </span>
+  );
+}
+
+const cardStyle = {
+  background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem',
 };
 
-export function PointBalancesTab({ onNavigateAddRewards }) {
-  const [records, setRecords] = useState([]);
+export function PointBalancesTab() {
+  const [view, setView] = useState('balances');
   const [loading, setLoading] = useState(true);
+  const [programs, setPrograms] = useState([]);
+  const [cardProductNameById, setCardProductNameById] = useState({});
+  const [portfolioNameById, setPortfolioNameById] = useState({});
+  const [balances, setBalances] = useState([]);
+  const [programColors, setProgramColors] = useState({});
   const [personFilter, setPersonFilter] = useState('All');
-  const [editingId, setEditingId] = useState(null);
-  const [editBalance, setEditBalance] = useState('');
-  const [editVPP, setEditVPP] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
+  const [balancesOnly, setBalancesOnly] = useState(true);
 
   useEffect(() => {
-    load();
+    Promise.all([
+      fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products']),
+      fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name']),
+      fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
+      fetchFieldChoiceColors(REWARDS_TABLE, 'Program Name'),
+    ])
+      .then(([programRows, cardProductRows, portfolioRows, balanceRows, colors]) => {
+        setPrograms(programRows);
+        setCardProductNameById(Object.fromEntries(cardProductRows.map(r => [r.id, r.fields['Product Name'] || r.id])));
+        setPortfolioNameById(Object.fromEntries(portfolioRows.map(r => [r.id, r.fields['Card Name'] || r.id])));
+        setBalances(balanceRows);
+        setProgramColors(colors);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  async function load() {
-    setLoading(true);
-    const rows = await fetchTable(REWARDS_TABLE, [
-      'Program Name', 'Owner', 'Current Balance', 'Value Per Point',
-      'Program Value', 'Expiration Date', 'Expiration Policy', 'Last Update',
-    ]);
-    setRecords(rows);
-    setLoading(false);
-  }
+  const programById = Object.fromEntries(programs.map(p => [p.id, p]));
 
-  function startEdit(row) {
-    setSaveError(null);
-    setEditingId(row.id);
-    setEditBalance(row.currentBalance != null ? String(row.currentBalance) : '');
-    setEditVPP(row.valuePerPoint != null ? String(row.valuePerPoint) : '');
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setSaveError(null);
-  }
-
-  async function saveEdit(row) {
-    setSaveError(null);
-    if (editBalance === '' || isNaN(parseFloat(editBalance))) {
-      setSaveError('Enter a valid balance.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const fields = {
-        'Current Balance': parseFloat(editBalance),
-        'Last Update': toAirtableDate(new Date()),
-      };
-      if (editVPP !== '' && !isNaN(parseFloat(editVPP))) {
-        fields['Value Per Point'] = parseFloat(editVPP);
-      }
-      const updated = await updateRecord(REWARDS_TABLE, row.id, fields);
-      setRecords(prev => prev.map(r => (r.id === row.id ? updated : r)));
-      setEditingId(null);
-    } catch (err) {
-      setSaveError(String(err.message || err));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const enriched = records
-    .map((r, i) => ({
-      id: r.id,
-      programName: r.fields['Program Name'] || '—',
-      ownerIds: r.fields['Owner'] || [],
-      currentBalance: r.fields['Current Balance'] ?? null,
-      valuePerPoint: r.fields['Value Per Point'] ?? null,
-      programValue: r.fields['Program Value'] ?? null,
-      expirationDate: r.fields['Expiration Date'] || '',
-      expirationPolicy: r.fields['Expiration Policy'] || '',
-      lastUpdate: r.fields['Last Update'] || '',
+  const enrichedPrograms = programs
+    .map((p, i) => ({
+      id: p.id,
+      programName: p.fields['Program Name'] || '—',
+      valuePerPoint: p.fields['Value Per Point'] ?? null,
+      expirationPolicy: p.fields['Expiration Policy'] || '',
+      transferPartnerIds: p.fields['Transfer Partners'] || [],
+      cardProductIds: p.fields['Card Products'] || [],
       colorIndex: i,
-    }))
-    .filter(r => r.currentBalance != null && r.currentBalance > 0);
+    }));
 
-  const filtered = enriched.filter(r => {
-    if (personFilter === 'All') return true;
-    const personId = PERSON_ID_BY_NAME[personFilter];
-    return r.ownerIds.includes(personId);
+  const enrichedBalances = balances.map(b => {
+    const programId = (b.fields['Program'] || [])[0];
+    const program = programById[programId];
+    const valuePerPoint = program?.fields['Value Per Point'] ?? null;
+    const currentBalance = b.fields['Current Balance'] ?? 0;
+    return {
+      id: b.id,
+      programName: program?.fields['Program Name'] || '—',
+      ownerIds: b.fields['Person'] || [],
+      currentBalance,
+      valuePerPoint,
+      programValue: valuePerPoint != null ? currentBalance * valuePerPoint : null,
+      cardIds: b.fields['Credit Card Portfolio'] || [],
+      lastUpdated: b.fields['Last Updated'] || '',
+      expirationDate: b.fields['Expiration Date'] || '',
+      daysUntilExpiration: b.fields['Days Until Expiration'] ?? null,
+    };
   });
 
-  const sorted = [...filtered].sort((a, b) => (b.programValue ?? 0) - (a.programValue ?? 0));
-
-  const totalValue = sorted.reduce((s, r) => s + (r.programValue ?? 0), 0);
-  const programsTracked = sorted.length;
-
-  function PillBtn({ active, onClick, children }) {
-    return (
-      <button type="button" onClick={onClick} style={{
-        padding: '5px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
-        background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
-        color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
-        fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem',
-        transition: 'all 0.15s', whiteSpace: 'nowrap',
-      }}>
-        {children}
-      </button>
-    );
+  // --- Programs view ---
+  const programValueByName = {};
+  for (const b of enrichedBalances) {
+    programValueByName[b.programName] = (programValueByName[b.programName] ?? 0) + (b.programValue ?? 0);
   }
+  const programsSorted = [...enrichedPrograms].sort(
+    (a, b) => (programValueByName[b.programName] ?? 0) - (programValueByName[a.programName] ?? 0)
+  );
+  const totalPortfolioValue = enrichedBalances.reduce((s, r) => s + (r.programValue ?? 0), 0);
+  const totalProgramsTracked = enrichedPrograms.length;
+
+  // --- Balances view ---
+  const filteredBalances = enrichedBalances.filter(r => {
+    if (personFilter !== 'All') {
+      const personId = PERSON_ID_BY_NAME[personFilter];
+      if (!r.ownerIds.includes(personId)) return false;
+    }
+    if (balancesOnly && !(r.currentBalance > 0)) return false;
+    return true;
+  });
+  const balancesSorted = [...filteredBalances].sort((a, b) => (b.programValue ?? 0) - (a.programValue ?? 0));
+  const totalBalanceValue = enrichedBalances
+    .filter(r => r.currentBalance > 0)
+    .reduce((s, r) => s + (r.programValue ?? 0), 0);
+  const programsWithBalance = enrichedBalances.filter(r => r.currentBalance > 0).length;
 
   if (loading) {
     return (
@@ -159,217 +154,196 @@ export function PointBalancesTab({ onNavigateAddRewards }) {
     );
   }
 
-  const cols = '1.7fr 1fr 1fr 0.85fr 1fr 1fr 1.2fr 1.4fr 130px';
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1250 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1350 }}>
 
-      {/* Stat row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: '1rem', width: 'fit-content' }}>
-        <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem' }}>
-          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
-            Total Portfolio Value
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#00E676', lineHeight: 1 }}>
-            {fmtDollar(totalValue)}
-          </div>
-        </div>
-        <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem' }}>
-          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
-            Programs Tracked
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-            {programsTracked}
-          </div>
-        </div>
+      {/* View toggle */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <PillBtn active={view === 'programs'} onClick={() => setView('programs')}>Programs</PillBtn>
+        <PillBtn active={view === 'balances'} onClick={() => setView('balances')}>Balances</PillBtn>
       </div>
 
-      {/* Person filter */}
-      <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Person</span>
-            <PillBtn active={personFilter === 'All'} onClick={() => setPersonFilter('All')}>All</PillBtn>
-            {Object.values(PEOPLE).map(name => (
-              <PillBtn key={name} active={personFilter === name} onClick={() => setPersonFilter(name)}>{name}</PillBtn>
-            ))}
-          </div>
-          {onNavigateAddRewards && (
-            <button type="button" onClick={onNavigateAddRewards} style={{
-              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.82rem',
-              cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0, whiteSpace: 'nowrap',
-            }}>
-              + Add Rewards Program
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Table */}
-      {sorted.length === 0 ? (
-        <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '3rem', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
-          No point balances found.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: cols,
-            gap: '0.75rem',
-            padding: '0.5rem 1rem',
-            fontSize: '0.68rem',
-            color: 'rgba(255,255,255,0.3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            fontWeight: 600,
-          }}>
-            <span>Program</span>
-            <span>Owner</span>
-            <span>Balance</span>
-            <span>$/Point</span>
-            <span>Value</span>
-            <span>Last Update</span>
-            <span>Expires</span>
-            <span>Expiry Policy</span>
-            <span></span>
-          </div>
-
-          {sorted.map((row, i) => {
-            const days = daysUntil(row.expirationDate);
-            const expiringSoon = days != null && days < 60;
-            const ownerNames = row.ownerIds.map(id => PEOPLE[id] || id).join(', ') || '—';
-            const color = programBadgeColor(row.programName, i);
-            const stale = isStale(row.lastUpdate);
-            const isEditing = editingId === row.id;
-            return (
-              <div key={row.id}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: cols,
-                  gap: '0.75rem',
-                  alignItems: 'center',
-                  padding: '0.75rem 1rem',
-                  borderRadius: isEditing ? '10px 10px 0 0' : 10,
-                  background: '#172033',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}>
-                  <span>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 10px',
-                      borderRadius: 12,
-                      background: color + '22',
-                      color: color,
-                      fontWeight: 700,
-                      fontSize: '0.82rem',
-                      border: `1px solid ${color}44`,
-                    }}>
-                      {row.programName}
-                    </span>
-                  </span>
-                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{ownerNames}</span>
-                  <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{fmt(row.currentBalance)}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>
-                  <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{fmtDollar(row.programValue)}</span>
-                  <span
-                    title={stale ? 'No update in over 4 months' : ''}
-                    style={{
-                      fontSize: '0.82rem',
-                      color: stale ? '#0B1220' : 'rgba(255,255,255,0.5)',
-                      background: stale ? '#FFD700' : 'transparent',
-                      padding: stale ? '2px 8px' : 0,
-                      borderRadius: 8,
-                      fontWeight: stale ? 700 : 400,
-                      width: 'fit-content',
-                    }}
-                  >
-                    {fmtDate(row.lastUpdate)}
-                  </span>
-                  <span style={{ fontSize: '0.82rem', color: expiringSoon ? '#FFD700' : 'rgba(255,255,255,0.5)', fontWeight: expiringSoon ? 700 : 400 }}>
-                    {fmtDate(row.expirationDate)}{days != null ? ` (${days}d)` : ''}
-                  </span>
-                  <span
-                    title={row.expirationPolicy}
-                    style={{
-                      color: 'rgba(255,255,255,0.45)',
-                      fontSize: '0.8rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      cursor: row.expirationPolicy ? 'help' : 'default',
-                    }}
-                  >
-                    {row.expirationPolicy || '—'}
-                  </span>
-                  <span>
-                    {!isEditing && (
-                      <button type="button" onClick={() => startEdit(row)} style={{
-                        padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(0,212,255,0.4)',
-                        background: 'rgba(0,212,255,0.1)', color: '#00D4FF', fontWeight: 600,
-                        fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}>
-                        Update
-                      </button>
-                    )}
-                  </span>
-                </div>
-
-                {isEditing && (
-                  <div style={{
-                    display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end',
-                    padding: '0.85rem 1rem', borderRadius: '0 0 10px 10px',
-                    background: '#111a2b', border: '1px solid rgba(0,212,255,0.25)', borderTop: 'none',
-                  }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        New Balance
-                      </label>
-                      <input
-                        style={{ ...inp, width: 130 }}
-                        type="number"
-                        min="0"
-                        autoFocus
-                        value={editBalance}
-                        onChange={e => setEditBalance(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Value Per Point
-                      </label>
-                      <input
-                        style={{ ...inp, width: 110 }}
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={editVPP}
-                        onChange={e => setEditVPP(e.target.value)}
-                      />
-                    </div>
-                    <button type="button" onClick={() => saveEdit(row)} disabled={saving} style={{
-                      padding: '0.5rem 1.1rem', borderRadius: 8, border: 'none',
-                      background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
-                      color: '#0B1220', fontWeight: 700, fontSize: '0.82rem',
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                    }}>
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
-                    <button type="button" onClick={cancelEdit} disabled={saving} style={{
-                      padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600,
-                      fontSize: '0.82rem', cursor: 'pointer',
-                    }}>
-                      Cancel
-                    </button>
-                    {saveError && (
-                      <span style={{ color: '#FF4D4D', fontSize: '0.8rem' }}>{saveError}</span>
-                    )}
-                  </div>
-                )}
+      {view === 'programs' ? (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: '1rem', width: 'fit-content' }}>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
+                Total Programs Tracked
               </div>
-            );
-          })}
-        </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                {totalProgramsTracked}
+              </div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
+                Total Portfolio Value
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#00E676', lineHeight: 1 }}>
+                {fmtDollar(totalPortfolioValue)}
+              </div>
+            </div>
+          </div>
+
+          {programsSorted.length === 0 ? (
+            <div style={{ ...cardStyle, padding: '3rem', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+              No rewards programs found.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1.6fr 1fr 1.8fr 1.6fr 1.8fr', gap: '0.75rem',
+                padding: '0.5rem 1rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
+              }}>
+                <span>Program</span>
+                <span>$/Point</span>
+                <span>Expiration Policy</span>
+                <span>Transfer Partners</span>
+                <span>Linked Card Products</span>
+              </div>
+              {programsSorted.map((row, i) => {
+                const color = resolveProgramColor(row.programName, programColors, i);
+                const partnerNames = row.transferPartnerIds.map(id => programById[id]?.fields['Program Name'] || id);
+                const productNames = row.cardProductIds.map(id => cardProductNameById[id] || id);
+                const shownProducts = productNames.slice(0, 3);
+                const extraCount = productNames.length - shownProducts.length;
+                return (
+                  <div key={row.id} style={{
+                    display: 'grid', gridTemplateColumns: '1.6fr 1fr 1.8fr 1.6fr 1.8fr', gap: '0.75rem',
+                    alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10,
+                    background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <span><ProgramBadge name={row.programName} color={color} /></span>
+                    <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>
+                    <span
+                      title={row.expirationPolicy}
+                      style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {row.expirationPolicy || '—'}
+                    </span>
+                    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {partnerNames.length === 0
+                        ? <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>—</span>
+                        : partnerNames.map((n, idx) => {
+                            const pColor = resolveProgramColor(n, programColors, idx);
+                            return <ProgramBadge key={n + idx} name={n} color={pColor} />;
+                          })}
+                    </span>
+                    <span
+                      title={productNames.join(', ')}
+                      style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {productNames.length === 0 ? '—' : `${shownProducts.join(', ')}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: '1rem', width: 'fit-content' }}>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
+                Total Balance Value
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#00E676', lineHeight: 1 }}>
+                {fmtDollar(totalBalanceValue)}
+              </div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
+                Programs With Balance
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                {programsWithBalance}
+              </div>
+            </div>
+          </div>
+
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Person</span>
+                <PillBtn active={personFilter === 'All'} onClick={() => setPersonFilter('All')}>All</PillBtn>
+                {Object.values(PEOPLE).map(name => (
+                  <PillBtn key={name} active={personFilter === name} onClick={() => setPersonFilter(name)}>{name}</PillBtn>
+                ))}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={balancesOnly}
+                  onChange={e => setBalancesOnly(e.target.checked)}
+                  style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
+                />
+                Show Balances Only
+              </label>
+            </div>
+          </div>
+
+          {balancesSorted.length === 0 ? (
+            <div style={{ ...cardStyle, padding: '3rem', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+              No balances found.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1.4fr 0.9fr 1fr 0.85fr 1.1fr 1.6fr 1fr 1fr 1fr', gap: '0.6rem',
+                padding: '0.5rem 1rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)',
+                textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
+              }}>
+                <span>Program</span>
+                <span>Person</span>
+                <span>Balance</span>
+                <span>$/Point</span>
+                <span>Value</span>
+                <span>Linked Cards</span>
+                <span>Last Updated</span>
+                <span>Expires</span>
+                <span>Days</span>
+              </div>
+              {balancesSorted.map((row, i) => {
+                const color = resolveProgramColor(row.programName, programColors, i);
+                const ownerNames = row.ownerIds.map(id => PEOPLE[id] || id).join(', ') || '—';
+                const cardNames = row.cardIds.map(id => portfolioNameById[id] || id);
+                const stale = isStaleDays(row.lastUpdated, 60);
+                const days = row.daysUntilExpiration;
+                const daysColor = days != null && days < 14 ? '#FF4D4D' : days != null && days < 60 ? '#FFD700' : 'rgba(255,255,255,0.5)';
+                return (
+                  <div key={row.id} style={{
+                    display: 'grid', gridTemplateColumns: '1.4fr 0.9fr 1fr 0.85fr 1.1fr 1.6fr 1fr 1fr 1fr', gap: '0.6rem',
+                    alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10,
+                    background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <span><ProgramBadge name={row.programName} color={color} /></span>
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{ownerNames}</span>
+                    <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{fmt(row.currentBalance)}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>
+                    <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{fmtDollar(row.programValue)}</span>
+                    <span
+                      title={cardNames.join(', ')}
+                      style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {cardNames.length === 0 ? '—' : cardNames.join(', ')}
+                    </span>
+                    <span
+                      title={stale ? 'No update in over 60 days' : ''}
+                      style={{ fontSize: '0.82rem', color: stale ? '#FFD700' : 'rgba(255,255,255,0.5)', fontWeight: stale ? 700 : 400 }}
+                    >
+                      {fmtDate(row.lastUpdated)}
+                    </span>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{fmtDate(row.expirationDate)}</span>
+                    <span style={{ fontSize: '0.82rem', color: daysColor, fontWeight: days != null && days < 60 ? 700 : 400 }}>
+                      {days != null ? days : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

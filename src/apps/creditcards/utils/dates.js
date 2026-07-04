@@ -34,11 +34,11 @@ export function toAirtableDate(d) {
   return d.toISOString().split('T')[0];
 }
 
-export function isStale(dateStr, months = 4) {
+export function isStaleDays(dateStr, days = 60) {
   if (!dateStr) return true;
   const threshold = new Date();
   threshold.setHours(0, 0, 0, 0);
-  threshold.setMonth(threshold.getMonth() - months);
+  threshold.setDate(threshold.getDate() - days);
   const d = new Date(dateStr + 'T00:00:00');
   return d < threshold;
 }

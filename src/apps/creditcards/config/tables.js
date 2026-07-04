@@ -9,3 +9,4 @@ export const HOTELS_TABLE = 'tblAu5dxcrnVkv3ki';
 export const HOTEL_TEMPLATES_TABLE = 'tblYaWoIq1iBF5Enn';
 export const PERK_DEFINITIONS_TABLE = 'tblA2XdVpJoLGDNMd';
 export const PERK_INSTANCES_TABLE = 'tblCAFlsuqRfoAxI0';
+export const POINT_BALANCES_TABLE = 'tblQTdEyf8hoUBOf5';
