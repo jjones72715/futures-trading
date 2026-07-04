@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, REWARDS_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
@@ -31,7 +31,7 @@ const FIELDS = [
   'Card Name',
   'Issuer',
   'Personal/Business',
-  'Program Name (from Rewards Program)',
+  'Rewards Program',
   'Annual Fee Amount',
   'Days Until Annual Fee',
   'Annual Fee Status',
@@ -61,16 +61,21 @@ function buildIssuerGroups(cards) {
 
 export function PortfolioTab() {
   const [cards, setCards] = useState([]);
+  const [programNameById, setProgramNameById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPerson, setSelectedPerson] = useState(ALL_PEOPLE);
 
   useEffect(() => {
     setLoading(true);
-    fetchTable(PORTFOLIO_TABLE, FIELDS)
-      .then(records => {
+    Promise.all([
+      fetchTable(PORTFOLIO_TABLE, FIELDS),
+      fetchTable(REWARDS_TABLE, ['Program Name']),
+    ])
+      .then(([records, programRows]) => {
         const active = records.filter(r => r.fields['Status'] === 'Active');
         setCards(active);
+        setProgramNameById(Object.fromEntries(programRows.map(p => [p.id, p.fields['Program Name'] || p.id])));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -157,7 +162,7 @@ export function PortfolioTab() {
             </div>
 
             {group.cards.map(card => (
-              <CardRow key={card.id} card={card} />
+              <CardRow key={card.id} card={card} programNameById={programNameById} />
             ))}
           </div>
         );

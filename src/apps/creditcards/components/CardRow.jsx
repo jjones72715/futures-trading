@@ -22,14 +22,14 @@ const RISK_COLORS = {
   High: '#FF4D4D',
 };
 
-function extractProgramName(field) {
+function resolveProgramNames(field, programNameById) {
   if (!field) return '—';
-  if (Array.isArray(field)) return field[0] || '—';
-  if (typeof field === 'string') return field;
-  return '—';
+  const ids = Array.isArray(field) ? field : [field];
+  const names = ids.map(id => programNameById[id] || id).filter(Boolean);
+  return names.length ? names.join(', ') : '—';
 }
 
-export function CardRow({ card }) {
+export function CardRow({ card, programNameById = {} }) {
   const f = card.fields;
   const issuerRaw = f['Issuer'];
   const issuerKey = Array.isArray(issuerRaw) ? issuerRaw[0] : issuerRaw;
@@ -73,7 +73,7 @@ export function CardRow({ card }) {
       </div>
 
       <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)' }}>
-        {extractProgramName(f['Program Name (from Rewards Program)'])}
+        {resolveProgramNames(f['Rewards Program'], programNameById)}
       </div>
 
       <div style={{ fontSize: '0.85rem', color: '#fff' }}>
