@@ -50,7 +50,7 @@ const inp = {
   outline: 'none', boxSizing: 'border-box',
 };
 
-export function PointBalancesTab() {
+export function PointBalancesTab({ onNavigateAddRewards }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [personFilter, setPersonFilter] = useState('All');
@@ -186,12 +186,22 @@ export function PointBalancesTab() {
 
       {/* Person filter */}
       <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Person</span>
-          <PillBtn active={personFilter === 'All'} onClick={() => setPersonFilter('All')}>All</PillBtn>
-          {Object.values(PEOPLE).map(name => (
-            <PillBtn key={name} active={personFilter === name} onClick={() => setPersonFilter(name)}>{name}</PillBtn>
-          ))}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Person</span>
+            <PillBtn active={personFilter === 'All'} onClick={() => setPersonFilter('All')}>All</PillBtn>
+            {Object.values(PEOPLE).map(name => (
+              <PillBtn key={name} active={personFilter === name} onClick={() => setPersonFilter(name)}>{name}</PillBtn>
+            ))}
+          </div>
+          {onNavigateAddRewards && (
+            <button type="button" onClick={onNavigateAddRewards} style={{
+              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.82rem',
+              cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0, whiteSpace: 'nowrap',
+            }}>
+              + Add Rewards Program
+            </button>
+          )}
         </div>
       </div>
 

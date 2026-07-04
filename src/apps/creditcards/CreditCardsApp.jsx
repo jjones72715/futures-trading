@@ -17,7 +17,6 @@ const TABS = [
   { id: 'recommendations', label: 'Card Recommendations' },
   { id: 'add', label: 'Add Card' },
   { id: 'add-hotel', label: 'Add Hotel Benefit' },
-  { id: 'add-rewards', label: 'Add Rewards Program' },
 ];
 
 export default function CreditCardsApp() {
@@ -67,12 +66,22 @@ export default function CreditCardsApp() {
 
       <div style={{ padding: '1.5rem 2rem' }}>
         {tab === 'portfolio' && <PortfolioTab />}
-        {tab === 'point-balances' && <PointBalancesTab />}
+        {tab === 'point-balances' && <PointBalancesTab onNavigateAddRewards={() => setTab('add-rewards')} />}
         {tab === 'benefits' && <BenefitsTrackerTab />}
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'add' && <AddCardTab />}
         {tab === 'add-hotel' && <AddHotelBenefitTab onNavigateTemplates={() => setTab('hotel-templates')} />}
-        {tab === 'add-rewards' && <AddRewardsProgramTab />}
+        {tab === 'add-rewards' && (
+          <div>
+            <button onClick={() => setTab('point-balances')} style={{
+              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.85rem',
+              cursor: 'pointer', fontWeight: 600, padding: '0 0 1.25rem 0', display: 'block',
+            }}>
+              ← Back to Point Balances
+            </button>
+            <AddRewardsProgramTab />
+          </div>
+        )}
         {tab === 'hotel-templates' && (
           <div>
             <button onClick={() => setTab('add-hotel')} style={{

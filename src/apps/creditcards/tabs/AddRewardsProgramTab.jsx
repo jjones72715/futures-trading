@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
-import { createRecord, fetchFieldChoices } from '../services/airtable.js';
+import { createRecord, fetchTable, fetchFieldChoices } from '../services/airtable.js';
 import { REWARDS_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { toAirtableDate } from '../utils/dates.js';
 
 const EMPTY = {
+  ownerId: '',
   programName: '',
-  customProgramName: '',
-  ownerIds: [],
   currentBalance: '',
   valuePerPoint: '',
-  expirationDate: '',
-  expirationPolicy: '',
 };
 
 const inp = {
@@ -47,44 +44,51 @@ function PillBtn({ active, onClick, children }) {
 export function AddRewardsProgramTab() {
   const [form, setForm] = useState(EMPTY);
   const [programChoices, setProgramChoices] = useState([]);
-  const [useCustomName, setUseCustomName] = useState(false);
+  const [allRecords, setAllRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchFieldChoices(REWARDS_TABLE, 'Program Name')
-      .then(choices => setProgramChoices(choices.sort((a, b) => a.localeCompare(b))))
+    Promise.all([
+      fetchFieldChoices(REWARDS_TABLE, 'Program Name'),
+      fetchTable(REWARDS_TABLE, ['Program Name', 'Owner', 'Expiration Date', 'Expiration Policy']),
+    ])
+      .then(([choices, records]) => {
+        setProgramChoices(choices.sort((a, b) => a.localeCompare(b)));
+        setAllRecords(records);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  function selectOwner(id) {
+    setForm(prev => ({ ...prev, ownerId: prev.ownerId === id ? '' : id, programName: '' }));
+  }
+
+  function selectProgram(name) {
+    setForm(prev => ({ ...prev, programName: prev.programName === name ? '' : name }));
+  }
 
   function set(field) {
     return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
   }
 
-  function selectProgram(name) {
-    setUseCustomName(false);
-    setForm(prev => ({ ...prev, programName: prev.programName === name ? '' : name, customProgramName: '' }));
-  }
-
-  function toggleOwner(id) {
-    setForm(prev => ({
-      ...prev,
-      ownerIds: prev.ownerIds.includes(id)
-        ? prev.ownerIds.filter(o => o !== id)
-        : [...prev.ownerIds, id],
-    }));
-  }
+  const trackedProgramNames = new Set(
+    allRecords
+      .filter(r => (r.fields['Owner'] || []).includes(form.ownerId))
+      .map(r => r.fields['Program Name'])
+      .filter(Boolean)
+  );
+  const availablePrograms = programChoices.filter(name => !trackedProgramNames.has(name));
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
 
-    const programName = useCustomName ? form.customProgramName.trim() : form.programName;
-    if (!programName) { setError('Program Name is required.'); return; }
-    if (form.ownerIds.length === 0) { setError('At least one Owner is required.'); return; }
+    if (!form.ownerId) { setError('Owner is required.'); return; }
+    if (!form.programName) { setError('Program Name is required.'); return; }
     if (form.currentBalance === '' || isNaN(parseFloat(form.currentBalance))) {
       setError('Current Balance is required.');
       return;
@@ -92,27 +96,30 @@ export function AddRewardsProgramTab() {
 
     setSubmitting(true);
     const fields = {
-      'Name': programName,
-      'Program Name': programName,
-      'Owner': form.ownerIds,
+      'Name': form.programName,
+      'Program Name': form.programName,
+      'Owner': [form.ownerId],
       'Current Balance': parseFloat(form.currentBalance),
       'Last Update': toAirtableDate(new Date()),
     };
     if (form.valuePerPoint !== '' && !isNaN(parseFloat(form.valuePerPoint))) {
       fields['Value Per Point'] = parseFloat(form.valuePerPoint);
     }
-    if (form.expirationDate) fields['Expiration Date'] = form.expirationDate;
-    if (form.expirationPolicy.trim()) fields['Expiration Policy'] = form.expirationPolicy.trim();
+
+    const reference = allRecords.find(r =>
+      r.fields['Program Name'] === form.programName &&
+      (r.fields['Expiration Date'] || r.fields['Expiration Policy'])
+    );
+    if (reference) {
+      if (reference.fields['Expiration Date']) fields['Expiration Date'] = reference.fields['Expiration Date'];
+      if (reference.fields['Expiration Policy']) fields['Expiration Policy'] = reference.fields['Expiration Policy'];
+    }
 
     try {
       const result = await createRecord(REWARDS_TABLE, fields);
-      console.log('Rewards program created:', result);
+      setAllRecords(prev => [...prev, result]);
       setSuccess(true);
       setForm(EMPTY);
-      setUseCustomName(false);
-      if (!programChoices.includes(programName)) {
-        setProgramChoices(prev => [...prev, programName].sort((a, b) => a.localeCompare(b)));
-      }
       setTimeout(() => setSuccess(false), 6000);
     } catch (err) {
       console.error('Rewards program save error:', err);
@@ -133,31 +140,6 @@ export function AddRewardsProgramTab() {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 780 }}>
 
-      {/* Program Name */}
-      <div style={cardStyle}>
-        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
-          Program Name <span style={{ color: '#FF4D4D' }}>*</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: useCustomName ? '0.85rem' : 0 }}>
-          {programChoices.map(name => (
-            <PillBtn key={name} active={!useCustomName && form.programName === name} onClick={() => selectProgram(name)}>
-              {name}
-            </PillBtn>
-          ))}
-          <PillBtn active={useCustomName} onClick={() => { setUseCustomName(v => !v); setForm(prev => ({ ...prev, programName: '' })); }}>
-            + New Program
-          </PillBtn>
-        </div>
-        {useCustomName && (
-          <input
-            style={inp}
-            value={form.customProgramName}
-            onChange={set('customProgramName')}
-            placeholder="e.g. Delta SkyMiles"
-          />
-        )}
-      </div>
-
       {/* Owner */}
       <div style={cardStyle}>
         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
@@ -165,47 +147,51 @@ export function AddRewardsProgramTab() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {Object.entries(PEOPLE).map(([id, name]) => (
-            <PillBtn key={id} active={form.ownerIds.includes(id)} onClick={() => toggleOwner(id)}>
+            <PillBtn key={id} active={form.ownerId === id} onClick={() => selectOwner(id)}>
               {name}
             </PillBtn>
           ))}
         </div>
       </div>
 
-      {/* Balance & Value */}
-      <div style={cardStyle}>
-        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Balance & Value</div>
-        <div style={grid2}>
-          <div>
-            <label style={lbl}>Current Balance <span style={{ color: '#FF4D4D' }}>*</span></label>
-            <input style={inp} type="number" min="0" value={form.currentBalance} onChange={set('currentBalance')} placeholder="0" />
+      {/* Program Name — only after Owner is picked */}
+      {form.ownerId && (
+        <div style={cardStyle}>
+          <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>
+            Program Name <span style={{ color: '#FF4D4D' }}>*</span>
           </div>
-          <div>
-            <label style={lbl}>Value Per Point ($)</label>
-            <input style={inp} type="number" step="0.001" min="0" value={form.valuePerPoint} onChange={set('valuePerPoint')} placeholder="0.010" />
-          </div>
+          {availablePrograms.length === 0 ? (
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.88rem' }}>
+              {PEOPLE[form.ownerId]} already tracks every available program.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {availablePrograms.map(name => (
+                <PillBtn key={name} active={form.programName === name} onClick={() => selectProgram(name)}>
+                  {name}
+                </PillBtn>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* Expiration */}
-      <div style={cardStyle}>
-        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Expiration</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label style={lbl}>Expiration Date</label>
-            <input style={{ ...inp, maxWidth: 200 }} type="date" value={form.expirationDate} onChange={set('expirationDate')} />
-          </div>
-          <div>
-            <label style={lbl}>Expiration Policy</label>
-            <textarea
-              style={{ ...inp, minHeight: 70, resize: 'vertical' }}
-              value={form.expirationPolicy}
-              onChange={set('expirationPolicy')}
-              placeholder="e.g. Points expire after 24 months of inactivity"
-            />
+      {/* Balance & Value */}
+      {form.ownerId && form.programName && (
+        <div style={cardStyle}>
+          <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Balance & Value</div>
+          <div style={grid2}>
+            <div>
+              <label style={lbl}>Current Balance <span style={{ color: '#FF4D4D' }}>*</span></label>
+              <input style={inp} type="number" min="0" value={form.currentBalance} onChange={set('currentBalance')} placeholder="0" />
+            </div>
+            <div>
+              <label style={lbl}>Value Per Point ($)</label>
+              <input style={inp} type="number" step="0.001" min="0" value={form.valuePerPoint} onChange={set('valuePerPoint')} placeholder="0.010" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {success && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.85rem 1rem', color: '#00E676', fontWeight: 600 }}>
