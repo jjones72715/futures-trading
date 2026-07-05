@@ -12,3 +12,4 @@ export const PERK_INSTANCES_TABLE = 'tblCAFlsuqRfoAxI0';
 export const POINT_BALANCES_TABLE = 'tblQTdEyf8hoUBOf5';
 export const SIGNUP_BONUSES_TABLE = 'tblRVlvqetNHxlclv';
 export const SPEND_BONUSES_TABLE = 'tbl2VXLEeFzSkU3h7';
+export const SUGGESTIONS_TABLE = 'tblCkyQNxt6qaWed8';
