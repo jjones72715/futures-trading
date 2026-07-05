@@ -29,7 +29,7 @@ function resolveProgramNames(field, programNameById) {
   return names.length ? names.join(', ') : '—';
 }
 
-export function CardRow({ card, programNameById = {} }) {
+export function CardRow({ card, programNameById = {}, personNameById = {} }) {
   const f = card.fields;
   const issuerRaw = f['Issuer'];
   const issuerKey = Array.isArray(issuerRaw) ? issuerRaw[0] : issuerRaw;
@@ -37,11 +37,14 @@ export function CardRow({ card, programNameById = {} }) {
   const cardType = f['Personal/Business'];
   const cancelRisk = f['Cancel Risk Level'];
   const riskColor = RISK_COLORS[cancelRisk] ?? 'rgba(255,255,255,0.4)';
+  const authorizedUsers = f['Authorized Users'];
+  const auIds = Array.isArray(authorizedUsers) ? authorizedUsers : (authorizedUsers ? [authorizedUsers] : []);
+  const auNames = auIds.map(id => personNameById[id] || id);
 
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '2fr 1fr 90px 1fr 80px 70px 110px 80px',
+      gridTemplateColumns: '2fr 1fr 90px 1fr 80px 70px 110px 70px 80px',
       alignItems: 'center',
       gap: '0.75rem',
       padding: '0.75rem 1rem',
@@ -102,6 +105,13 @@ export function CardRow({ card, programNameById = {} }) {
             {cancelRisk}
           </span>
         )}
+      </div>
+
+      <div
+        style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}
+        title={auNames.length ? auNames.join(', ') : undefined}
+      >
+        {auNames.length ? `${auNames.length} AU${auNames.length !== 1 ? 's' : ''}` : '—'}
       </div>
     </div>
   );

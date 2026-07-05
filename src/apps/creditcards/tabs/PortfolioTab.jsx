@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, REWARDS_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, REWARDS_TABLE, PEOPLE_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
@@ -38,6 +38,7 @@ const FIELDS = [
   'Cancel Risk Level',
   'Status',
   'Owner',
+  'Authorized Users',
 ];
 
 function buildIssuerGroups(cards) {
@@ -62,6 +63,7 @@ function buildIssuerGroups(cards) {
 export function PortfolioTab() {
   const [cards, setCards] = useState([]);
   const [programNameById, setProgramNameById] = useState({});
+  const [personNameById, setPersonNameById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPerson, setSelectedPerson] = useState(ALL_PEOPLE);
@@ -71,11 +73,13 @@ export function PortfolioTab() {
     Promise.all([
       fetchTable(PORTFOLIO_TABLE, FIELDS),
       fetchTable(REWARDS_TABLE, ['Program Name']),
+      fetchTable(PEOPLE_TABLE, ['Name']),
     ])
-      .then(([records, programRows]) => {
+      .then(([records, programRows, peopleRows]) => {
         const active = records.filter(r => r.fields['Status'] === 'Active');
         setCards(active);
         setProgramNameById(Object.fromEntries(programRows.map(p => [p.id, p.fields['Program Name'] || p.id])));
+        setPersonNameById(Object.fromEntries(peopleRows.map(p => [p.id, p.fields['Name'] || p.id])));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -149,12 +153,12 @@ export function PortfolioTab() {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '2fr 1fr 90px 1fr 80px 70px 110px 80px',
+              gridTemplateColumns: '2fr 1fr 90px 1fr 80px 70px 110px 70px 80px',
               gap: '0.75rem',
               padding: '0.5rem 1rem',
               borderBottom: '1px solid rgba(255,255,255,0.05)',
             }}>
-              {['Card', 'Type', 'Rewards', 'Annual Fee', 'Days', 'AF Status', 'Risk', ''].map((h, i) => (
+              {['Card', 'Type', 'Rewards', 'Annual Fee', 'Days', 'AF Status', 'Risk', 'AUs', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {h}
                 </span>
@@ -162,7 +166,7 @@ export function PortfolioTab() {
             </div>
 
             {group.cards.map(card => (
-              <CardRow key={card.id} card={card} programNameById={programNameById} />
+              <CardRow key={card.id} card={card} programNameById={programNameById} personNameById={personNameById} />
             ))}
           </div>
         );
