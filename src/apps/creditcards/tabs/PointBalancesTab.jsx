@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { fetchTable, fetchFieldChoiceColors, updateRecord } from '../services/airtable.js';
+import { fetchTable, updateRecord } from '../services/airtable.js';
 import { REWARDS_TABLE, CARD_PRODUCTS_TABLE, PORTFOLIO_TABLE, POINT_BALANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { isStaleDays, toAirtableDate } from '../utils/dates.js';
-import { resolveProgramColor } from '../utils/airtableColors.js';
 
 const PERSON_ID_BY_NAME = Object.fromEntries(Object.entries(PEOPLE).map(([id, name]) => [name, id]));
 
@@ -42,13 +41,9 @@ function PillBtn({ active, onClick, children }) {
   );
 }
 
-function ProgramBadge({ name, color }) {
+function ProgramBadge({ name }) {
   return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 12,
-      background: color + '22', color, fontWeight: 700, fontSize: '0.82rem',
-      border: `1px solid ${color}44`,
-    }}>
+    <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>
       {name}
     </span>
   );
@@ -71,7 +66,6 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
   const [cardProductNameById, setCardProductNameById] = useState({});
   const [portfolioNameById, setPortfolioNameById] = useState({});
   const [balances, setBalances] = useState([]);
-  const [programColors, setProgramColors] = useState({});
   const [personFilter, setPersonFilter] = useState('All');
   const [balancesOnly, setBalancesOnly] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -91,14 +85,12 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
       fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Value Per Point', 'Program Value', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
-      fetchFieldChoiceColors(REWARDS_TABLE, 'Program Name'),
     ])
-      .then(([programRows, cardProductRows, portfolioRows, balanceRows, colors]) => {
+      .then(([programRows, cardProductRows, portfolioRows, balanceRows]) => {
         setPrograms(programRows);
         setCardProductNameById(Object.fromEntries(cardProductRows.map(r => [r.id, r.fields['Product Name'] || r.id])));
         setPortfolioNameById(Object.fromEntries(portfolioRows.map(r => [r.id, r.fields['Card Name'] || r.id])));
         setBalances(balanceRows);
-        setProgramColors(colors);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -255,8 +247,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
                 <span>Transfer Partners</span>
                 <span>Linked Card Products</span>
               </div>
-              {programsSorted.map((row, i) => {
-                const color = resolveProgramColor(row.programName, programColors, i);
+              {programsSorted.map((row) => {
                 const partnerNames = row.transferPartnerIds.map(id => programById[id]?.fields['Program Name'] || id);
                 const productNames = row.cardProductIds.map(id => cardProductNameById[id] || id);
                 const shownProducts = productNames.slice(0, 3);
@@ -267,7 +258,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
                     alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10,
                     background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
                   }}>
-                    <span><ProgramBadge name={row.programName} color={color} /></span>
+                    <span><ProgramBadge name={row.programName} /></span>
                     <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>
                     <span
                       title={row.expirationPolicy}
@@ -278,10 +269,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
                     <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {partnerNames.length === 0
                         ? <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>—</span>
-                        : partnerNames.map((n, idx) => {
-                            const pColor = resolveProgramColor(n, programColors, idx);
-                            return <ProgramBadge key={n + idx} name={n} color={pColor} />;
-                          })}
+                        : partnerNames.map((n, idx) => <ProgramBadge key={n + idx} name={n} />)}
                     </span>
                     <span
                       title={productNames.join(', ')}
@@ -369,8 +357,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
                 <span>Days</span>
                 <span></span>
               </div>
-              {balancesSorted.map((row, i) => {
-                const color = resolveProgramColor(row.programName, programColors, i);
+              {balancesSorted.map((row) => {
                 const ownerNames = row.ownerIds.map(id => PEOPLE[id] || id).join(', ') || '—';
                 const cardNames = row.cardIds.map(id => portfolioNameById[id] || id);
                 const stale = isStaleDays(row.lastUpdated, 60);
@@ -384,7 +371,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
                       alignItems: 'center', padding: '0.75rem 1rem', borderRadius: isEditing ? '10px 10px 0 0' : 10,
                       background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
                     }}>
-                      <span><ProgramBadge name={row.programName} color={color} /></span>
+                      <span><ProgramBadge name={row.programName} /></span>
                       <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{ownerNames}</span>
                       <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{fmt(row.currentBalance)}</span>
                       <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{fmtVPP(row.valuePerPoint)}</span>

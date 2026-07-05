@@ -53,11 +53,3 @@ export async function fetchFieldChoices(tableId, fieldName) {
   const field = (table?.fields || []).find(f => f.name === fieldName);
   return (field?.options?.choices || []).map(c => c.name);
 }
-
-export async function fetchFieldChoiceColors(tableId, fieldName) {
-  const res = await fetch(`/.netlify/functions/cc-airtable/meta/bases/${BASE}/tables`);
-  const data = await res.json();
-  const table = (data.tables || []).find(t => t.id === tableId);
-  const field = (table?.fields || []).find(f => f.name === fieldName);
-  return Object.fromEntries((field?.options?.choices || []).map(c => [c.name, c.color]));
-}
