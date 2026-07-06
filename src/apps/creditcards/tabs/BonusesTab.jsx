@@ -297,16 +297,28 @@ function signupMonthLabel(approvalDateStr, n) {
   return MONTH_NAMES[idx];
 }
 
-function SignupBonusCard({ row, monthInputs, setMonthInputs, savingKey, onSaveMonth, onToggleAchieved }) {
-  const missingMonths = [1, 2, 3, 4, 5, 6].filter(n => row.fields[`Month ${n}`] == null);
+function SignupBonusCard({ row, onOpen, onToggleAchieved }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <div style={cardStyle}>
+    <div
+      onClick={() => onOpen(row.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        ...cardStyle, cursor: 'pointer',
+        background: hovered ? '#1b2740' : '#172033',
+        transition: 'background 0.12s',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '1rem', color: '#fff' }}>{row.cardName}</div>
           <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>{row.personName}</div>
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+        <label
+          onClick={e => e.stopPropagation()}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+        >
           <input
             type="checkbox"
             checked={row.achieved}
@@ -333,41 +345,128 @@ function SignupBonusCard({ row, monthInputs, setMonthInputs, savingKey, onSaveMo
       }}>
         Deadline: {fmtDate(row.effectiveDeadline)}{row.daysRemaining != null && ` (${row.daysRemaining} days remaining)`}
       </div>
-
-      {!row.achieved && missingMonths.length > 0 && (
-        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {missingMonths.map(n => {
-            const field = `Month ${n}`;
-            const label = signupMonthLabel(row.approvalDate, n);
-            const key = `${row.id}:${field}`;
-            return (
-              <MonthInputRow
-                key={key}
-                label={label}
-                value={monthInputs[key] || ''}
-                onChange={v => setMonthInputs(prev => ({ ...prev, [key]: v }))}
-                onSave={() => onSaveMonth(SIGNUP_BONUSES_TABLE, row.id, field, true)}
-                saving={savingKey === key}
-              />
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
 
-const SPEND_ROW_COLUMNS = '1.7fr 1fr 1fr 1fr 1fr 70px 32px';
+function SignupBonusMonthPanel({ row, monthInputs, setMonthInputs, savingKey, onSaveMonth, onClose }) {
+  const [mounted, setMounted] = useState(false);
 
-function SpendBonusRow({ row, onOpenMonths, onToggleEarned }) {
-  const missingMonths = MONTH_NAMES.filter(m => row.fields[m] == null);
-  const canEnterMonths = !row.earned && missingMonths.length > 0;
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  function handleClose() {
+    setMounted(false);
+    setTimeout(onClose, 200);
+  }
+
+  const missingMonths = [1, 2, 3, 4, 5, 6].filter(n => row.fields[`Month ${n}`] == null);
+
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: SPEND_ROW_COLUMNS, gap: '0.75rem',
-      alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10,
-      background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
-    }}>
+    <>
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'fixed', inset: 0, background: '#0B1220',
+          opacity: mounted ? 0.6 : 0, transition: 'opacity 0.2s ease', zIndex: 40,
+        }}
+      />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: '40%', minWidth: 380, maxWidth: '90vw',
+        background: '#172033', borderLeft: '1px solid #1E2D45', zIndex: 41,
+        transform: mounted ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.22s ease', boxShadow: '-12px 0 32px rgba(0,0,0,0.4)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          padding: '1.25rem 1.5rem', borderBottom: '1px solid #1E2D45',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem',
+        }}>
+          <div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>{row.cardName}</div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{row.personName}</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            style={{
+              background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+              fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, padding: '0 0.25rem', flexShrink: 0,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {row.description && (
+            <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{row.description}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <Stat label="Spend Target" value={$$(row.spendTarget)} />
+            <Stat label="Current Spend" value={$$(row.currentSpend)} color="#00D4FF" />
+            <Stat label="Remaining Spend" value={$$(row.remainingSpend)} color="#00E676" />
+          </div>
+
+          {row.daysRemaining != null && (
+            <div style={{
+              fontSize: '0.85rem', color: deadlineColor(row.daysRemaining),
+              fontWeight: row.daysRemaining < 14 ? 700 : 400,
+            }}>
+              Deadline {fmtDate(row.effectiveDeadline)} ({row.daysRemaining} days remaining)
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid #1E2D45' }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Enter Monthly Spend</div>
+            {missingMonths.length === 0 ? (
+              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.35)' }}>All months entered.</div>
+            ) : (
+              missingMonths.map(n => {
+                const field = `Month ${n}`;
+                const label = signupMonthLabel(row.approvalDate, n);
+                const key = `${row.id}:${field}`;
+                return (
+                  <MonthInputRow
+                    key={key}
+                    label={label}
+                    value={monthInputs[key] || ''}
+                    onChange={v => setMonthInputs(prev => ({ ...prev, [key]: v }))}
+                    onSave={() => onSaveMonth(SIGNUP_BONUSES_TABLE, row.id, field, true)}
+                    saving={savingKey === key}
+                  />
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const SPEND_ROW_COLUMNS = '1.7fr 1fr 1fr 1fr 1fr 70px';
+
+function SpendBonusRow({ row, onOpen, onToggleEarned }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={() => onOpen(row.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: SPEND_ROW_COLUMNS, gap: '0.75rem',
+        alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10, cursor: 'pointer',
+        background: hovered ? '#1b2740' : '#172033', border: '1px solid rgba(255,255,255,0.06)',
+        transition: 'background 0.12s',
+      }}
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {row.cardName}
@@ -385,7 +484,7 @@ function SpendBonusRow({ row, onOpenMonths, onToggleEarned }) {
       <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{$$(row.annualTarget)}</span>
       <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.currentSpend)}</span>
       <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.remainingSpend)}</span>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={row.earned}
@@ -393,19 +492,6 @@ function SpendBonusRow({ row, onOpenMonths, onToggleEarned }) {
           style={{ accentColor: '#00D4FF', width: 17, height: 17, cursor: 'pointer' }}
         />
       </div>
-      <button
-        type="button"
-        onClick={() => onOpenMonths(row.id)}
-        disabled={!canEnterMonths}
-        title={canEnterMonths ? 'Enter monthly spend' : 'No months left to enter'}
-        style={{
-          width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(0,212,255,0.3)',
-          background: 'rgba(0,212,255,0.12)', color: '#00D4FF', fontWeight: 700, fontSize: '1rem', lineHeight: 1,
-          cursor: canEnterMonths ? 'pointer' : 'not-allowed', opacity: canEnterMonths ? 1 : 0.3,
-        }}
-      >
-        +
-      </button>
     </div>
   );
 }
@@ -524,6 +610,7 @@ export function BonusesTab() {
   const [productHolders, setProductHolders] = useState({});
   const [monthInputs, setMonthInputs] = useState({});
   const [savingKey, setSavingKey] = useState(null);
+  const [openSignupBonusId, setOpenSignupBonusId] = useState(null);
   const [openSpendBonusId, setOpenSpendBonusId] = useState(null);
 
   const [showAddSignup, setShowAddSignup] = useState(false);
@@ -830,10 +917,7 @@ export function BonusesTab() {
                 <SignupBonusCard
                   key={row.id}
                   row={row}
-                  monthInputs={monthInputs}
-                  setMonthInputs={setMonthInputs}
-                  savingKey={savingKey}
-                  onSaveMonth={saveMonth}
+                  onOpen={setOpenSignupBonusId}
                   onToggleAchieved={r => toggleFlag(SIGNUP_BONUSES_TABLE, r.id, 'Achieved', r.achieved, true)}
                 />
               ))}
@@ -879,14 +963,13 @@ export function BonusesTab() {
                 <span>Current</span>
                 <span>Remaining</span>
                 <span style={{ textAlign: 'center' }}>Earned</span>
-                <span />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {spendSorted.map(row => (
                   <SpendBonusRow
                     key={row.id}
                     row={row}
-                    onOpenMonths={setOpenSpendBonusId}
+                    onOpen={setOpenSpendBonusId}
                     onToggleEarned={r => toggleFlag(SPEND_BONUSES_TABLE, r.id, 'Bonus Earned', r.earned, false)}
                   />
                 ))}
@@ -895,6 +978,21 @@ export function BonusesTab() {
           )}
         </>
       )}
+
+      {openSignupBonusId && (() => {
+        const activeRow = signupEnriched.find(r => r.id === openSignupBonusId);
+        if (!activeRow) return null;
+        return (
+          <SignupBonusMonthPanel
+            row={activeRow}
+            monthInputs={monthInputs}
+            setMonthInputs={setMonthInputs}
+            savingKey={savingKey}
+            onSaveMonth={saveMonth}
+            onClose={() => setOpenSignupBonusId(null)}
+          />
+        );
+      })()}
 
       {openSpendBonusId && (() => {
         const activeRow = spendEnriched.find(r => r.id === openSpendBonusId);
