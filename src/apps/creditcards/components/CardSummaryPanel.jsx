@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { fetchTable, getRecord } from '../services/airtable.js';
 import {
-  PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PEOPLE_TABLE,
+  PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PEOPLE_TABLE, PERK_DEFINITIONS_TABLE,
   PERK_INSTANCES_TABLE, HOTELS_TABLE, SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE,
 } from '../config/tables.js';
 import { $$ } from '../utils/format.js';
+import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 
 const BANK_NAMES = {
   'recmOSLhOAYVqi09z': 'American Express',
@@ -28,14 +29,16 @@ const DECISION_COLORS = {
   Upgrade: '#00D4FF',
 };
 
-const PERK_FIELDS = ['Label', 'Credit Amount', 'Reset Cycle', 'Next Reset Date', 'Priority Score', 'Used'];
+const PERK_FIELDS = ['Label', 'Perk Definition', 'Credit Amount', 'Reset Cycle', 'Next Reset Date', 'Priority Score', 'Used'];
 const HOTEL_FIELDS = ['Name', 'Record Type', 'Benefit Type', 'Estimated Value', 'Expiration Date', 'Days Until Expiration'];
 const SIGNUP_FIELDS = ['Bonus Description', 'Spend Target', 'Current Spend', 'Remaining Spend', 'Effective Deadline', 'Days Remaining', 'Achieved'];
 const SPEND_FIELDS = ['Bonus Description', 'Annual Spend Target', 'Current Spend', 'Remaining Spend', 'Reset Date', 'Days Until Reset', 'Bonus Earned'];
+const PERK_DEF_FIELDS = ['Perk Name', 'Card Product', 'Credit Amount', 'Reset Cycle', 'Priority Score', 'Benefit Type'];
 
 const dataCache = new Map();
 let peopleNamesPromise = null;
 let productsPromise = null;
+let perkDefinitionsPromise = null;
 
 function loadPeopleNames() {
   if (!peopleNamesPromise) {
@@ -55,10 +58,18 @@ function loadProducts() {
   return productsPromise;
 }
 
+function loadPerkDefinitions() {
+  if (!perkDefinitionsPromise) {
+    perkDefinitionsPromise = fetchTable(PERK_DEFINITIONS_TABLE, PERK_DEF_FIELDS);
+  }
+  return perkDefinitionsPromise;
+}
+
 export function clearCardSummaryCache() {
   dataCache.clear();
   peopleNamesPromise = null;
   productsPromise = null;
+  perkDefinitionsPromise = null;
 }
 
 function resolveIssuer(raw) {
@@ -192,10 +203,11 @@ export function CardSummaryPanel({ cardId, onClose }) {
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS, { filterByFormula: filter }),
       loadPeopleNames(),
       loadProducts(),
+      loadPerkDefinitions(),
     ])
-      .then(([card, perks, hotels, signup, spend, peopleNames, products]) => {
+      .then(([card, perks, hotels, signup, spend, peopleNames, products, perkDefs]) => {
         if (cancelled) return;
-        const result = { card, perks, hotels, signup, spend, peopleNames, products };
+        const result = { card, perks, hotels, signup, spend, peopleNames, products, perkDefs };
         dataCache.set(cardId, result);
         setBundle(result);
       })
@@ -223,17 +235,40 @@ export function CardSummaryPanel({ cardId, onClose }) {
   const upgradeIds = currentProduct?.['Can Upgrade To'] || [];
   const downgradeIds = currentProduct?.['Can Downgrade To'] || [];
 
-  const perksEnriched = (bundle?.perks || []).map(r => ({
-    id: r.id,
-    label: r.fields['Label'] || '—',
-    creditAmount: r.fields['Credit Amount'] ?? null,
-    resetCycle: extractSelectName(r.fields['Reset Cycle']) || '',
-    nextReset: r.fields['Next Reset Date'] || '',
-    priority: r.fields['Priority Score'] ?? 0,
-    used: !!r.fields['Used'],
-  })).sort((a, b) => b.priority - a.priority);
+  const instanceByDefId = {};
+  (bundle?.perks || []).forEach(r => {
+    const defId = (r.fields['Perk Definition'] || [])[0];
+    if (defId) instanceByDefId[defId] = r;
+  });
+
+  const perkDefsForProduct = (bundle?.perkDefs || []).filter(d =>
+    (d.fields['Card Product'] || []).includes(currentProductId)
+  );
+
+  const today = new Date();
+  const allPerkRows = perkDefsForProduct.map(def => {
+    const inst = instanceByDefId[def.id];
+    const cycle = extractSelectName(def.fields['Reset Cycle']) || '';
+    const nextReset = inst
+      ? (inst.fields['Next Reset Date'] || '')
+      : (cycle ? toAirtableDate(calculateNextResetDate(cycle, today)) : '');
+    return {
+      id: inst?.id || def.id,
+      label: def.fields['Perk Name'] || inst?.fields['Label'] || '—',
+      creditAmount: inst?.fields['Credit Amount'] ?? def.fields['Credit Amount'] ?? null,
+      resetCycle: cycle,
+      nextReset,
+      priority: inst?.fields['Priority Score'] ?? def.fields['Priority Score'] ?? 0,
+      used: inst ? !!inst.fields['Used'] : false,
+      benefitType: extractSelectName(def.fields['Benefit Type']),
+    };
+  });
+
+  const perksEnriched = allPerkRows.filter(p => p.benefitType !== 'Hotel Credit').sort((a, b) => b.priority - a.priority);
   const perksAvailableCount = perksEnriched.filter(p => !p.used).length;
   const perksVisible = showAllPerks ? perksEnriched : perksEnriched.filter(p => !p.used);
+
+  const hotelCreditRows = allPerkRows.filter(p => p.benefitType === 'Hotel Credit').sort((a, b) => b.priority - a.priority);
 
   const hotelsEnriched = (bundle?.hotels || []).map(r => ({
     id: r.id,
@@ -244,6 +279,8 @@ export function CardSummaryPanel({ cardId, onClose }) {
     expiration: r.fields['Expiration Date'] || '',
     daysUntil: r.fields['Days Until Expiration'] ?? null,
   }));
+
+  const hotelSectionCount = hotelsEnriched.length + hotelCreditRows.length;
 
   const signupRows = bundle?.signup || [];
   const spendRows = bundle?.spend || [];
@@ -395,8 +432,8 @@ export function CardSummaryPanel({ cardId, onClose }) {
 
               {/* Hotel Benefits */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <SectionTitle title="Hotel Benefits" count={hotelsEnriched.length} />
-                {hotelsEnriched.length === 0 ? (
+                <SectionTitle title="Hotel Benefits" count={hotelSectionCount} />
+                {hotelSectionCount === 0 ? (
                   <EmptyNote>No hotel benefits tracked for this card.</EmptyNote>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -424,6 +461,29 @@ export function CardSummaryPanel({ cardId, onClose }) {
                         </div>
                       );
                     })}
+                    {hotelCreditRows.map(p => (
+                      <div key={p.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '0.6rem 0.85rem', borderRadius: 8, background: '#111a2b',
+                        border: '1px solid rgba(255,255,255,0.06)', opacity: p.used ? 0.45 : 1,
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Badge color="#00E676">Hotel Credit</Badge>
+                            <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>{p.label}</span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)' }}>
+                            {p.resetCycle || '—'} · Resets {fmtDate(p.nextReset)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.85rem' }}>
+                            {p.creditAmount != null ? `$${p.creditAmount}` : '—'}
+                          </span>
+                          <input type="checkbox" checked={p.used} readOnly disabled style={{ width: 16, height: 16, accentColor: '#00D4FF' }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
