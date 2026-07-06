@@ -5,7 +5,7 @@ import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
 import { AnnualFeeBadge } from '../components/AnnualFeeBadge.jsx';
-import { NetValueGroup } from '../components/NetValueGroup.jsx';
+import { TotalPerkValueCell, DifferenceCell } from '../components/NetValueGroup.jsx';
 import { annualizedCreditAmount, sumPerkValue } from '../utils/perks.js';
 import { $$ } from '../utils/format.js';
 
@@ -37,7 +37,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const ROW_COLUMNS = '2fr 0.8fr 90px 90px 110px 140px 110px 100px 130px';
+const ROW_COLUMNS = '1.6fr 0.7fr 80px 100px 90px 65px 95px 120px 90px 95px 110px';
 
 const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
@@ -194,101 +194,6 @@ function ProductChips({ productIds, productsById }) {
   );
 }
 
-function DecisionPanel({ card, productsById, onSave, onCancel, saving, error }) {
-  const [draft, setDraft] = useState({
-    decision: card.decision,
-    willingToUpgrade: card.willingToUpgrade,
-    notes: card.decisionNotes,
-  });
-  const product = productsById[card.productId];
-
-  return (
-    <div style={{
-      background: '#111a2b', border: '1px solid rgba(255,255,255,0.08)', borderTop: 'none',
-      borderRadius: '0 0 10px 10px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem',
-    }}>
-      <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
-        <div><strong style={{ color: '#fff' }}>{card.cardName}</strong></div>
-        <div>{card.ownerName}</div>
-        <div>{$$(card.annualFee)} / yr</div>
-        <div>Due {fmtDate(card.feeDate)}</div>
-      </div>
-
-      <div>
-        <label style={lbl}>Decision</label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {DECISION_OPTIONS.map(opt => (
-            <PillBtn key={opt} active={draft.decision === opt} onClick={() => setDraft(d => ({ ...d, decision: d.decision === opt ? '' : opt }))}>
-              {opt}
-            </PillBtn>
-          ))}
-        </div>
-      </div>
-
-      {(draft.decision === 'Upgrade' || draft.decision === 'Product Change') && (
-        <div>
-          <label style={lbl}>Can Upgrade To</label>
-          <ProductChips productIds={product?.canUpgradeTo} productsById={productsById} />
-        </div>
-      )}
-
-      {draft.decision === 'Downgrade' && (
-        <div>
-          <label style={lbl}>Can Downgrade To</label>
-          <ProductChips productIds={product?.canDowngradeTo} productsById={productsById} />
-        </div>
-      )}
-
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', width: 'fit-content' }}>
-        <input
-          type="checkbox"
-          checked={draft.willingToUpgrade}
-          onChange={e => setDraft(d => ({ ...d, willingToUpgrade: e.target.checked }))}
-          style={{ accentColor: '#00D4FF', width: 16, height: 16 }}
-        />
-        Willing to Upgrade
-      </label>
-
-      <div>
-        <label style={lbl}>Decision Notes</label>
-        <textarea
-          style={{ ...inp, minHeight: 80, resize: 'vertical' }}
-          value={draft.notes}
-          onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
-          placeholder="Any context for this decision…"
-        />
-      </div>
-
-      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>
-        Last Reviewed: {fmtDateStr(card.lastReviewed)} — will update to today on save.
-      </div>
-
-      {error && (
-        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#FF4D4D', fontSize: '0.82rem' }}>
-          {error}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" disabled={saving} onClick={() => onSave(draft)} style={{
-          padding: '0.6rem 1.5rem', borderRadius: 8, border: 'none',
-          background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
-          color: '#0B1220', fontWeight: 700, fontSize: '0.85rem',
-          cursor: saving ? 'not-allowed' : 'pointer',
-        }}>
-          {saving ? 'Saving…' : 'Save Decision'}
-        </button>
-        <button type="button" onClick={onCancel} style={{
-          padding: '0.6rem 1.5rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
-          background: 'none', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
-        }}>
-          Close
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function RowActionBtn({ onClick, disabled, title, active, children }) {
   return (
     <button
@@ -309,67 +214,45 @@ function RowActionBtn({ onClick, disabled, title, active, children }) {
   );
 }
 
-function CardAuditRow({ card, expanded, onToggleExpand, onToggleWTU, savingWTU, tinted, productsById, onSavePanel, panelSaving, panelError, onOpenAnnualReview, onOpenAnnualDecision }) {
+function CardAuditRow({ card, onToggleWTU, savingWTU, tinted, onOpenAnnualReview, onOpenAnnualDecision }) {
   const bg = tinted ? urgencyTint(card.daysUntilFee) : 'transparent';
   return (
-    <div>
-      <div style={{
-        display: 'grid', gridTemplateColumns: ROW_COLUMNS, gap: '0.75rem',
-        alignItems: 'center', padding: '0.75rem 1rem',
-        borderRadius: expanded ? '10px 10px 0 0' : 10,
-        background: bg === 'transparent' ? '#172033' : bg,
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}>
-        <div>
-          <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>{card.cardName}</div>
-          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{card.productName}</div>
-          <div style={{ marginTop: 3 }}>
-            <NetValueGroup netValue={card.netValue} annualFee={card.annualFee} hasAnyValue={card.hasAnyValue} mode="audit" />
-          </div>
-        </div>
-        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{card.ownerName}</div>
-        <div style={{ fontSize: '0.85rem', color: '#fff' }}>{$$(card.annualFee)}</div>
-        <div><AnnualFeeBadge days={card.daysUntilFee} /></div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>{fmtDate(card.feeDate)}</div>
-        <div><DecisionBadge decision={card.decision} /></div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <input
-            type="checkbox"
-            checked={card.willingToUpgrade}
-            disabled={savingWTU}
-            onChange={() => onToggleWTU(card)}
-            style={{ accentColor: '#00D4FF', width: 17, height: 17, cursor: 'pointer' }}
-          />
-        </div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{fmtDateStr(card.lastReviewed)}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <RowActionBtn onClick={onToggleExpand} active={expanded}>{expanded ? 'Close' : 'Actions'}</RowActionBtn>
-          <RowActionBtn onClick={() => onOpenAnnualReview(card)}>Annual Review</RowActionBtn>
-          <RowActionBtn
-            onClick={() => onOpenAnnualDecision(card)}
-            disabled={!card.hasAnyValue}
-            title={!card.hasAnyValue ? 'Run Annual Review first.' : undefined}
-          >
-            Annual Decision
-          </RowActionBtn>
-        </div>
+    <div style={{
+      display: 'grid', gridTemplateColumns: ROW_COLUMNS, gap: '0.75rem',
+      alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10,
+      background: bg === 'transparent' ? '#172033' : bg,
+      border: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      <div>
+        <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>{card.cardName}</div>
+        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{card.productName}</div>
       </div>
-
-      {expanded && (
-        <DecisionPanel
-          card={card}
-          productsById={productsById}
-          onSave={onSavePanel}
-          onCancel={onToggleExpand}
-          saving={panelSaving}
-          error={panelError}
+      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{card.ownerName}</div>
+      <div style={{ fontSize: '0.85rem', color: '#fff' }}>{$$(card.annualFee)}</div>
+      <div><TotalPerkValueCell netValue={card.netValue} hasAnyValue={card.hasAnyValue} mode="audit" /></div>
+      <div><DifferenceCell netValue={card.netValue} annualFee={card.annualFee} hasAnyValue={card.hasAnyValue} mode="audit" /></div>
+      <div><AnnualFeeBadge days={card.daysUntilFee} /></div>
+      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>{fmtDate(card.feeDate)}</div>
+      <div><DecisionBadge decision={card.decision} /></div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <input
+          type="checkbox"
+          checked={card.willingToUpgrade}
+          disabled={savingWTU}
+          onChange={() => onToggleWTU(card)}
+          style={{ accentColor: '#00D4FF', width: 17, height: 17, cursor: 'pointer' }}
         />
-      )}
+      </div>
+      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{fmtDateStr(card.lastReviewed)}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <RowActionBtn onClick={() => onOpenAnnualReview(card)}>Annual Review</RowActionBtn>
+        <RowActionBtn onClick={() => onOpenAnnualDecision(card)}>Annual Decision</RowActionBtn>
+      </div>
     </div>
   );
 }
 
-function Section({ title, cards, tinted, expandedId, onToggleExpand, onToggleWTU, savingWTU, productsById, onSavePanel, panelSaving, panelError, onOpenAnnualReview, onOpenAnnualDecision }) {
+function Section({ title, cards, tinted, onToggleWTU, savingWTU, onOpenAnnualReview, onOpenAnnualDecision }) {
   if (cards.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -384,6 +267,8 @@ function Section({ title, cards, tinted, expandedId, onToggleExpand, onToggleWTU
         <span>Card</span>
         <span>Person</span>
         <span>Annual Fee</span>
+        <span>Total Perk Value</span>
+        <span>Difference</span>
         <span>Days</span>
         <span>Fee Date</span>
         <span>Decision</span>
@@ -397,14 +282,8 @@ function Section({ title, cards, tinted, expandedId, onToggleExpand, onToggleWTU
             key={card.id}
             card={card}
             tinted={tinted}
-            expanded={expandedId === card.id}
-            onToggleExpand={() => onToggleExpand(card.id)}
             onToggleWTU={onToggleWTU}
             savingWTU={savingWTU === card.id}
-            productsById={productsById}
-            onSavePanel={draft => onSavePanel(card, draft)}
-            panelSaving={panelSaving === card.id}
-            panelError={expandedId === card.id ? panelError : null}
             onOpenAnnualReview={onOpenAnnualReview}
             onOpenAnnualDecision={onOpenAnnualDecision}
           />
@@ -523,7 +402,7 @@ function PerkReviewRow({ inst, draftValue, onDraftChange }) {
   );
 }
 
-function AnnualReviewPanel({ card, instances, onClose, onInstancesChange, onCycleToNewYear, cycling, cycleMessage }) {
+function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
   const [localInstances, setLocalInstances] = useState(instances);
   const [drafts, setDrafts] = useState(() => Object.fromEntries(instances.map(i => [i.id, i.fields['Value'] != null ? String(i.fields['Value']) : ''])));
   const [saving, setSaving] = useState(false);
@@ -534,6 +413,8 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange, onCycl
   const [newPerkValue, setNewPerkValue] = useState('');
   const [addingPerk, setAddingPerk] = useState(false);
   const [addPerkError, setAddPerkError] = useState(null);
+  const [cycling, setCycling] = useState(false);
+  const [cycleMessage, setCycleMessage] = useState('');
 
   const year = todayDate().getFullYear();
   const trackable = localInstances.filter(i => i.fields['Perk Type'] !== 'Value Only');
@@ -598,6 +479,36 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange, onCycl
       setAddPerkError(e.message);
     } finally {
       setAddingPerk(false);
+    }
+  }
+
+  async function handleCycleThisCard() {
+    const confirmed = window.confirm(
+      `This will clear ${card.cardName}'s current year values and move them to Previous Value. This cannot be undone. Continue?`
+    );
+    if (!confirmed || localInstances.length === 0) return;
+
+    setCycling(true);
+    setCycleMessage(`Cycling ${localInstances.length} instance${localInstances.length !== 1 ? 's' : ''}...`);
+    try {
+      await Promise.all(localInstances.map(i =>
+        updateRecord(PERK_INSTANCES_TABLE, i.id, {
+          'Previous Value': i.fields['Value'] ?? null,
+          'Value': null,
+        })
+      ));
+      const updated = localInstances.map(i => ({
+        ...i,
+        fields: { ...i.fields, 'Previous Value': i.fields['Value'] ?? null, Value: null },
+      }));
+      setLocalInstances(updated);
+      setDrafts(Object.fromEntries(updated.map(i => [i.id, ''])));
+      onInstancesChange(card.id, updated);
+      setCycleMessage(`Done — ${card.cardName} ready for ${year + 1} review`);
+    } catch (e) {
+      setCycleMessage(`Cycle failed: ${e.message}`);
+    } finally {
+      setCycling(false);
     }
   }
 
@@ -704,22 +615,27 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange, onCycl
       </div>
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
-        <button type="button" disabled={cycling} onClick={onCycleToNewYear} style={{
+        <button type="button" disabled={cycling || localInstances.length === 0} onClick={handleCycleThisCard} style={{
           width: '100%', padding: '0.7rem 1rem', borderRadius: 8, border: '1px solid rgba(255,109,0,0.4)',
           background: 'rgba(255,109,0,0.15)', color: '#FF6D00', fontWeight: 700, fontSize: '0.85rem',
-          cursor: cycling ? 'not-allowed' : 'pointer',
+          cursor: cycling || localInstances.length === 0 ? 'not-allowed' : 'pointer',
         }}>
-          {cycling ? (cycleMessage || 'Cycling…') : 'Cycle All Cards to New Year'}
+          {cycling ? (cycleMessage || 'Cycling…') : 'Cycle This Card to New Year'}
         </button>
+        {!cycling && cycleMessage && (
+          <div style={{ fontSize: '0.78rem', color: '#00E676', marginTop: 6, fontWeight: 600 }}>
+            {cycleMessage}
+          </div>
+        )}
         <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
-          This is a global operation — it affects every card, not just this one.
+          Only affects this card's perk instances.
         </div>
       </div>
     </SlideOver>
   );
 }
 
-function AnnualDecisionPanel({ card, netValue, onClose, onSave, saving, error }) {
+function AnnualDecisionPanel({ card, productsById, netValue, onClose, onSave, saving, error }) {
   const [draft, setDraft] = useState({
     decision: card.decision,
     willingToUpgrade: card.willingToUpgrade,
@@ -727,6 +643,7 @@ function AnnualDecisionPanel({ card, netValue, onClose, onSave, saving, error })
   });
   const difference = netValue - (card.annualFee || 0);
   const diffColor = difference > 0 ? '#00E676' : difference < 0 ? '#FF4D4D' : 'rgba(255,255,255,0.5)';
+  const product = productsById[card.productId];
 
   return (
     <SlideOver onClose={onClose} width={480}>
@@ -760,6 +677,20 @@ function AnnualDecisionPanel({ card, netValue, onClose, onSave, saving, error })
         </div>
       </div>
 
+      {(draft.decision === 'Upgrade' || draft.decision === 'Product Change') && (
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lbl}>Can Upgrade To</label>
+          <ProductChips productIds={product?.canUpgradeTo} productsById={productsById} />
+        </div>
+      )}
+
+      {draft.decision === 'Downgrade' && (
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={lbl}>Can Downgrade To</label>
+          <ProductChips productIds={product?.canDowngradeTo} productsById={productsById} />
+        </div>
+      )}
+
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', width: 'fit-content', marginBottom: '1rem' }}>
         <input
           type="checkbox"
@@ -778,6 +709,10 @@ function AnnualDecisionPanel({ card, netValue, onClose, onSave, saving, error })
           onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
           placeholder="Any context for this decision…"
         />
+      </div>
+
+      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', marginBottom: '1rem' }}>
+        Last Reviewed: {fmtDateStr(card.lastReviewed)} — will update to today on save.
       </div>
 
       {error && (
@@ -804,9 +739,6 @@ export function CardAuditTab() {
   const [error, setError] = useState(null);
   const [personFilter, setPersonFilter] = useState(ALL_PEOPLE);
   const [viewFilter, setViewFilter] = useState('all');
-  const [expandedId, setExpandedId] = useState(null);
-  const [panelSaving, setPanelSaving] = useState(null);
-  const [panelError, setPanelError] = useState(null);
   const [savingWTU, setSavingWTU] = useState(null);
   const [pastDueForms, setPastDueForms] = useState({});
   const [justResolved, setJustResolved] = useState([]);
@@ -815,8 +747,6 @@ export function CardAuditTab() {
   const [annualDecisionCard, setAnnualDecisionCard] = useState(null);
   const [annualDecisionSaving, setAnnualDecisionSaving] = useState(null);
   const [annualDecisionError, setAnnualDecisionError] = useState(null);
-  const [cycling, setCycling] = useState(false);
-  const [cycleMessage, setCycleMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -938,11 +868,6 @@ export function CardAuditTab() {
     }
   }
 
-  function toggleExpand(id) {
-    setExpandedId(prev => prev === id ? null : id);
-    setPanelError(null);
-  }
-
   async function patchDecisionFields(cardId, draft) {
     const patch = {
       'Decision': draft.decision || null,
@@ -953,19 +878,6 @@ export function CardAuditTab() {
     const updated = await updateRecord(PORTFOLIO_TABLE, cardId, patch);
     setCards(prev => prev.map(r => r.id === cardId ? { ...r, fields: updated.fields } : r));
     return updated;
-  }
-
-  async function savePanel(card, draft) {
-    setPanelSaving(card.id);
-    setPanelError(null);
-    try {
-      await patchDecisionFields(card.id, draft);
-      setExpandedId(null);
-    } catch (e) {
-      setPanelError(e.message);
-    } finally {
-      setPanelSaving(null);
-    }
   }
 
   async function saveAnnualDecision(card, draft) {
@@ -983,36 +895,6 @@ export function CardAuditTab() {
 
   function handleInstancesChange(cardId, updatedInstances) {
     setInstancesByCard(prev => ({ ...prev, [cardId]: updatedInstances }));
-  }
-
-  async function cycleToNewYear() {
-    const confirmed = window.confirm(
-      'This will clear all current year values and move them to Previous Value. This cannot be undone. Continue?'
-    );
-    if (!confirmed) return;
-
-    setCycling(true);
-    setCycleMessage('Cycling…');
-    setAnnualReviewCard(null);
-    setAnnualDecisionCard(null);
-    try {
-      const allInstances = await fetchTable(PERK_INSTANCES_TABLE, ['Value', 'Previous Value']);
-      setCycleMessage(`Cycling ${allInstances.length} instance${allInstances.length !== 1 ? 's' : ''}...`);
-      await Promise.all(allInstances.map(inst =>
-        updateRecord(PERK_INSTANCES_TABLE, inst.id, {
-          'Previous Value': inst.fields['Value'] ?? null,
-          'Value': null,
-        })
-      ));
-      const newYear = todayDate().getFullYear() + 1;
-      setCycleMessage(`Done — all cards ready for ${newYear} review`);
-      await load();
-      setTimeout(() => setCycleMessage(''), 8000);
-    } catch (e) {
-      setCycleMessage(`Cycle failed: ${e.message}`);
-    } finally {
-      setCycling(false);
-    }
   }
 
   function updatePastDueForm(id, patch) {
@@ -1119,35 +1001,12 @@ export function CardAuditTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', flex: 1 }}>
-          <StatCard label="Cards Needing Decision" value={statNeedsDecision} accent="#00D4FF" />
-          <StatCard label="Due Within 30 Days" value={stat30} accent="#FF4D4D" />
-          <StatCard label="Due Within 60 Days" value={stat60} accent="#FFD60A" />
-          <StatCard label="Due Within 90 Days" value={stat90} accent="#00E676" />
-        </div>
-        <button
-          type="button"
-          onClick={cycleToNewYear}
-          disabled={cycling}
-          style={{
-            padding: '0.65rem 1.1rem', borderRadius: 9, border: '1px solid rgba(255,109,0,0.4)',
-            background: 'rgba(255,109,0,0.15)', color: '#FF6D00', fontWeight: 700, fontSize: '0.82rem',
-            cursor: cycling ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', alignSelf: 'flex-start',
-          }}
-        >
-          Cycle All Cards to New Year
-        </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+        <StatCard label="Cards Needing Decision" value={statNeedsDecision} accent="#00D4FF" />
+        <StatCard label="Due Within 30 Days" value={stat30} accent="#FF4D4D" />
+        <StatCard label="Due Within 60 Days" value={stat60} accent="#FFD60A" />
+        <StatCard label="Due Within 90 Days" value={stat90} accent="#00E676" />
       </div>
-
-      {cycleMessage && (
-        <div style={{
-          background: 'rgba(255,109,0,0.1)', border: '1px solid rgba(255,109,0,0.3)',
-          borderRadius: 10, padding: '0.75rem 1rem', color: '#FF6D00', fontSize: '0.85rem', fontWeight: 600,
-        }}>
-          {cycleMessage}
-        </div>
-      )}
 
       {pastDue.length > 0 && (
         <div style={{
@@ -1197,14 +1056,8 @@ export function CardAuditTab() {
           title="Needs Decision"
           cards={needsDecision}
           tinted
-          expandedId={expandedId}
-          onToggleExpand={toggleExpand}
           onToggleWTU={toggleWTU}
           savingWTU={savingWTU}
-          productsById={productsById}
-          onSavePanel={savePanel}
-          panelSaving={panelSaving}
-          panelError={panelError}
           onOpenAnnualReview={setAnnualReviewCard}
           onOpenAnnualDecision={setAnnualDecisionCard}
         />
@@ -1215,14 +1068,8 @@ export function CardAuditTab() {
           title="Decision Made"
           cards={decisionMade}
           tinted={false}
-          expandedId={expandedId}
-          onToggleExpand={toggleExpand}
           onToggleWTU={toggleWTU}
           savingWTU={savingWTU}
-          productsById={productsById}
-          onSavePanel={savePanel}
-          panelSaving={panelSaving}
-          panelError={panelError}
           onOpenAnnualReview={setAnnualReviewCard}
           onOpenAnnualDecision={setAnnualDecisionCard}
         />
@@ -1240,15 +1087,13 @@ export function CardAuditTab() {
           instances={instancesByCard[annualReviewCard.id] || []}
           onClose={() => setAnnualReviewCard(null)}
           onInstancesChange={handleInstancesChange}
-          onCycleToNewYear={cycleToNewYear}
-          cycling={cycling}
-          cycleMessage={cycleMessage}
         />
       )}
 
       {annualDecisionCard && (
         <AnnualDecisionPanel
           card={annualDecisionCard}
+          productsById={productsById}
           netValue={sumPerkValue(instancesByCard[annualDecisionCard.id] || []).netValue}
           onClose={() => setAnnualDecisionCard(null)}
           onSave={draft => saveAnnualDecision(annualDecisionCard, draft)}

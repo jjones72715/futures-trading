@@ -6,7 +6,7 @@ import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { CardSummaryPanel } from '../components/CardSummaryPanel.jsx';
-import { NetValueGroup } from '../components/NetValueGroup.jsx';
+import { TotalPerkValueCell, DifferenceCell } from '../components/NetValueGroup.jsx';
 import { sumPerkValue } from '../utils/perks.js';
 
 const BANK_NAMES = {
@@ -50,7 +50,7 @@ const FIELDS = [
 
 const PERK_INSTANCE_FIELDS = ['Card', 'Value'];
 
-const ROW_COLUMNS = '2.2fr 90px 100px 130px 140px 70px';
+const ROW_COLUMNS = '1.7fr 80px 0.8fr 80px 100px 90px 65px 95px 120px 60px';
 
 function resolveIssuer(raw) {
   if (!raw) return 'Unknown';
@@ -63,6 +63,17 @@ function daysUntilFeeColor(days) {
   if (days < 60) return '#FFD60A';
   if (days < 90) return 'rgba(255,255,255,0.45)';
   return '#fff';
+}
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
 function PillBtn({ active, onClick, children }) {
@@ -113,6 +124,9 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const cardType = f['Personal/Business'];
   const annualFee = f['Annual Fee Amount'] || 0;
   const days = f['Days Until Annual Fee'];
+  const feeDate = annualFee > 0 && days != null ? addDays(new Date(), days) : null;
+  const ownerIds = f['Owner'] || [];
+  const ownerNames = ownerIds.map(id => personNameById[id] || id);
   const auIds = f['Authorized Users'] || [];
   const auNames = auIds.map(id => personNameById[id] || id);
   const { netValue, hasAnyValue } = sumPerkValue(instances);
@@ -141,11 +155,6 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
           {issuer}
         </div>
-        {annualFee > 0 && (
-          <div style={{ marginTop: 3 }}>
-            <NetValueGroup netValue={netValue} annualFee={annualFee} hasAnyValue={hasAnyValue} mode="portfolio" />
-          </div>
-        )}
       </div>
 
       <div>
@@ -161,14 +170,34 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
         )}
       </div>
 
+      <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
+        {ownerNames.join(', ') || '—'}
+      </div>
+
       <div style={{ fontSize: '0.85rem' }}>
         {annualFee > 0
           ? <span style={{ color: '#fff' }}>{$$(annualFee)}</span>
           : <span style={{ color: 'rgba(255,255,255,0.4)' }}>No Fee</span>}
       </div>
 
+      <div>
+        {annualFee > 0
+          ? <TotalPerkValueCell netValue={netValue} hasAnyValue={hasAnyValue} mode="portfolio" />
+          : <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
+      </div>
+
+      <div>
+        {annualFee > 0
+          ? <DifferenceCell netValue={netValue} annualFee={annualFee} hasAnyValue={hasAnyValue} mode="portfolio" />
+          : <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>}
+      </div>
+
       <div style={{ fontSize: '0.82rem', fontWeight: days != null && days < 90 ? 700 : 400, color: annualFee > 0 && days != null ? daysUntilFeeColor(days) : 'transparent' }}>
         {annualFee > 0 && days != null ? `${days}d` : ''}
+      </div>
+
+      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
+        {feeDate ? fmtDate(feeDate) : ''}
       </div>
 
       <div>
@@ -299,7 +328,7 @@ export function PortfolioTab() {
           display: 'grid', gridTemplateColumns: ROW_COLUMNS, gap: '0.75rem',
           padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
-          {['Card', 'Type', 'Annual Fee', 'Days Until Fee', 'Decision', 'AUs'].map((h, i) => (
+          {['Card', 'Type', 'Person', 'Annual Fee', 'Total Perk Value', 'Difference', 'Days', 'Fee Date', 'Decision', 'AUs'].map((h, i) => (
             <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {h}
             </span>
