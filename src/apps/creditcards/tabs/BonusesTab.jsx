@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord, createRecord } from '../services/airtable.js';
-import { SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE } from '../config/tables.js';
+import {
+  SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE,
+  SPEND_BONUS_DEFINITIONS_TABLE,
+} from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
 import { $$ } from '../utils/format.js';
 
 const EMPTY_SIGNUP_FORM = { personId: '', cardId: '', description: '', spendTarget: '', approvalDate: '', bonusWindow: '' };
-const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetDate: '' };
+const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetType: '', notes: '' };
+const RESET_TYPES = ['Jan 1', 'Card Open Date'];
 
 const inp = {
   width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
@@ -172,16 +176,15 @@ function AddSignupBonusForm({ cards, form, setForm, onSubmit, onCancel, submitti
   );
 }
 
-function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSubmit, onCancel, submitting, error }) {
+function AddSpendBonusForm({ productOptions, form, setForm, onSubmit, onCancel, submitting, error }) {
   function set(field) {
     return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
   }
-  const holders = form.productId ? (productHolders[form.productId] || []) : [];
   return (
     <form onSubmit={onSubmit} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>New Spend Bonus</div>
       <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', marginTop: -8 }}>
-        Pick the card product — a bonus is created for every active card of that product, one per person.
+        Creates a bonus definition, then a tracked instance for every active card of that product.
       </div>
 
       <div>
@@ -189,18 +192,10 @@ function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSu
         <select style={inp} value={form.productId} onChange={set('productId')}>
           <option value="">— Select card product —</option>
           {productOptions.map(p => (
-            <option key={p.id} value={p.id}>{p.name} ({p.count} card{p.count > 1 ? 's' : ''})</option>
+            <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
       </div>
-
-      {form.productId && (
-        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.55)' }}>
-          Will create a bonus for: {holders.length > 0
-            ? holders.map(h => PEOPLE[h.personId] || h.personId).join(', ')
-            : 'no active cards found for this product'}
-        </div>
-      )}
 
       <div>
         <label style={lbl}>Bonus Description</label>
@@ -213,9 +208,25 @@ function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSu
           <input style={inp} type="number" min="0" value={form.annualTarget} onChange={set('annualTarget')} placeholder="0" />
         </div>
         <div>
-          <label style={lbl}>Reset Date <span style={{ color: '#FF4D4D' }}>*</span></label>
-          <input style={inp} type="date" value={form.resetDate} onChange={set('resetDate')} />
+          <label style={lbl}>Reset Type <span style={{ color: '#FF4D4D' }}>*</span></label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {RESET_TYPES.map(t => (
+              <PillBtn key={t} active={form.resetType === t} onClick={() => setForm(prev => ({ ...prev, resetType: t }))}>
+                {t}
+              </PillBtn>
+            ))}
+          </div>
         </div>
+      </div>
+
+      <div>
+        <label style={lbl}>Notes</label>
+        <textarea
+          style={{ ...inp, minHeight: 70, resize: 'vertical' }}
+          value={form.notes}
+          onChange={set('notes')}
+          placeholder="Any additional notes…"
+        />
       </div>
 
       <FormActions submitting={submitting} onCancel={onCancel} error={error} />
@@ -288,6 +299,27 @@ function addYears(dateStr, years) {
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCFullYear(dt.getUTCFullYear() + years);
   return dt.toISOString().split('T')[0];
+}
+
+function nextJan1() {
+  return `${new Date().getFullYear() + 1}-01-01`;
+}
+
+function nextCardAnniversary(openDateStr) {
+  if (!openDateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let years = 1;
+  let candidate = addYears(openDateStr, years);
+  while (new Date(candidate + 'T00:00:00') <= today) {
+    years += 1;
+    candidate = addYears(openDateStr, years);
+  }
+  return candidate;
+}
+
+function calculateSpendBonusResetDate(resetType, openDateStr) {
+  return resetType === 'Card Open Date' ? nextCardAnniversary(openDateStr) : nextJan1();
 }
 
 function signupMonthLabel(approvalDateStr, n) {
@@ -607,7 +639,6 @@ export function BonusesTab() {
   const [cardNameById, setCardNameById] = useState({});
   const [portfolioCards, setPortfolioCards] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
-  const [productHolders, setProductHolders] = useState({});
   const [monthInputs, setMonthInputs] = useState({});
   const [savingKey, setSavingKey] = useState(null);
   const [openSignupBonusId, setOpenSignupBonusId] = useState(null);
@@ -622,6 +653,7 @@ export function BonusesTab() {
   const [spendForm, setSpendForm] = useState(EMPTY_SPEND_FORM);
   const [addSpendSubmitting, setAddSpendSubmitting] = useState(false);
   const [addSpendError, setAddSpendError] = useState(null);
+  const [addSpendResult, setAddSpendResult] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -630,7 +662,7 @@ export function BonusesTab() {
     const [signup, spend, cards, products] = await Promise.all([
       fetchTable(SIGNUP_BONUSES_TABLE, SIGNUP_FIELDS),
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Current Product', 'Status']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
     ]);
 
@@ -640,21 +672,9 @@ export function BonusesTab() {
         .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
-
-    const productNameById = Object.fromEntries(products.map(p => [p.id, p.fields['Product Name'] || p.id]));
-    const holdersByProduct = {};
-    cards.forEach(r => {
-      if (r.fields['Status'] !== 'Active') return;
-      const productId = (r.fields['Current Product'] || [])[0];
-      const personId = (r.fields['Owner'] || [])[0];
-      if (!productId || !personId) return;
-      if (!holdersByProduct[productId]) holdersByProduct[productId] = [];
-      holdersByProduct[productId].push({ cardId: r.id, personId });
-    });
-    setProductHolders(holdersByProduct);
     setProductOptions(
-      Object.keys(holdersByProduct)
-        .map(id => ({ id, name: productNameById[id] || id, count: holdersByProduct[id].length }))
+      products
+        .map(p => ({ id: p.id, name: p.fields['Product Name'] || p.id }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
 
@@ -749,27 +769,67 @@ export function BonusesTab() {
     setAddSpendError(null);
     if (!spendForm.productId) { setAddSpendError('Card Product is required.'); return; }
     if (!spendForm.annualTarget) { setAddSpendError('Annual Spend Target is required.'); return; }
-    if (!spendForm.resetDate) { setAddSpendError('Reset Date is required.'); return; }
-
-    const holders = productHolders[spendForm.productId] || [];
-    if (holders.length === 0) { setAddSpendError('No active cards found for this product.'); return; }
+    if (!spendForm.resetType) { setAddSpendError('Reset Type is required.'); return; }
 
     setAddSpendSubmitting(true);
-    const baseFields = {
-      'Annual Spend Target': parseFloat(spendForm.annualTarget),
-      'Reset Date': spendForm.resetDate,
-    };
-    if (spendForm.description.trim()) baseFields['Bonus Description'] = spendForm.description.trim();
-
     try {
-      const created = await Promise.all(holders.map(h => createRecord(SPEND_BONUSES_TABLE, {
-        ...baseFields,
-        'Card': [h.cardId],
-        'Person': [h.personId],
-      })));
-      setSpendBonuses(prev => [...prev, ...created]);
+      const description = spendForm.description.trim();
+      const target = parseFloat(spendForm.annualTarget);
+
+      // 1. Create the Spend Bonus Definition
+      const defFields = {
+        'Bonus Description': description,
+        'Card Product': [spendForm.productId],
+        'Annual Spend Target': target,
+        'Reset Type': spendForm.resetType,
+      };
+      if (spendForm.notes.trim()) defFields['Notes'] = spendForm.notes.trim();
+      const definition = await createRecord(SPEND_BONUS_DEFINITIONS_TABLE, defFields);
+
+      // 2. Fetch all active Portfolio cards matching this Card Product
+      const filter = `AND(FIND("${spendForm.productId}",ARRAYJOIN({Current Product})),{Status}='Active')`;
+      const matchingCards = await fetchTable(PORTFOLIO_TABLE, ['Owner', 'Open Date', 'Status'], { filterByFormula: filter });
+
+      // 3. Existing instances, for the Card + Definition duplicate check
+      const existingInstances = await fetchTable(SPEND_BONUSES_TABLE, ['Card', 'Spend Bonus Definition']);
+      const existingKeys = new Set(
+        existingInstances.map(r => `${(r.fields['Card'] || [])[0]}::${(r.fields['Spend Bonus Definition'] || [])[0]}`)
+      );
+
+      // 4. Create an instance per matching card
+      let created = 0;
+      const cardsSeen = new Set();
+      for (const card of matchingCards) {
+        const ownerId = (card.fields['Owner'] || [])[0];
+        if (!ownerId) continue;
+        const key = `${card.id}::${definition.id}`;
+        if (existingKeys.has(key)) continue;
+
+        const resetDate = calculateSpendBonusResetDate(spendForm.resetType, card.fields['Open Date']);
+        if (!resetDate) continue;
+
+        try {
+          await createRecord(SPEND_BONUSES_TABLE, {
+            'Card': [card.id],
+            'Person': [ownerId],
+            'Annual Spend Target': target,
+            'Reset Date': resetDate,
+            'Bonus Earned': false,
+            'Spend Bonus Definition': [definition.id],
+            'Bonus Description': description,
+          });
+          created++;
+          cardsSeen.add(card.id);
+        } catch (err) {
+          console.error('Spend bonus instance create failed', err);
+        }
+      }
+
+      setAddSpendResult(`Spend bonus added — ${created} instance${created !== 1 ? 's' : ''} created across ${cardsSeen.size} card${cardsSeen.size !== 1 ? 's' : ''}`);
+      setTimeout(() => setAddSpendResult(null), 6000);
       setSpendForm(EMPTY_SPEND_FORM);
       setShowAddSpend(false);
+      await load();
     } catch (err) {
       console.error('Add spend bonus failed', err);
       setAddSpendError(String(err.message || err));
@@ -931,12 +991,20 @@ export function BonusesTab() {
             <StatCard label="Total Remaining Spend" value={$$(spendActiveRemaining)} accent="#00E676" />
           </div>
 
+          {addSpendResult && (
+            <div style={{
+              background: 'rgba(0,230,118,0.1)', border: '1px solid rgba(0,230,118,0.35)',
+              borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontSize: '0.85rem', fontWeight: 600,
+            }}>
+              {addSpendResult}
+            </div>
+          )}
+
           {!showAddSpend && <AddBonusButton onClick={() => setShowAddSpend(true)} />}
 
           {showAddSpend && (
             <AddSpendBonusForm
               productOptions={productOptions}
-              productHolders={productHolders}
               form={spendForm}
               setForm={setSpendForm}
               onSubmit={handleAddSpend}

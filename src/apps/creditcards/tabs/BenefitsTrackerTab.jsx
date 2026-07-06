@@ -1,8 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord, createRecord, deleteRecord } from '../services/airtable.js';
-import { PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
+import {
+  PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE,
+  SPEND_BONUS_DEFINITIONS_TABLE, SPEND_BONUSES_TABLE,
+} from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
+
+function addYears(dateStr, years) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCFullYear(dt.getUTCFullYear() + years);
+  return dt.toISOString().split('T')[0];
+}
+
+function nextJan1() {
+  return `${new Date().getFullYear() + 1}-01-01`;
+}
+
+function nextCardAnniversary(openDateStr) {
+  if (!openDateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let years = 1;
+  let candidate = addYears(openDateStr, years);
+  while (new Date(candidate + 'T00:00:00') <= today) {
+    years += 1;
+    candidate = addYears(openDateStr, years);
+  }
+  return candidate;
+}
+
+function calculateSpendBonusResetDate(resetType, openDateStr) {
+  return resetType === 'Card Open Date' ? nextCardAnniversary(openDateStr) : nextJan1();
+}
 
 const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
 
@@ -54,6 +85,27 @@ function isResettingSoon(dateStr) {
   const reset = new Date(dateStr + 'T00:00:00');
   const diff = (reset - today) / (1000 * 60 * 60 * 24);
   return diff >= 0 && diff <= 7;
+}
+
+function buildSyncSummary(r) {
+  const parts = [];
+  if (r.deleted > 0) parts.push(`${r.deleted} orphan${r.deleted !== 1 ? 's' : ''} deleted`);
+  if (r.addedTrackable > 0 || r.addedValue > 0) {
+    parts.push(`${r.addedTrackable} trackable perk${r.addedTrackable !== 1 ? 's' : ''} and ${r.addedValue} value perk${r.addedValue !== 1 ? 's' : ''} added`);
+  }
+  if (r.patched > 0) parts.push(`${r.patched} backfilled`);
+  if (r.spendAdded > 0) parts.push(`${r.spendAdded} spend bonus${r.spendAdded !== 1 ? 'es' : ''} added`);
+
+  if (parts.length === 0) return 'All perks up to date';
+
+  let msg = parts.join(', ');
+  const cardsTouched = Math.max(r.cards || 0, r.spendCards || 0);
+  if (cardsTouched > 0) msg += ` across ${cardsTouched} card${cardsTouched !== 1 ? 's' : ''}`;
+
+  const totalSkipped = (r.skipped || 0) + (r.spendSkipped || 0);
+  if (totalSkipped > 0) msg += `, ${totalSkipped} skipped`;
+
+  return msg;
 }
 
 function isPastOrToday(dateStr) {
@@ -140,11 +192,13 @@ export function BenefitsTrackerTab() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      // Fetch all three sources in parallel
-      const [portfolio, defs, existingInst] = await Promise.all([
-        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
+      // Fetch all sources in parallel
+      const [portfolio, defs, existingInst, spendDefs, existingSpendInst] = await Promise.all([
+        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner', 'Open Date', 'Status']),
         fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score', 'Benefit Type']),
         fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition', 'Label', 'Credit Amount', 'Priority Score', 'Reset Cycle']),
+        fetchTable(SPEND_BONUS_DEFINITIONS_TABLE, ['Bonus Description', 'Card Product', 'Annual Spend Target', 'Reset Type']),
+        fetchTable(SPEND_BONUSES_TABLE, ['Card', 'Spend Bonus Definition']),
       ]);
 
       // Index defs by record ID and by Card Product record ID
@@ -257,7 +311,73 @@ export function BenefitsTrackerTab() {
         }
       }
 
-      setSyncResult({ addedTrackable, addedValue, patched, deleted, cards: cardsSeen.size, skipped });
+      // Spend Bonus Definitions: create missing instances per active card
+      const spendDefsByProductId = {};
+      spendDefs.forEach(def => {
+        const productIds = def.fields['Card Product'] || [];
+        productIds.forEach(pid => {
+          if (!spendDefsByProductId[pid]) spendDefsByProductId[pid] = [];
+          spendDefsByProductId[pid].push(def);
+        });
+      });
+
+      const existingSpendKeys = new Set(
+        existingSpendInst.map(r => `${(r.fields['Card'] || [])[0]}::${(r.fields['Spend Bonus Definition'] || [])[0]}`)
+      );
+
+      const spendCreates = [];
+      let spendSkipped = 0;
+      const spendCardsSeen = new Set();
+
+      for (const card of portfolio) {
+        if (card.fields['Status'] !== 'Active') continue;
+        const productId = (card.fields['Current Product'] || [])[0];
+        if (!productId) continue;
+
+        const matchingDefs = spendDefsByProductId[productId] || [];
+        if (matchingDefs.length === 0) continue;
+
+        const ownerId = (card.fields['Owner'] || [])[0];
+        if (!ownerId) continue;
+
+        for (const def of matchingDefs) {
+          const key = `${card.id}::${def.id}`;
+          if (existingSpendKeys.has(key)) { spendSkipped++; continue; }
+
+          const resetDate = calculateSpendBonusResetDate(def.fields['Reset Type'], card.fields['Open Date']);
+          if (!resetDate) continue;
+
+          spendCreates.push({
+            cardId: card.id,
+            fields: {
+              'Card': [card.id],
+              'Person': [ownerId],
+              'Annual Spend Target': def.fields['Annual Spend Target'] ?? 0,
+              'Reset Date': resetDate,
+              'Bonus Earned': false,
+              'Spend Bonus Definition': [def.id],
+              'Bonus Description': def.fields['Bonus Description'] || '',
+            },
+          });
+          existingSpendKeys.add(key);
+        }
+      }
+
+      let spendAdded = 0;
+      for (const c of spendCreates) {
+        try {
+          await createRecord(SPEND_BONUSES_TABLE, c.fields);
+          spendAdded++;
+          spendCardsSeen.add(c.cardId);
+        } catch (e) {
+          console.error('Spend bonus sync create failed:', e);
+        }
+      }
+
+      setSyncResult({
+        addedTrackable, addedValue, patched, deleted, cards: cardsSeen.size, skipped,
+        spendAdded, spendCards: spendCardsSeen.size, spendSkipped,
+      });
       await load();
     } catch (e) {
       console.error('Sync failed:', e);
@@ -373,15 +493,7 @@ export function BenefitsTrackerTab() {
 
       {syncResult && !syncResult.error && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.88rem' }}>
-          {syncResult.deleted > 0 && `${syncResult.deleted} orphan${syncResult.deleted !== 1 ? 's' : ''} deleted`}
-        {syncResult.deleted > 0 && (syncResult.addedTrackable > 0 || syncResult.addedValue > 0 || syncResult.patched > 0) && ', '}
-        {(syncResult.addedTrackable > 0 || syncResult.addedValue > 0) &&
-          `${syncResult.addedTrackable} trackable perk${syncResult.addedTrackable !== 1 ? 's' : ''} and ${syncResult.addedValue} value perk${syncResult.addedValue !== 1 ? 's' : ''} added`}
-        {(syncResult.addedTrackable > 0 || syncResult.addedValue > 0) && syncResult.patched > 0 && ', '}
-        {syncResult.patched > 0 && `${syncResult.patched} backfilled`}
-        {(syncResult.addedTrackable > 0 || syncResult.addedValue > 0 || syncResult.patched > 0) && syncResult.cards > 0 && ` across ${syncResult.cards} card${syncResult.cards !== 1 ? 's' : ''}`}
-        {syncResult.deleted === 0 && syncResult.addedTrackable === 0 && syncResult.addedValue === 0 && syncResult.patched === 0 && 'All perks up to date'}
-        {syncResult.skipped > 0 && `, ${syncResult.skipped} skipped`}
+          {buildSyncSummary(syncResult)}
         </div>
       )}
       {syncResult?.error && (
