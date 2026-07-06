@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, REWARDS_TABLE, PEOPLE_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, PEOPLE_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
-import { CardRow } from '../components/CardRow.jsx';
+import { CardSummaryPanel } from '../components/CardSummaryPanel.jsx';
 
 const BANK_NAMES = {
   'recmOSLhOAYVqi09z': 'American Express',
@@ -21,82 +21,222 @@ const BANK_NAMES = {
   'recRKg9TA1IQpRkmH': 'Wells Fargo',
 };
 
-function resolveIssuer(raw) {
-  if (!raw) return 'Unknown';
-  if (Array.isArray(raw)) return BANK_NAMES[raw[0]] || raw[0] || 'Unknown';
-  return BANK_NAMES[raw] || raw;
-}
+const DECISION_COLORS = {
+  Keep: '#00C853',
+  Cancel: '#FF3D00',
+  'Product Change': '#2979FF',
+  Downgrade: '#FF6D00',
+  Upgrade: '#00D4FF',
+};
+
+const DECISION_OPTIONS = ['All', 'Undecided', 'Keep', 'Cancel', 'Product Change', 'Downgrade', 'Upgrade'];
+const TYPE_OPTIONS = ['All', 'Personal', 'Business'];
+
+const PERSON_ID_BY_NAME = Object.fromEntries(Object.entries(PEOPLE).map(([id, name]) => [name, id]));
 
 const FIELDS = [
   'Card Name',
   'Issuer',
   'Personal/Business',
-  'Rewards Program',
   'Annual Fee Amount',
   'Days Until Annual Fee',
-  'Annual Fee Status',
-  'Cancel Risk Level',
+  'Decision',
   'Status',
   'Owner',
   'Authorized Users',
 ];
 
-function buildIssuerGroups(cards) {
-  const map = {};
-  cards.forEach(card => {
-    const issuer = resolveIssuer(card.fields['Issuer']);
-    if (!map[issuer]) map[issuer] = [];
-    map[issuer].push(card);
-  });
-  return Object.keys(map)
-    .sort((a, b) => a.localeCompare(b))
-    .map(issuer => ({
-      issuer,
-      cards: map[issuer].sort((a, b) => {
-        const da = a.fields['Days Until Annual Fee'] ?? Infinity;
-        const db = b.fields['Days Until Annual Fee'] ?? Infinity;
-        return da - db;
-      }),
-    }));
+const ROW_COLUMNS = '2.2fr 90px 100px 130px 140px 70px';
+
+function resolveIssuer(raw) {
+  if (!raw) return 'Unknown';
+  const key = Array.isArray(raw) ? raw[0] : raw;
+  return BANK_NAMES[key] || key || 'Unknown';
+}
+
+function daysUntilFeeColor(days) {
+  if (days < 30) return '#FF4D4D';
+  if (days < 60) return '#FFD60A';
+  if (days < 90) return 'rgba(255,255,255,0.45)';
+  return '#fff';
+}
+
+function PillBtn({ active, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      padding: '6px 16px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+      background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+      color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+      fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.85rem',
+      transition: 'all 0.15s', whiteSpace: 'nowrap',
+    }}>
+      {children}
+    </button>
+  );
+}
+
+function FilterRow({ label, options, selected, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>
+        {label}
+      </span>
+      {options.map(opt => (
+        <PillBtn key={opt} active={selected === opt} onClick={() => onChange(opt)}>{opt}</PillBtn>
+      ))}
+    </div>
+  );
+}
+
+function DecisionBadge({ decision }) {
+  if (!decision) return <span style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>;
+  const color = DECISION_COLORS[decision] || 'rgba(255,255,255,0.4)';
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+      fontSize: '0.72rem', fontWeight: 700, background: color + '22', color,
+      border: `1px solid ${color}55`, whiteSpace: 'nowrap',
+    }}>
+      {decision}
+    </span>
+  );
+}
+
+function PortfolioRow({ card, personNameById, onOpen }) {
+  const [hovered, setHovered] = useState(false);
+  const f = card.fields;
+  const issuer = resolveIssuer(f['Issuer']);
+  const cardType = f['Personal/Business'];
+  const annualFee = f['Annual Fee Amount'] || 0;
+  const days = f['Days Until Annual Fee'];
+  const auIds = f['Authorized Users'] || [];
+  const auNames = auIds.map(id => personNameById[id] || id);
+
+  return (
+    <div
+      onClick={() => onOpen(card.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: ROW_COLUMNS,
+        alignItems: 'center',
+        gap: '0.75rem',
+        padding: '0.75rem 1rem',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        cursor: 'pointer',
+        background: hovered ? 'rgba(0,212,255,0.06)' : 'transparent',
+        transition: 'background 0.12s',
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>
+          {f['Card Name'] || '—'}
+        </div>
+        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+          {issuer}
+        </div>
+      </div>
+
+      <div>
+        {cardType && (
+          <span style={{
+            padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
+            background: cardType === 'Business' ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.08)',
+            color: cardType === 'Business' ? '#00D4FF' : 'rgba(255,255,255,0.6)',
+            border: `1px solid ${cardType === 'Business' ? '#00D4FF44' : 'rgba(255,255,255,0.12)'}`,
+          }}>
+            {cardType}
+          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: '0.85rem' }}>
+        {annualFee > 0
+          ? <span style={{ color: '#fff' }}>{$$(annualFee)}</span>
+          : <span style={{ color: 'rgba(255,255,255,0.4)' }}>No Fee</span>}
+      </div>
+
+      <div style={{ fontSize: '0.82rem', fontWeight: days != null && days < 90 ? 700 : 400, color: annualFee > 0 && days != null ? daysUntilFeeColor(days) : 'transparent' }}>
+        {annualFee > 0 && days != null ? `${days}d` : ''}
+      </div>
+
+      <div>
+        <DecisionBadge decision={f['Decision']} />
+      </div>
+
+      <div
+        style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}
+        title={auNames.length ? auNames.join(', ') : undefined}
+      >
+        {auNames.length ? '👤' : <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.82rem' }}>—</span>}
+      </div>
+    </div>
+  );
 }
 
 export function PortfolioTab() {
   const [cards, setCards] = useState([]);
-  const [programNameById, setProgramNameById] = useState({});
   const [personNameById, setPersonNameById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedPerson, setSelectedPerson] = useState(ALL_PEOPLE);
+
+  const [personFilter, setPersonFilter] = useState(ALL_PEOPLE);
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [issuerFilter, setIssuerFilter] = useState('All');
+  const [decisionFilter, setDecisionFilter] = useState('All');
+
+  const [selectedCardId, setSelectedCardId] = useState(null);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetchTable(PORTFOLIO_TABLE, FIELDS),
-      fetchTable(REWARDS_TABLE, ['Program Name']),
+      fetchTable(PORTFOLIO_TABLE, FIELDS, { filterByFormula: "{Status}='Active'" }),
       fetchTable(PEOPLE_TABLE, ['Name']),
     ])
-      .then(([records, programRows, peopleRows]) => {
-        const active = records.filter(r => r.fields['Status'] === 'Active');
-        setCards(active);
-        setProgramNameById(Object.fromEntries(programRows.map(p => [p.id, p.fields['Program Name'] || p.id])));
+      .then(([records, peopleRows]) => {
+        setCards(records);
         setPersonNameById(Object.fromEntries(peopleRows.map(p => [p.id, p.fields['Name'] || p.id])));
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
-  const visibleCards = selectedPerson === ALL_PEOPLE
-    ? cards
-    : cards.filter(c => {
-        const owner = c.fields['Owner'];
-        const owners = Array.isArray(owner) ? owner : (owner ? [owner] : []);
-        const personId = Object.entries(PEOPLE).find(([, name]) => name === selectedPerson)?.[0];
-        return personId ? owners.includes(personId) : true;
-      });
+  const issuerOptions = ['All', ...new Set(cards.map(c => resolveIssuer(c.fields['Issuer'])))].sort((a, b) => {
+    if (a === 'All') return -1;
+    if (b === 'All') return 1;
+    return a.localeCompare(b);
+  });
+
+  const visibleCards = cards.filter(c => {
+    const f = c.fields;
+    if (personFilter !== ALL_PEOPLE) {
+      const owners = f['Owner'] || [];
+      if (!owners.includes(PERSON_ID_BY_NAME[personFilter])) return false;
+    }
+    if (typeFilter !== 'All' && f['Personal/Business'] !== typeFilter) return false;
+    if (issuerFilter !== 'All' && resolveIssuer(f['Issuer']) !== issuerFilter) return false;
+    if (decisionFilter !== 'All') {
+      const decision = f['Decision'] || '';
+      if (decisionFilter === 'Undecided') {
+        if (decision) return false;
+      } else if (decision !== decisionFilter) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const totalFees = visibleCards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
   const dueSoon = visibleCards.filter(c => (c.fields['Days Until Annual Fee'] ?? Infinity) <= 60).length;
-  const issuerGroups = buildIssuerGroups(visibleCards);
+
+  const withFee = visibleCards
+    .filter(c => (c.fields['Annual Fee Amount'] || 0) > 0)
+    .sort((a, b) => (a.fields['Days Until Annual Fee'] ?? Infinity) - (b.fields['Days Until Annual Fee'] ?? Infinity));
+
+  const noFee = visibleCards
+    .filter(c => !((c.fields['Annual Fee Amount'] || 0) > 0))
+    .sort((a, b) => (a.fields['Card Name'] || '').localeCompare(b.fields['Card Name'] || ''));
 
   if (loading) {
     return (
@@ -122,60 +262,57 @@ export function PortfolioTab() {
         <StatCard label="Cards Due Soon (≤60d)" value={dueSoon} accent="#FFD60A" />
       </div>
 
-      <PersonFilter selected={selectedPerson} onChange={setSelectedPerson} />
+      <div style={{
+        background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+        padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
+      }}>
+        <FilterRow label="Person" options={['All', ...Object.values(PEOPLE)]} selected={personFilter === ALL_PEOPLE ? 'All' : personFilter} onChange={v => setPersonFilter(v === 'All' ? ALL_PEOPLE : v)} />
+        <FilterRow label="Type" options={TYPE_OPTIONS} selected={typeFilter} onChange={setTypeFilter} />
+        <FilterRow label="Issuer" options={issuerOptions} selected={issuerFilter} onChange={setIssuerFilter} />
+        <FilterRow label="Decision" options={DECISION_OPTIONS} selected={decisionFilter} onChange={setDecisionFilter} />
+      </div>
 
-      {issuerGroups.map(group => {
-        const groupFees = group.cards.reduce((sum, c) => sum + (c.fields['Annual Fee Amount'] || 0), 0);
-        return (
-          <div key={group.issuer} style={{
-            background: '#172033',
-            borderRadius: 12,
-            border: '1px solid rgba(255,255,255,0.08)',
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              padding: '0.85rem 1rem',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
-              <span style={{ fontWeight: 700, color: '#00D4FF', fontSize: '0.95rem' }}>
-                {group.issuer}
-                <span style={{ marginLeft: 8, fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
-                  {group.cards.length} card{group.cards.length !== 1 ? 's' : ''}
-                </span>
-              </span>
-              <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
-                {$$(groupFees)} / yr
-              </span>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '2fr 1fr 90px 1fr 80px 70px 110px 70px 80px',
-              gap: '0.75rem',
-              padding: '0.5rem 1rem',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              {['Card', 'Type', 'Rewards', 'Annual Fee', 'Days', 'AF Status', 'Risk', 'AUs', ''].map((h, i) => (
-                <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {h}
-                </span>
-              ))}
-            </div>
-
-            {group.cards.map(card => (
-              <CardRow key={card.id} card={card} programNameById={programNameById} personNameById={personNameById} />
-            ))}
-          </div>
-        );
-      })}
-
-      {issuerGroups.length === 0 && (
-        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: '3rem' }}>
-          No active cards found.
+      <div style={{
+        background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: ROW_COLUMNS, gap: '0.75rem',
+          padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          {['Card', 'Type', 'Annual Fee', 'Days Until Fee', 'Decision', 'AUs'].map((h, i) => (
+            <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {h}
+            </span>
+          ))}
         </div>
+
+        {withFee.map(card => (
+          <PortfolioRow key={card.id} card={card} personNameById={personNameById} onOpen={setSelectedCardId} />
+        ))}
+
+        {noFee.length > 0 && (
+          <div style={{
+            padding: '0.5rem 1rem', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)',
+            textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)',
+          }}>
+            No Annual Fee
+          </div>
+        )}
+
+        {noFee.map(card => (
+          <PortfolioRow key={card.id} card={card} personNameById={personNameById} onOpen={setSelectedCardId} />
+        ))}
+
+        {visibleCards.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: '3rem' }}>
+            No cards match the current filters.
+          </div>
+        )}
+      </div>
+
+      {selectedCardId && (
+        <CardSummaryPanel cardId={selectedCardId} onClose={() => setSelectedCardId(null)} />
       )}
     </div>
   );
