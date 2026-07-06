@@ -527,7 +527,7 @@ export function CardAuditTab() {
     };
   }
 
-  const enriched = cards.map(enrich);
+  const enriched = cards.map(enrich).filter(c => c.annualFee != null && c.annualFee > 0);
   const personFiltered = personFilter === ALL_PEOPLE ? enriched : enriched.filter(c => c.ownerName === personFilter);
 
   const pastDue = enriched.filter(c => c.decision && c.daysUntilFee != null && c.daysUntilFee <= 0);
