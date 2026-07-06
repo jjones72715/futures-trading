@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, createRecord, updateRecord } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PRODUCT_CHANGES_TABLE, PERK_INSTANCES_TABLE, SPEND_BONUSES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PRODUCT_CHANGES_TABLE, PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, SPEND_BONUSES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
@@ -449,8 +449,10 @@ function AnnualReviewPanel({ card, instances, spendBonuses, onClose, onInstances
   const [showAddPerk, setShowAddPerk] = useState(false);
   const [newPerkName, setNewPerkName] = useState('');
   const [newPerkValue, setNewPerkValue] = useState('');
+  const [newPerkNotes, setNewPerkNotes] = useState('');
   const [addingPerk, setAddingPerk] = useState(false);
   const [addPerkError, setAddPerkError] = useState(null);
+  const [addPerkSuccess, setAddPerkSuccess] = useState('');
   const [cycling, setCycling] = useState(false);
   const [cycleMessage, setCycleMessage] = useState('');
 
@@ -510,23 +512,24 @@ function AnnualReviewPanel({ card, instances, spendBonuses, onClose, onInstances
   async function handleAddPerk() {
     setAddPerkError(null);
     if (!newPerkName.trim()) { setAddPerkError('Perk name is required.'); return; }
+    if (!card.productId) { setAddPerkError('This card has no linked Card Product.'); return; }
     setAddingPerk(true);
     try {
       const fields = {
-        'Label': newPerkName.trim(),
-        'Perk Type': 'Value Only',
-        'Card': [card.id],
+        'Perk Name': newPerkName.trim(),
+        'Card Product': [card.productId],
+        'Reset Cycle': 'Value Only',
+        'Priority Score': 5,
+        'Benefit Type': 'Value Only',
       };
-      if (card.ownerId) fields['Person'] = [card.ownerId];
       if (newPerkValue !== '') fields['Credit Amount'] = parseFloat(newPerkValue);
-      const created = await createRecord(PERK_INSTANCES_TABLE, fields);
-      const nextInstances = [...localInstances, created];
-      setLocalInstances(nextInstances);
-      setDrafts(prev => ({ ...prev, [created.id]: '' }));
+      if (newPerkNotes.trim()) fields['Notes'] = newPerkNotes.trim();
+      await createRecord(PERK_DEFINITIONS_TABLE, fields);
       setNewPerkName('');
       setNewPerkValue('');
+      setNewPerkNotes('');
       setShowAddPerk(false);
-      onInstancesChange(card.id, nextInstances);
+      setAddPerkSuccess('Value perk added to definitions. Run Sync All Perks in Benefits Tracker to push to all cards.');
     } catch (e) {
       setAddPerkError(e.message);
     } finally {
@@ -616,22 +619,31 @@ function AnnualReviewPanel({ card, instances, spendBonuses, onClose, onInstances
       )}
 
       {!showAddPerk ? (
-        <button type="button" onClick={() => setShowAddPerk(true)} style={{
+        <button type="button" onClick={() => { setShowAddPerk(true); setAddPerkSuccess(''); }} style={{
           padding: '0.45rem 1rem', borderRadius: 8, border: '1px solid rgba(179,136,255,0.35)',
-          background: 'rgba(179,136,255,0.1)', color: '#B388FF', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', marginBottom: '1.25rem',
+          background: 'rgba(179,136,255,0.1)', color: '#B388FF', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', marginBottom: addPerkSuccess ? 8 : '1.25rem',
         }}>
           + Add Value Perk
         </button>
       ) : (
         <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: '1.25rem' }}>
-          <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>New Value-Only Perk</div>
+          <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>New Value Perk Definition</div>
           <div>
             <label style={lbl}>Perk Name</label>
             <input style={inp} value={newPerkName} onChange={e => setNewPerkName(e.target.value)} placeholder="e.g. Lounge Access" />
           </div>
           <div>
-            <label style={lbl}>Annualized Value</label>
+            <label style={lbl}>Credit Amount</label>
             <input style={inp} type="number" value={newPerkValue} onChange={e => setNewPerkValue(e.target.value)} placeholder="0" />
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Annualized face value of the perk.</div>
+          </div>
+          <div>
+            <label style={lbl}>Notes</label>
+            <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} value={newPerkNotes} onChange={e => setNewPerkNotes(e.target.value)} placeholder="Optional context…" />
+          </div>
+          <div>
+            <label style={lbl}>Card Product</label>
+            <input style={{ ...inp, opacity: 0.6, cursor: 'not-allowed' }} value={card.productName} readOnly disabled />
           </div>
           {addPerkError && (
             <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.5rem 0.75rem', color: '#FF4D4D', fontSize: '0.8rem' }}>
@@ -653,6 +665,12 @@ function AnnualReviewPanel({ card, instances, spendBonuses, onClose, onInstances
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {addPerkSuccess && (
+        <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#00E676', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
+          {addPerkSuccess}
         </div>
       )}
 

@@ -168,7 +168,7 @@ export function AddCardTab() {
         const filter = `FIND("${form.currentProductId}",ARRAYJOIN({Card Product}))`;
         const matchingDefs = await fetchTable(
           PERK_DEFINITIONS_TABLE,
-          ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score'],
+          ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score', 'Benefit Type'],
           { filterByFormula: filter }
         );
 
@@ -180,6 +180,7 @@ export function AddCardTab() {
             const cycle = def.fields['Reset Cycle'];
             const nextDate = cycle ? calculateNextResetDate(cycle, today) : null;
             const nextDateStr = nextDate ? toAirtableDate(nextDate) : null;
+            const perkType = def.fields['Benefit Type'] === 'Value Only' ? 'Value Only' : 'Trackable';
 
             for (const personId of form.ownerIds) {
               const instanceFields = {
@@ -188,7 +189,7 @@ export function AddCardTab() {
                 'Person': [personId],
                 'Used': false,
                 'Label': def.fields['Perk Name'] || '',
-                'Perk Type': 'Trackable',
+                'Perk Type': perkType,
               };
               if (nextDateStr) instanceFields['Next Reset Date'] = nextDateStr;
               if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];

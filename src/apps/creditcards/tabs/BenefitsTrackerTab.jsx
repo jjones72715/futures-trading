@@ -143,7 +143,7 @@ export function BenefitsTrackerTab() {
       // Fetch all three sources in parallel
       const [portfolio, defs, existingInst] = await Promise.all([
         fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
-        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score']),
+        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score', 'Benefit Type']),
         fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition', 'Label', 'Credit Amount', 'Priority Score', 'Reset Cycle']),
       ]);
 
@@ -213,13 +213,14 @@ export function BenefitsTrackerTab() {
             }
             const cycle = def.fields['Reset Cycle'];
             const nextDate = cycle ? calculateNextResetDate(cycle, today) : null;
+            const perkType = def.fields['Benefit Type'] === 'Value Only' ? 'Value Only' : 'Trackable';
             const instanceFields = {
               'Perk Definition': [def.id],
               'Card': [cardId],
               'Person': [personId],
               'Used': false,
               'Label': def.fields['Perk Name'] || '',
-              'Perk Type': 'Trackable',
+              'Perk Type': perkType,
             };
             if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
             if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
@@ -232,11 +233,13 @@ export function BenefitsTrackerTab() {
       }
 
       // Fire creates sequentially to avoid rate limits
-      let added = 0;
+      let addedTrackable = 0;
+      let addedValue = 0;
       for (const c of creates) {
         try {
           await createRecord(PERK_INSTANCES_TABLE, c.fields);
-          added++;
+          if (c.fields['Perk Type'] === 'Value Only') addedValue++;
+          else addedTrackable++;
           cardsSeen.add(c.cardId);
         } catch (e) {
           console.error('Sync create failed:', e);
@@ -254,7 +257,7 @@ export function BenefitsTrackerTab() {
         }
       }
 
-      setSyncResult({ added, patched, deleted, cards: cardsSeen.size, skipped });
+      setSyncResult({ addedTrackable, addedValue, patched, deleted, cards: cardsSeen.size, skipped });
       await load();
     } catch (e) {
       console.error('Sync failed:', e);
@@ -371,13 +374,14 @@ export function BenefitsTrackerTab() {
       {syncResult && !syncResult.error && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.88rem' }}>
           {syncResult.deleted > 0 && `${syncResult.deleted} orphan${syncResult.deleted !== 1 ? 's' : ''} deleted`}
-        {syncResult.deleted > 0 && (syncResult.added > 0 || syncResult.patched > 0) && ', '}
-        {syncResult.added > 0 && `${syncResult.added} added`}
-        {syncResult.added > 0 && syncResult.patched > 0 && ', '}
+        {syncResult.deleted > 0 && (syncResult.addedTrackable > 0 || syncResult.addedValue > 0 || syncResult.patched > 0) && ', '}
+        {(syncResult.addedTrackable > 0 || syncResult.addedValue > 0) &&
+          `${syncResult.addedTrackable} trackable perk${syncResult.addedTrackable !== 1 ? 's' : ''} and ${syncResult.addedValue} value perk${syncResult.addedValue !== 1 ? 's' : ''} added`}
+        {(syncResult.addedTrackable > 0 || syncResult.addedValue > 0) && syncResult.patched > 0 && ', '}
         {syncResult.patched > 0 && `${syncResult.patched} backfilled`}
-        {(syncResult.added > 0 || syncResult.patched > 0) && syncResult.cards > 0 && ` across ${syncResult.cards} card${syncResult.cards !== 1 ? 's' : ''}`}
-        {syncResult.deleted === 0 && syncResult.added === 0 && syncResult.patched === 0 && 'All perks up to date'}
-        {syncResult.skipped > 0 && `, ${syncResult.skipped} already complete`}
+        {(syncResult.addedTrackable > 0 || syncResult.addedValue > 0 || syncResult.patched > 0) && syncResult.cards > 0 && ` across ${syncResult.cards} card${syncResult.cards !== 1 ? 's' : ''}`}
+        {syncResult.deleted === 0 && syncResult.addedTrackable === 0 && syncResult.addedValue === 0 && syncResult.patched === 0 && 'All perks up to date'}
+        {syncResult.skipped > 0 && `, ${syncResult.skipped} skipped`}
         </div>
       )}
       {syncResult?.error && (
