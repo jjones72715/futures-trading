@@ -83,11 +83,14 @@ export function BenefitsTrackerTab() {
     setResetStatus('Checking for expired perks…');
 
     // Step 1 — load defs and instances together
-    const [allInst, defs, cards] = await Promise.all([
-      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits', 'Credit Type']),
+    const [allInstRaw, defs, cards] = await Promise.all([
+      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits', 'Credit Type', 'Perk Type']),
       fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
+
+    // Value Only perks are tracked in Card Summary / Annual Review instead — hide them here entirely
+    const allInst = allInstRaw.filter(r => r.fields['Perk Type'] !== 'Value Only');
 
     const defMap = {};
     defs.forEach(r => { defMap[r.id] = r.fields; });
@@ -216,6 +219,7 @@ export function BenefitsTrackerTab() {
               'Person': [personId],
               'Used': false,
               'Label': def.fields['Perk Name'] || '',
+              'Perk Type': 'Trackable',
             };
             if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
             if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];

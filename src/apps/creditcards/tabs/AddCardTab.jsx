@@ -188,6 +188,7 @@ export function AddCardTab() {
                 'Person': [personId],
                 'Used': false,
                 'Label': def.fields['Perk Name'] || '',
+                'Perk Type': 'Trackable',
               };
               if (nextDateStr) instanceFields['Next Reset Date'] = nextDateStr;
               if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];

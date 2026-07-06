@@ -6,6 +6,7 @@ import {
 } from '../config/tables.js';
 import { $$ } from '../utils/format.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
+import { annualizedCreditAmount, sumPerkValue } from '../utils/perks.js';
 
 const BANK_NAMES = {
   'recmOSLhOAYVqi09z': 'American Express',
@@ -29,7 +30,7 @@ const DECISION_COLORS = {
   Upgrade: '#00D4FF',
 };
 
-const PERK_FIELDS = ['Label', 'Perk Definition', 'Credit Amount', 'Reset Cycle', 'Next Reset Date', 'Priority Score', 'Used'];
+const PERK_FIELDS = ['Label', 'Perk Definition', 'Credit Amount', 'Reset Cycle', 'Next Reset Date', 'Priority Score', 'Used', 'Perk Type', 'Value', 'Previous Value'];
 const HOTEL_FIELDS = ['Name', 'Record Type', 'Benefit Type', 'Estimated Value', 'Expiration Date', 'Days Until Expiration'];
 const SIGNUP_FIELDS = ['Bonus Description', 'Spend Target', 'Current Spend', 'Remaining Spend', 'Effective Deadline', 'Days Remaining', 'Achieved'];
 const SPEND_FIELDS = ['Bonus Description', 'Annual Spend Target', 'Current Spend', 'Remaining Spend', 'Reset Date', 'Days Until Reset', 'Bonus Earned'];
@@ -142,6 +143,17 @@ function EmptyNote({ children }) {
 
 function Divider() {
   return <div style={{ borderTop: '1px solid #1E2D45' }} />;
+}
+
+function MiniStat({ label, value, color }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
+      <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+        {label}
+      </span>
+      <span style={{ fontSize: '0.82rem', color: color || 'rgba(255,255,255,0.75)', fontWeight: 700 }}>{value}</span>
+    </div>
+  );
 }
 
 function Skeleton() {
@@ -261,6 +273,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
       priority: inst?.fields['Priority Score'] ?? def.fields['Priority Score'] ?? 0,
       used: inst ? !!inst.fields['Used'] : false,
       benefitType: extractSelectName(def.fields['Benefit Type']),
+      value: inst?.fields['Value'] ?? null,
     };
   });
 
@@ -284,6 +297,16 @@ export function CardSummaryPanel({ cardId, onClose }) {
 
   const signupRows = bundle?.signup || [];
   const spendRows = bundle?.spend || [];
+
+  // Value Only perks are card-specific and aren't tied to a Perk Definition, so they
+  // never appear in perkDefsForProduct — surface them straight from the raw instances.
+  const valueOnlyRows = (bundle?.perks || [])
+    .filter(r => r.fields['Perk Type'] === 'Value Only')
+    .map(r => ({ id: r.id, label: r.fields['Label'] || '—', value: r.fields['Value'] ?? null }));
+
+  const { netValue } = sumPerkValue(bundle?.perks || []);
+  const valueDifference = netValue - annualFee;
+  const valueDiffColor = netValue === 0 ? 'rgba(255,255,255,0.5)' : valueDifference >= 0 ? '#00E676' : '#FF4D4D';
 
   return (
     <>
@@ -381,6 +404,27 @@ export function CardSummaryPanel({ cardId, onClose }) {
                 </div>
               </div>
 
+              {/* Value Summary */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', padding: '0.85rem 1rem',
+                borderRadius: 10, background: '#111a2b', border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Net Value</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>{$$(netValue)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Annual Fee</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>{$$(annualFee)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Difference</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: valueDiffColor }}>
+                    {valueDifference > 0 ? '+' : ''}{$$(valueDifference)}
+                  </div>
+                </div>
+              </div>
+
               <Divider />
 
               {/* Perks */}
@@ -400,7 +444,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
                     </button>
                   )}
                 </div>
-                {perksVisible.length === 0 ? (
+                {perksVisible.length === 0 && valueOnlyRows.length === 0 ? (
                   <EmptyNote>No perks tracked for this card.</EmptyNote>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -416,12 +460,30 @@ export function CardSummaryPanel({ cardId, onClose }) {
                             {p.resetCycle || '—'} · Resets {fmtDate(p.nextReset)}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.85rem' }}>
-                            {p.creditAmount != null ? `$${p.creditAmount}` : '—'}
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <MiniStat label="Annualized" value={(() => { const a = annualizedCreditAmount(p.creditAmount, p.resetCycle); return a != null ? $$(a) : '—'; })()} />
+                          <MiniStat label="Your Value" value={p.value != null ? $$(p.value) : '—'} color="#00D4FF" />
                           <input type="checkbox" checked={p.used} readOnly disabled style={{ width: 16, height: 16, accentColor: '#00D4FF' }} />
                         </div>
+                      </div>
+                    ))}
+                    {valueOnlyRows.map(v => (
+                      <div key={v.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '0.6rem 0.85rem', borderRadius: 8, background: '#111a2b',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>{v.label}</span>
+                          <span style={{
+                            width: 'fit-content', fontSize: '0.65rem', fontWeight: 700, color: '#B388FF',
+                            background: 'rgba(179,136,255,0.12)', border: '1px solid rgba(179,136,255,0.35)',
+                            borderRadius: 20, padding: '1px 8px',
+                          }}>
+                            Value Only
+                          </span>
+                        </div>
+                        <MiniStat label="Your Value" value={v.value != null ? $$(v.value) : '—'} color="#00D4FF" />
                       </div>
                     ))}
                   </div>

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, PEOPLE_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, PEOPLE_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { CardSummaryPanel } from '../components/CardSummaryPanel.jsx';
+import { NetValueGroup } from '../components/NetValueGroup.jsx';
+import { sumPerkValue } from '../utils/perks.js';
 
 const BANK_NAMES = {
   'recmOSLhOAYVqi09z': 'American Express',
@@ -45,6 +47,8 @@ const FIELDS = [
   'Owner',
   'Authorized Users',
 ];
+
+const PERK_INSTANCE_FIELDS = ['Card', 'Value'];
 
 const ROW_COLUMNS = '2.2fr 90px 100px 130px 140px 70px';
 
@@ -102,7 +106,7 @@ function DecisionBadge({ decision }) {
   );
 }
 
-function PortfolioRow({ card, personNameById, onOpen }) {
+function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const [hovered, setHovered] = useState(false);
   const f = card.fields;
   const issuer = resolveIssuer(f['Issuer']);
@@ -111,6 +115,7 @@ function PortfolioRow({ card, personNameById, onOpen }) {
   const days = f['Days Until Annual Fee'];
   const auIds = f['Authorized Users'] || [];
   const auNames = auIds.map(id => personNameById[id] || id);
+  const { netValue, hasAnyValue } = sumPerkValue(instances);
 
   return (
     <div
@@ -136,6 +141,11 @@ function PortfolioRow({ card, personNameById, onOpen }) {
         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
           {issuer}
         </div>
+        {annualFee > 0 && (
+          <div style={{ marginTop: 3 }}>
+            <NetValueGroup netValue={netValue} annualFee={annualFee} hasAnyValue={hasAnyValue} mode="portfolio" />
+          </div>
+        )}
       </div>
 
       <div>
@@ -178,6 +188,7 @@ function PortfolioRow({ card, personNameById, onOpen }) {
 export function PortfolioTab() {
   const [cards, setCards] = useState([]);
   const [personNameById, setPersonNameById] = useState({});
+  const [instancesByCard, setInstancesByCard] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -193,10 +204,19 @@ export function PortfolioTab() {
     Promise.all([
       fetchTable(PORTFOLIO_TABLE, FIELDS, { filterByFormula: "{Status}='Active'" }),
       fetchTable(PEOPLE_TABLE, ['Name']),
+      fetchTable(PERK_INSTANCES_TABLE, PERK_INSTANCE_FIELDS),
     ])
-      .then(([records, peopleRows]) => {
+      .then(([records, peopleRows, perkInstances]) => {
         setCards(records);
         setPersonNameById(Object.fromEntries(peopleRows.map(p => [p.id, p.fields['Name'] || p.id])));
+        const byCard = {};
+        perkInstances.forEach(inst => {
+          const cardId = (inst.fields['Card'] || [])[0];
+          if (!cardId) return;
+          if (!byCard[cardId]) byCard[cardId] = [];
+          byCard[cardId].push(inst);
+        });
+        setInstancesByCard(byCard);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -287,7 +307,7 @@ export function PortfolioTab() {
         </div>
 
         {withFee.map(card => (
-          <PortfolioRow key={card.id} card={card} personNameById={personNameById} onOpen={setSelectedCardId} />
+          <PortfolioRow key={card.id} card={card} personNameById={personNameById} instances={instancesByCard[card.id] || []} onOpen={setSelectedCardId} />
         ))}
 
         {noFee.length > 0 && (
@@ -301,7 +321,7 @@ export function PortfolioTab() {
         )}
 
         {noFee.map(card => (
-          <PortfolioRow key={card.id} card={card} personNameById={personNameById} onOpen={setSelectedCardId} />
+          <PortfolioRow key={card.id} card={card} personNameById={personNameById} instances={instancesByCard[card.id] || []} onOpen={setSelectedCardId} />
         ))}
 
         {visibleCards.length === 0 && (

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, createRecord, updateRecord } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PRODUCT_CHANGES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PRODUCT_CHANGES_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
 import { AnnualFeeBadge } from '../components/AnnualFeeBadge.jsx';
+import { NetValueGroup } from '../components/NetValueGroup.jsx';
+import { annualizedCreditAmount, sumPerkValue } from '../utils/perks.js';
 import { $$ } from '../utils/format.js';
 
 const PORTFOLIO_FIELDS = [
@@ -14,6 +16,11 @@ const PORTFOLIO_FIELDS = [
 ];
 
 const PRODUCT_FIELDS = ['Product Name', 'Annual Fee', 'Can Upgrade To', 'Can Downgrade To', 'Signup Bonus Eligible After (Months)'];
+
+const PERK_INSTANCE_FIELDS = [
+  'Label', 'Card', 'Person', 'Perk Definition', 'Credit Amount', 'Reset Cycle',
+  'Perk Type', 'Value', 'Previous Value', 'Used',
+];
 
 const DECISION_OPTIONS = ['Keep', 'Cancel', 'Product Change', 'Downgrade', 'Upgrade'];
 
@@ -30,7 +37,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const ROW_COLUMNS = '2fr 0.8fr 90px 90px 110px 140px 110px 100px 90px';
+const ROW_COLUMNS = '2fr 0.8fr 90px 90px 110px 140px 110px 100px 130px';
 
 const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
@@ -111,6 +118,34 @@ function optionsForDecision(decision, product) {
   if (decision === 'Downgrade') return product.canDowngradeTo;
   if (decision === 'Upgrade' || decision === 'Product Change') return product.canUpgradeTo;
   return [];
+}
+
+function SlideOver({ onClose, width = 520, children }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)' }} />
+      <div style={{
+        position: 'absolute', top: 0, right: 0, height: '100%', width, maxWidth: '92vw',
+        background: '#0B1220', borderLeft: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '-8px 0 24px rgba(0,0,0,0.4)', overflowY: 'auto', padding: '1.5rem',
+        animation: 'ccPanelSlideIn 0.2s ease-out',
+      }}>
+        <style>{'@keyframes ccPanelSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }'}</style>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SlideOverHeader({ title, onClose }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#fff', paddingRight: '1rem' }}>{title}</div>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, flexShrink: 0 }}>
+        ×
+      </button>
+    </div>
+  );
 }
 
 function PillBtn({ active, onClick, children }) {
@@ -254,7 +289,27 @@ function DecisionPanel({ card, productsById, onSave, onCancel, saving, error }) 
   );
 }
 
-function CardAuditRow({ card, expanded, onToggleExpand, onToggleWTU, savingWTU, tinted, productsById, onSavePanel, panelSaving, panelError }) {
+function RowActionBtn({ onClick, disabled, title, active, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        padding: '4px 10px', borderRadius: 7, border: '1px solid rgba(0,212,255,0.3)',
+        background: disabled ? 'rgba(255,255,255,0.04)' : active ? '#00D4FF' : 'rgba(0,212,255,0.12)',
+        color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#0B1220' : '#00D4FF',
+        fontWeight: 700, fontSize: '0.68rem', cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1, width: '100%',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CardAuditRow({ card, expanded, onToggleExpand, onToggleWTU, savingWTU, tinted, productsById, onSavePanel, panelSaving, panelError, onOpenAnnualReview, onOpenAnnualDecision }) {
   const bg = tinted ? urgencyTint(card.daysUntilFee) : 'transparent';
   return (
     <div>
@@ -268,6 +323,9 @@ function CardAuditRow({ card, expanded, onToggleExpand, onToggleWTU, savingWTU, 
         <div>
           <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>{card.cardName}</div>
           <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{card.productName}</div>
+          <div style={{ marginTop: 3 }}>
+            <NetValueGroup netValue={card.netValue} annualFee={card.annualFee} hasAnyValue={card.hasAnyValue} mode="audit" />
+          </div>
         </div>
         <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{card.ownerName}</div>
         <div style={{ fontSize: '0.85rem', color: '#fff' }}>{$$(card.annualFee)}</div>
@@ -284,17 +342,17 @@ function CardAuditRow({ card, expanded, onToggleExpand, onToggleWTU, savingWTU, 
           />
         </div>
         <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{fmtDateStr(card.lastReviewed)}</div>
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          style={{
-            padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(0,212,255,0.3)',
-            background: expanded ? '#00D4FF' : 'rgba(0,212,255,0.12)',
-            color: expanded ? '#0B1220' : '#00D4FF', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
-          }}
-        >
-          {expanded ? 'Close' : 'Actions'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <RowActionBtn onClick={onToggleExpand} active={expanded}>{expanded ? 'Close' : 'Actions'}</RowActionBtn>
+          <RowActionBtn onClick={() => onOpenAnnualReview(card)}>Annual Review</RowActionBtn>
+          <RowActionBtn
+            onClick={() => onOpenAnnualDecision(card)}
+            disabled={!card.hasAnyValue}
+            title={!card.hasAnyValue ? 'Run Annual Review first.' : undefined}
+          >
+            Annual Decision
+          </RowActionBtn>
+        </div>
       </div>
 
       {expanded && (
@@ -311,7 +369,7 @@ function CardAuditRow({ card, expanded, onToggleExpand, onToggleWTU, savingWTU, 
   );
 }
 
-function Section({ title, cards, tinted, expandedId, onToggleExpand, onToggleWTU, savingWTU, productsById, onSavePanel, panelSaving, panelError }) {
+function Section({ title, cards, tinted, expandedId, onToggleExpand, onToggleWTU, savingWTU, productsById, onSavePanel, panelSaving, panelError, onOpenAnnualReview, onOpenAnnualDecision }) {
   if (cards.length === 0) return null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -347,6 +405,8 @@ function Section({ title, cards, tinted, expandedId, onToggleExpand, onToggleWTU
             onSavePanel={draft => onSavePanel(card, draft)}
             panelSaving={panelSaving === card.id}
             panelError={expandedId === card.id ? panelError : null}
+            onOpenAnnualReview={onOpenAnnualReview}
+            onOpenAnnualDecision={onOpenAnnualDecision}
           />
         ))}
       </div>
@@ -436,6 +496,307 @@ function PastDueCard({ card, product, productsById, form, onFormChange, onConfir
   );
 }
 
+function PerkReviewRow({ inst, draftValue, onDraftChange }) {
+  const annualized = annualizedCreditAmount(inst.fields['Credit Amount'], inst.fields['Reset Cycle']);
+  const previousValue = inst.fields['Previous Value'];
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 110px', gap: 8, alignItems: 'center',
+      padding: '0.6rem 0.75rem', borderRadius: 8, background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>{inst.fields['Label'] || '—'}</span>
+      <div>
+        <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 600 }}>Annualized</div>
+        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{annualized != null ? $$(annualized) : '—'}</div>
+      </div>
+      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>
+        {previousValue != null ? `Last year: ${$$(previousValue)}` : '—'}
+      </div>
+      <input
+        type="number"
+        value={draftValue}
+        onChange={e => onDraftChange(e.target.value)}
+        placeholder="$0"
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.82rem' }}
+      />
+    </div>
+  );
+}
+
+function AnnualReviewPanel({ card, instances, onClose, onInstancesChange, onCycleToNewYear, cycling, cycleMessage }) {
+  const [localInstances, setLocalInstances] = useState(instances);
+  const [drafts, setDrafts] = useState(() => Object.fromEntries(instances.map(i => [i.id, i.fields['Value'] != null ? String(i.fields['Value']) : ''])));
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [showAddPerk, setShowAddPerk] = useState(false);
+  const [newPerkName, setNewPerkName] = useState('');
+  const [newPerkValue, setNewPerkValue] = useState('');
+  const [addingPerk, setAddingPerk] = useState(false);
+  const [addPerkError, setAddPerkError] = useState(null);
+
+  const year = todayDate().getFullYear();
+  const trackable = localInstances.filter(i => i.fields['Perk Type'] !== 'Value Only');
+  const valueOnly = localInstances.filter(i => i.fields['Perk Type'] === 'Value Only');
+
+  const totalPerkValue = localInstances.reduce((sum, i) => {
+    const raw = drafts[i.id];
+    const v = raw === '' || raw == null ? NaN : parseFloat(raw);
+    return sum + (Number.isFinite(v) ? v : 0);
+  }, 0);
+  const difference = totalPerkValue - (card.annualFee || 0);
+  const diffColor = difference > 0 ? '#00E676' : difference < 0 ? '#FF4D4D' : 'rgba(255,255,255,0.5)';
+
+  function setDraft(id, value) {
+    setDrafts(prev => ({ ...prev, [id]: value }));
+  }
+
+  async function handleSaveAll() {
+    setSaving(true); setSaveError(null); setSaveMsg('');
+    try {
+      await Promise.all(localInstances.map(i => {
+        const raw = drafts[i.id];
+        const value = raw === '' || raw == null ? null : parseFloat(raw);
+        return updateRecord(PERK_INSTANCES_TABLE, i.id, { 'Value': value });
+      }));
+      const updated = localInstances.map(i => {
+        const raw = drafts[i.id];
+        const value = raw === '' || raw == null ? null : parseFloat(raw);
+        return { ...i, fields: { ...i.fields, Value: value } };
+      });
+      setLocalInstances(updated);
+      setSaveMsg('Saved.');
+      onInstancesChange(card.id, updated);
+    } catch (e) {
+      setSaveError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAddPerk() {
+    setAddPerkError(null);
+    if (!newPerkName.trim()) { setAddPerkError('Perk name is required.'); return; }
+    setAddingPerk(true);
+    try {
+      const fields = {
+        'Label': newPerkName.trim(),
+        'Perk Type': 'Value Only',
+        'Card': [card.id],
+      };
+      if (card.ownerId) fields['Person'] = [card.ownerId];
+      if (newPerkValue !== '') fields['Credit Amount'] = parseFloat(newPerkValue);
+      const created = await createRecord(PERK_INSTANCES_TABLE, fields);
+      const nextInstances = [...localInstances, created];
+      setLocalInstances(nextInstances);
+      setDrafts(prev => ({ ...prev, [created.id]: '' }));
+      setNewPerkName('');
+      setNewPerkValue('');
+      setShowAddPerk(false);
+      onInstancesChange(card.id, nextInstances);
+    } catch (e) {
+      setAddPerkError(e.message);
+    } finally {
+      setAddingPerk(false);
+    }
+  }
+
+  return (
+    <SlideOver onClose={onClose} width={600}>
+      <SlideOverHeader title={`${card.cardName} — Annual Review ${year}`} onClose={onClose} />
+
+      {trackable.length > 0 && (
+        <>
+          <div style={{ fontWeight: 700, color: '#00D4FF', fontSize: '0.85rem', marginBottom: 8 }}>Trackable Perks</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1.25rem' }}>
+            {trackable.map(inst => (
+              <PerkReviewRow key={inst.id} inst={inst} draftValue={drafts[inst.id] ?? ''} onDraftChange={v => setDraft(inst.id, v)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div style={{ fontWeight: 700, color: '#B388FF', fontSize: '0.85rem', marginBottom: 8 }}>Value Only Perks</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '0.75rem' }}>
+        {valueOnly.length === 0 && (
+          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem' }}>No value-only perks yet.</div>
+        )}
+        {valueOnly.map(inst => (
+          <PerkReviewRow key={inst.id} inst={inst} draftValue={drafts[inst.id] ?? ''} onDraftChange={v => setDraft(inst.id, v)} />
+        ))}
+      </div>
+
+      {!showAddPerk ? (
+        <button type="button" onClick={() => setShowAddPerk(true)} style={{
+          padding: '0.45rem 1rem', borderRadius: 8, border: '1px solid rgba(179,136,255,0.35)',
+          background: 'rgba(179,136,255,0.1)', color: '#B388FF', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', marginBottom: '1.25rem',
+        }}>
+          + Add Value Perk
+        </button>
+      ) : (
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: '1.25rem' }}>
+          <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.85rem' }}>New Value-Only Perk</div>
+          <div>
+            <label style={lbl}>Perk Name</label>
+            <input style={inp} value={newPerkName} onChange={e => setNewPerkName(e.target.value)} placeholder="e.g. Lounge Access" />
+          </div>
+          <div>
+            <label style={lbl}>Annualized Value</label>
+            <input style={inp} type="number" value={newPerkValue} onChange={e => setNewPerkValue(e.target.value)} placeholder="0" />
+          </div>
+          {addPerkError && (
+            <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.5rem 0.75rem', color: '#FF4D4D', fontSize: '0.8rem' }}>
+              {addPerkError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" disabled={addingPerk} onClick={handleAddPerk} style={{
+              padding: '0.5rem 1.1rem', borderRadius: 8, border: 'none',
+              background: addingPerk ? 'rgba(179,136,255,0.4)' : '#B388FF',
+              color: '#0B1220', fontWeight: 700, fontSize: '0.8rem', cursor: addingPerk ? 'not-allowed' : 'pointer',
+            }}>
+              {addingPerk ? 'Adding…' : 'Add Perk'}
+            </button>
+            <button type="button" onClick={() => { setShowAddPerk(false); setAddPerkError(null); }} style={{
+              padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
+              background: 'none', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+            }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+          <span style={{ color: 'rgba(255,255,255,0.6)' }}>Total Perk Value</span>
+          <span style={{ color: '#fff', fontWeight: 700 }}>{$$(totalPerkValue)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+          <span style={{ color: 'rgba(255,255,255,0.6)' }}>Annual Fee</span>
+          <span style={{ color: '#fff', fontWeight: 700 }}>{$$(card.annualFee)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Difference</span>
+          <span style={{ color: diffColor, fontWeight: 800 }}>{difference > 0 ? '+' : ''}{$$(difference)}</span>
+        </div>
+      </div>
+
+      {saveError && (
+        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#FF4D4D', fontSize: '0.82rem', marginBottom: '1rem' }}>
+          {saveError}
+        </div>
+      )}
+      {saveMsg && (
+        <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#00E676', fontSize: '0.82rem', marginBottom: '1rem' }}>
+          {saveMsg}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: '1.25rem' }}>
+        <button type="button" disabled={saving} onClick={handleSaveAll} style={{
+          padding: '0.6rem 1.5rem', borderRadius: 8, border: 'none',
+          background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+          color: '#0B1220', fontWeight: 700, fontSize: '0.85rem', cursor: saving ? 'not-allowed' : 'pointer',
+        }}>
+          {saving ? 'Saving…' : 'Save All'}
+        </button>
+      </div>
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+        <button type="button" disabled={cycling} onClick={onCycleToNewYear} style={{
+          width: '100%', padding: '0.7rem 1rem', borderRadius: 8, border: '1px solid rgba(255,109,0,0.4)',
+          background: 'rgba(255,109,0,0.15)', color: '#FF6D00', fontWeight: 700, fontSize: '0.85rem',
+          cursor: cycling ? 'not-allowed' : 'pointer',
+        }}>
+          {cycling ? (cycleMessage || 'Cycling…') : 'Cycle All Cards to New Year'}
+        </button>
+        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+          This is a global operation — it affects every card, not just this one.
+        </div>
+      </div>
+    </SlideOver>
+  );
+}
+
+function AnnualDecisionPanel({ card, netValue, onClose, onSave, saving, error }) {
+  const [draft, setDraft] = useState({
+    decision: card.decision,
+    willingToUpgrade: card.willingToUpgrade,
+    notes: card.decisionNotes,
+  });
+  const difference = netValue - (card.annualFee || 0);
+  const diffColor = difference > 0 ? '#00E676' : difference < 0 ? '#FF4D4D' : 'rgba(255,255,255,0.5)';
+
+  return (
+    <SlideOver onClose={onClose} width={480}>
+      <SlideOverHeader title={`${card.cardName} — Annual Decision`} onClose={onClose} />
+
+      <div style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <div>
+          <div style={lbl}>Net Value</div>
+          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>{$$(netValue)}</div>
+        </div>
+        <div>
+          <div style={lbl}>Annual Fee</div>
+          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>{$$(card.annualFee)}</div>
+        </div>
+        <div>
+          <div style={lbl}>Difference</div>
+          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: diffColor }}>
+            {difference > 0 ? '+' : ''}{$$(difference)}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={lbl}>Decision</label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {DECISION_OPTIONS.map(opt => (
+            <PillBtn key={opt} active={draft.decision === opt} onClick={() => setDraft(d => ({ ...d, decision: d.decision === opt ? '' : opt }))}>
+              {opt}
+            </PillBtn>
+          ))}
+        </div>
+      </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', width: 'fit-content', marginBottom: '1rem' }}>
+        <input
+          type="checkbox"
+          checked={draft.willingToUpgrade}
+          onChange={e => setDraft(d => ({ ...d, willingToUpgrade: e.target.checked }))}
+          style={{ accentColor: '#00D4FF', width: 16, height: 16 }}
+        />
+        Willing to Upgrade
+      </label>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={lbl}>Decision Notes</label>
+        <textarea
+          style={{ ...inp, minHeight: 80, resize: 'vertical' }}
+          value={draft.notes}
+          onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
+          placeholder="Any context for this decision…"
+        />
+      </div>
+
+      {error && (
+        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#FF4D4D', fontSize: '0.82rem', marginBottom: '1rem' }}>
+          {error}
+        </div>
+      )}
+
+      <button type="button" disabled={saving} onClick={() => onSave(draft)} style={{
+        padding: '0.6rem 1.5rem', borderRadius: 8, border: 'none',
+        background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+        color: '#0B1220', fontWeight: 700, fontSize: '0.85rem', cursor: saving ? 'not-allowed' : 'pointer',
+      }}>
+        {saving ? 'Saving…' : 'Save Decision'}
+      </button>
+    </SlideOver>
+  );
+}
+
 export function CardAuditTab() {
   const [cards, setCards] = useState([]);
   const [productsById, setProductsById] = useState({});
@@ -449,15 +810,32 @@ export function CardAuditTab() {
   const [savingWTU, setSavingWTU] = useState(null);
   const [pastDueForms, setPastDueForms] = useState({});
   const [justResolved, setJustResolved] = useState([]);
+  const [instancesByCard, setInstancesByCard] = useState({});
+  const [annualReviewCard, setAnnualReviewCard] = useState(null);
+  const [annualDecisionCard, setAnnualDecisionCard] = useState(null);
+  const [annualDecisionSaving, setAnnualDecisionSaving] = useState(null);
+  const [annualDecisionError, setAnnualDecisionError] = useState(null);
+  const [cycling, setCycling] = useState(false);
+  const [cycleMessage, setCycleMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [portfolioRows, productRows] = await Promise.all([
+      const [portfolioRows, productRows, perkInstances] = await Promise.all([
         fetchTable(PORTFOLIO_TABLE, PORTFOLIO_FIELDS, { filterByFormula: "{Status}='Active'" }),
         fetchTable(CARD_PRODUCTS_TABLE, PRODUCT_FIELDS),
+        fetchTable(PERK_INSTANCES_TABLE, PERK_INSTANCE_FIELDS),
       ]);
+
+      const byCard = {};
+      perkInstances.forEach(inst => {
+        const cardId = (inst.fields['Card'] || [])[0];
+        if (!cardId) return;
+        if (!byCard[cardId]) byCard[cardId] = [];
+        byCard[cardId].push(inst);
+      });
+      setInstancesByCard(byCard);
 
       const productsMap = Object.fromEntries(productRows.map(p => [p.id, {
         id: p.id,
@@ -508,6 +886,8 @@ export function CardAuditTab() {
     const ownerId = (f['Owner'] || [])[0];
     const productId = (f['Current Product'] || [])[0];
     const days = f['Days Until Annual Fee'] ?? null;
+    const cardInstances = instancesByCard[row.id] || [];
+    const { netValue, hasAnyValue } = sumPerkValue(cardInstances);
     return {
       id: row.id,
       cardName: f['Card Name'] || '—',
@@ -524,6 +904,8 @@ export function CardAuditTab() {
       willingToUpgrade: !!f['Willing to Upgrade'],
       decisionNotes: f['Decision Notes'] || '',
       lastReviewed: f['Last Reviewed'] || '',
+      netValue,
+      hasAnyValue,
     };
   }
 
@@ -561,23 +943,75 @@ export function CardAuditTab() {
     setPanelError(null);
   }
 
+  async function patchDecisionFields(cardId, draft) {
+    const patch = {
+      'Decision': draft.decision || null,
+      'Willing to Upgrade': draft.willingToUpgrade,
+      'Decision Notes': draft.notes,
+      'Last Reviewed': toAirtableDateStr(todayDate()),
+    };
+    const updated = await updateRecord(PORTFOLIO_TABLE, cardId, patch);
+    setCards(prev => prev.map(r => r.id === cardId ? { ...r, fields: updated.fields } : r));
+    return updated;
+  }
+
   async function savePanel(card, draft) {
     setPanelSaving(card.id);
     setPanelError(null);
     try {
-      const patch = {
-        'Decision': draft.decision || null,
-        'Willing to Upgrade': draft.willingToUpgrade,
-        'Decision Notes': draft.notes,
-        'Last Reviewed': toAirtableDateStr(todayDate()),
-      };
-      const updated = await updateRecord(PORTFOLIO_TABLE, card.id, patch);
-      setCards(prev => prev.map(r => r.id === card.id ? { ...r, fields: updated.fields } : r));
+      await patchDecisionFields(card.id, draft);
       setExpandedId(null);
     } catch (e) {
       setPanelError(e.message);
     } finally {
       setPanelSaving(null);
+    }
+  }
+
+  async function saveAnnualDecision(card, draft) {
+    setAnnualDecisionSaving(card.id);
+    setAnnualDecisionError(null);
+    try {
+      await patchDecisionFields(card.id, draft);
+      setAnnualDecisionCard(null);
+    } catch (e) {
+      setAnnualDecisionError(e.message);
+    } finally {
+      setAnnualDecisionSaving(null);
+    }
+  }
+
+  function handleInstancesChange(cardId, updatedInstances) {
+    setInstancesByCard(prev => ({ ...prev, [cardId]: updatedInstances }));
+  }
+
+  async function cycleToNewYear() {
+    const confirmed = window.confirm(
+      'This will clear all current year values and move them to Previous Value. This cannot be undone. Continue?'
+    );
+    if (!confirmed) return;
+
+    setCycling(true);
+    setCycleMessage('Cycling…');
+    setAnnualReviewCard(null);
+    setAnnualDecisionCard(null);
+    try {
+      const allInstances = await fetchTable(PERK_INSTANCES_TABLE, ['Value', 'Previous Value']);
+      setCycleMessage(`Cycling ${allInstances.length} instance${allInstances.length !== 1 ? 's' : ''}...`);
+      await Promise.all(allInstances.map(inst =>
+        updateRecord(PERK_INSTANCES_TABLE, inst.id, {
+          'Previous Value': inst.fields['Value'] ?? null,
+          'Value': null,
+        })
+      ));
+      const newYear = todayDate().getFullYear() + 1;
+      setCycleMessage(`Done — all cards ready for ${newYear} review`);
+      await load();
+      setTimeout(() => setCycleMessage(''), 8000);
+    } catch (e) {
+      setCycleMessage(`Cycle failed: ${e.message}`);
+    } finally {
+      setCycling(false);
     }
   }
 
@@ -685,12 +1119,35 @@ export function CardAuditTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-        <StatCard label="Cards Needing Decision" value={statNeedsDecision} accent="#00D4FF" />
-        <StatCard label="Due Within 30 Days" value={stat30} accent="#FF4D4D" />
-        <StatCard label="Due Within 60 Days" value={stat60} accent="#FFD60A" />
-        <StatCard label="Due Within 90 Days" value={stat90} accent="#00E676" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', flex: 1 }}>
+          <StatCard label="Cards Needing Decision" value={statNeedsDecision} accent="#00D4FF" />
+          <StatCard label="Due Within 30 Days" value={stat30} accent="#FF4D4D" />
+          <StatCard label="Due Within 60 Days" value={stat60} accent="#FFD60A" />
+          <StatCard label="Due Within 90 Days" value={stat90} accent="#00E676" />
+        </div>
+        <button
+          type="button"
+          onClick={cycleToNewYear}
+          disabled={cycling}
+          style={{
+            padding: '0.65rem 1.1rem', borderRadius: 9, border: '1px solid rgba(255,109,0,0.4)',
+            background: 'rgba(255,109,0,0.15)', color: '#FF6D00', fontWeight: 700, fontSize: '0.82rem',
+            cursor: cycling ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', alignSelf: 'flex-start',
+          }}
+        >
+          Cycle All Cards to New Year
+        </button>
       </div>
+
+      {cycleMessage && (
+        <div style={{
+          background: 'rgba(255,109,0,0.1)', border: '1px solid rgba(255,109,0,0.3)',
+          borderRadius: 10, padding: '0.75rem 1rem', color: '#FF6D00', fontSize: '0.85rem', fontWeight: 600,
+        }}>
+          {cycleMessage}
+        </div>
+      )}
 
       {pastDue.length > 0 && (
         <div style={{
@@ -748,6 +1205,8 @@ export function CardAuditTab() {
           onSavePanel={savePanel}
           panelSaving={panelSaving}
           panelError={panelError}
+          onOpenAnnualReview={setAnnualReviewCard}
+          onOpenAnnualDecision={setAnnualDecisionCard}
         />
       )}
 
@@ -764,6 +1223,8 @@ export function CardAuditTab() {
           onSavePanel={savePanel}
           panelSaving={panelSaving}
           panelError={panelError}
+          onOpenAnnualReview={setAnnualReviewCard}
+          onOpenAnnualDecision={setAnnualDecisionCard}
         />
       )}
 
@@ -771,6 +1232,29 @@ export function CardAuditTab() {
         <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', padding: '3rem' }}>
           No cards match the current filters.
         </div>
+      )}
+
+      {annualReviewCard && (
+        <AnnualReviewPanel
+          card={annualReviewCard}
+          instances={instancesByCard[annualReviewCard.id] || []}
+          onClose={() => setAnnualReviewCard(null)}
+          onInstancesChange={handleInstancesChange}
+          onCycleToNewYear={cycleToNewYear}
+          cycling={cycling}
+          cycleMessage={cycleMessage}
+        />
+      )}
+
+      {annualDecisionCard && (
+        <AnnualDecisionPanel
+          card={annualDecisionCard}
+          netValue={sumPerkValue(instancesByCard[annualDecisionCard.id] || []).netValue}
+          onClose={() => setAnnualDecisionCard(null)}
+          onSave={draft => saveAnnualDecision(annualDecisionCard, draft)}
+          saving={annualDecisionSaving === annualDecisionCard.id}
+          error={annualDecisionError}
+        />
       )}
     </div>
   );
