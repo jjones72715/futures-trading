@@ -10,7 +10,7 @@ import { StatCard } from '../components/StatCard.jsx';
 import { $$ } from '../utils/format.js';
 
 const EMPTY_SIGNUP_FORM = { personId: '', cardId: '', description: '', spendTarget: '', approvalDate: '', bonusWindow: '' };
-const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetType: '', notes: '' };
+const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetType: '', notes: '', priorityScore: 3 };
 const RESET_TYPES = ['Jan 1', 'Card Open Date'];
 
 const inp = {
@@ -40,7 +40,7 @@ const SIGNUP_FIELDS = [
 const SPEND_FIELDS = [
   'Bonus Description', 'Card', 'Person', 'Annual Spend Target',
   ...MONTH_NAMES, 'Current Spend', 'Remaining Spend', 'Reset Date',
-  'Days Until Reset', 'Bonus Earned',
+  'Days Until Reset', 'Bonus Earned', 'Spend Bonus Definition',
 ];
 
 const cardStyle = {
@@ -59,6 +59,27 @@ function PillBtn({ active, onClick, children }) {
     }}>
       {children}
     </button>
+  );
+}
+
+function PriorityDots({ value, onSet, size = 14 }) {
+  return (
+    <div style={{ display: 'flex', gap: 3 }} onClick={e => e.stopPropagation()}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onSet(n)}
+          title={`Priority ${n}`}
+          style={{
+            width: size, height: size, borderRadius: '50%', border: 'none',
+            background: n <= (value || 0) ? '#00D4FF' : 'rgba(255,255,255,0.12)',
+            cursor: 'pointer', padding: 0, flexShrink: 0,
+            transition: 'background 0.1s',
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -217,6 +238,15 @@ function AddSpendBonusForm({ productOptions, form, setForm, onSubmit, onCancel, 
             ))}
           </div>
         </div>
+      </div>
+
+      <div>
+        <label style={lbl}>Priority Score</label>
+        <PriorityDots
+          value={form.priorityScore}
+          onSet={n => setForm(prev => ({ ...prev, priorityScore: n }))}
+          size={20}
+        />
       </div>
 
       <div>
@@ -483,9 +513,9 @@ function SignupBonusMonthPanel({ row, monthInputs, setMonthInputs, savingKey, on
   );
 }
 
-const SPEND_ROW_COLUMNS = '1.7fr 1fr 1fr 1fr 1fr 70px';
+const SPEND_ROW_COLUMNS = '1.6fr 1fr 1fr 1fr 1fr 90px 70px';
 
-function SpendBonusRow({ row, onOpen, onToggleEarned }) {
+function SpendBonusRow({ row, onOpen, onToggleEarned, onSetPriority }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -496,7 +526,8 @@ function SpendBonusRow({ row, onOpen, onToggleEarned }) {
         display: 'grid', gridTemplateColumns: SPEND_ROW_COLUMNS, gap: '0.75rem',
         alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10, cursor: 'pointer',
         background: hovered ? '#1b2740' : '#172033', border: '1px solid rgba(255,255,255,0.06)',
-        transition: 'background 0.12s',
+        transition: 'background 0.12s, opacity 0.12s',
+        opacity: row.earned ? 0.45 : 1,
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
@@ -516,6 +547,7 @@ function SpendBonusRow({ row, onOpen, onToggleEarned }) {
       <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{$$(row.annualTarget)}</span>
       <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.currentSpend)}</span>
       <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.remainingSpend)}</span>
+      <PriorityDots value={row.priorityScore} onSet={n => onSetPriority(row.defId, n)} />
       <div style={{ display: 'flex', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
         <input
           type="checkbox"
@@ -639,6 +671,7 @@ export function BonusesTab() {
   const [cardNameById, setCardNameById] = useState({});
   const [portfolioCards, setPortfolioCards] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
+  const [spendDefsById, setSpendDefsById] = useState({});
   const [monthInputs, setMonthInputs] = useState({});
   const [savingKey, setSavingKey] = useState(null);
   const [openSignupBonusId, setOpenSignupBonusId] = useState(null);
@@ -659,11 +692,12 @@ export function BonusesTab() {
     setLoading(true);
     setResetStatus('');
 
-    const [signup, spend, cards, products] = await Promise.all([
+    const [signup, spend, cards, products, spendDefs] = await Promise.all([
       fetchTable(SIGNUP_BONUSES_TABLE, SIGNUP_FIELDS),
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS),
       fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
+      fetchTable(SPEND_BONUS_DEFINITIONS_TABLE, ['Priority Score']),
     ]);
 
     setCardNameById(Object.fromEntries(cards.map(r => [r.id, r.fields['Card Name'] || r.id])));
@@ -677,6 +711,7 @@ export function BonusesTab() {
         .map(p => ({ id: p.id, name: p.fields['Product Name'] || p.id }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
+    setSpendDefsById(Object.fromEntries(spendDefs.map(d => [d.id, d.fields])));
 
     const toReset = spend.filter(r => isPastOrToday(r.fields['Reset Date']));
     if (toReset.length > 0) {
@@ -732,6 +767,16 @@ export function BonusesTab() {
     }
   }
 
+  async function setSpendPriority(defId, score) {
+    if (!defId) return;
+    setSpendDefsById(prev => ({ ...prev, [defId]: { ...(prev[defId] || {}), 'Priority Score': score } }));
+    try {
+      await updateRecord(SPEND_BONUS_DEFINITIONS_TABLE, defId, { 'Priority Score': score });
+    } catch (e) {
+      console.error('Spend bonus priority update failed', e);
+    }
+  }
+
   async function handleAddSignup(e) {
     e.preventDefault();
     setAddSignupError(null);
@@ -782,6 +827,7 @@ export function BonusesTab() {
         'Card Product': [spendForm.productId],
         'Annual Spend Target': target,
         'Reset Type': spendForm.resetType,
+        'Priority Score': spendForm.priorityScore,
       };
       if (spendForm.notes.trim()) defFields['Notes'] = spendForm.notes.trim();
       const definition = await createRecord(SPEND_BONUS_DEFINITIONS_TABLE, defFields);
@@ -874,6 +920,7 @@ export function BonusesTab() {
     const f = r.fields;
     const cardId = (f['Card'] || [])[0];
     const personId = (f['Person'] || [])[0];
+    const defId = (f['Spend Bonus Definition'] || [])[0] || '';
     return {
       id: r.id,
       cardName: cardId ? (cardNameById[cardId] || '—') : '—',
@@ -885,6 +932,8 @@ export function BonusesTab() {
       resetDate: f['Reset Date'] || '',
       daysUntilReset: f['Days Until Reset'] ?? null,
       earned: !!f['Bonus Earned'],
+      defId,
+      priorityScore: defId ? (spendDefsById[defId]?.['Priority Score'] ?? 0) : 0,
       fields: f,
     };
   });
@@ -894,11 +943,14 @@ export function BonusesTab() {
   const spendActiveCount = spendActive.length;
   const spendActiveRemaining = spendActive.reduce((s, row) => s + (row.remainingSpend ?? 0), 0);
 
-  const spendSorted = [...spendVisible.filter(row => !showActiveOnly || !row.earned)].sort((a, b) => {
-    if (a.daysUntilReset == null && b.daysUntilReset == null) return 0;
-    if (a.daysUntilReset == null) return 1;
-    if (b.daysUntilReset == null) return -1;
-    return a.daysUntilReset - b.daysUntilReset;
+  // Completed bonuses sink to the bottom (grayed out); active ones sort by
+  // priority score (5 → 1), then by least remaining spend first.
+  const spendSorted = [...spendVisible].sort((a, b) => {
+    if (a.earned !== b.earned) return a.earned ? 1 : -1;
+    if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore;
+    const aRem = a.remainingSpend ?? Infinity;
+    const bRem = b.remainingSpend ?? Infinity;
+    return aRem - bRem;
   });
 
   if (loading) {
@@ -925,15 +977,17 @@ export function BonusesTab() {
             </span>
             <PersonFilter selected={personFilter} onChange={setPersonFilter} />
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', width: 'fit-content' }}>
-            <input
-              type="checkbox"
-              checked={showActiveOnly}
-              onChange={e => setShowActiveOnly(e.target.checked)}
-              style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
-            />
-            Show Active Only
-          </label>
+          {view === 'signup' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', width: 'fit-content' }}>
+              <input
+                type="checkbox"
+                checked={showActiveOnly}
+                onChange={e => setShowActiveOnly(e.target.checked)}
+                style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
+              />
+              Show Active Only
+            </label>
+          )}
         </div>
       </div>
 
@@ -1030,6 +1084,7 @@ export function BonusesTab() {
                 <span>Target</span>
                 <span>Current</span>
                 <span>Remaining</span>
+                <span>Priority</span>
                 <span style={{ textAlign: 'center' }}>Earned</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1039,6 +1094,7 @@ export function BonusesTab() {
                     row={row}
                     onOpen={setOpenSpendBonusId}
                     onToggleEarned={r => toggleFlag(SPEND_BONUSES_TABLE, r.id, 'Bonus Earned', r.earned, false)}
+                    onSetPriority={setSpendPriority}
                   />
                 ))}
               </div>
