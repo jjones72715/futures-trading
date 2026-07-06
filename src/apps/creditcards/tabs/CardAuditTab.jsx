@@ -22,7 +22,7 @@ const PERK_INSTANCE_FIELDS = [
   'Perk Type', 'Value', 'Previous Value', 'Used',
 ];
 
-const SPEND_BONUS_FIELDS = ['Bonus Description', 'Card', 'Person', 'Value', 'Previous Value'];
+const SPEND_BONUS_FIELDS = ['Bonus Description', 'Card', 'Person', 'Value', 'Previous Value', 'Annual Spend Target', 'Current Spend', 'Bonus Earned'];
 
 const DECISION_OPTIONS = ['Keep', 'Cancel', 'Product Change', 'Downgrade', 'Upgrade'];
 
@@ -408,13 +408,21 @@ function PerkReviewRow({ inst, draftValue, onDraftChange }) {
 
 function SpendBonusReviewRow({ sb, draftValue, onDraftChange }) {
   const previousValue = sb.fields['Previous Value'];
+  const spendTarget = sb.fields['Annual Spend Target'];
+  const currentSpend = sb.fields['Current Spend'];
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 110px', gap: 8, alignItems: 'center',
       padding: '0.6rem 0.75rem', borderRadius: 8, background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
     }}>
       <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>{sb.fields['Bonus Description'] || 'Spend Bonus'}</span>
-      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)' }}>—</div>
+      <div>
+        <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', fontWeight: 600 }}>Spend Target</div>
+        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{spendTarget != null ? $$(spendTarget) : '—'}</div>
+        {currentSpend != null && (
+          <div style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)' }}>{$$(currentSpend)} so far</div>
+        )}
+      </div>
       <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>
         {previousValue != null ? `Last year: ${$$(previousValue)}` : '—'}
       </div>
