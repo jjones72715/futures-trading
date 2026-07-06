@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord, createRecord, deleteRecord } from '../services/airtable.js';
 import {
   PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE,
-  SPEND_BONUS_DEFINITIONS_TABLE, SPEND_BONUSES_TABLE,
+  SPEND_BONUS_DEFINITIONS_TABLE, SPEND_BONUSES_TABLE, CARD_PRODUCTS_TABLE,
 } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
@@ -35,7 +35,230 @@ function calculateSpendBonusResetDate(resetType, openDateStr) {
   return resetType === 'Card Open Date' ? nextCardAnniversary(openDateStr) : nextJan1();
 }
 
-const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
+const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Value Only'];
+const BENEFIT_TYPES = ['Food Credit', 'Shopping Credit', 'Membership Credit', 'Entertainment Credit', 'Hotel Credit', 'Flight Credit', 'Other Credit', 'Value Only'];
+
+const inp = {
+  width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 8, padding: '0.6rem 0.75rem', color: '#fff', fontSize: '0.88rem',
+  outline: 'none', boxSizing: 'border-box',
+};
+const lbl = {
+  display: 'block', fontSize: '0.7rem', fontWeight: 600,
+  color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase',
+  letterSpacing: '0.05em', marginBottom: 5,
+};
+
+const EMPTY_BENEFIT = {
+  perkName: '', cardProductIds: [], creditAmount: '', resetCycle: '',
+  priorityScore: 0, benefitType: '', notes: '',
+};
+
+function AddBenefitModal({ onClose, onSaved }) {
+  const [form, setForm] = useState(EMPTY_BENEFIT);
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [productSearch, setProductSearch] = useState('');
+
+  useEffect(() => {
+    fetchTable(CARD_PRODUCTS_TABLE, ['Product Name'])
+      .then(rows => {
+        setProducts(rows.map(r => ({ id: r.id, name: r.fields['Product Name'] || '' })).sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  function toggleProduct(id) {
+    setForm(prev => ({
+      ...prev,
+      cardProductIds: prev.cardProductIds.includes(id)
+        ? prev.cardProductIds.filter(i => i !== id)
+        : [...prev.cardProductIds, id],
+    }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    if (!form.perkName.trim()) { setError('Perk Name is required.'); return; }
+    setSubmitting(true);
+    const fields = { 'Perk Name': form.perkName.trim() };
+    if (form.cardProductIds.length) fields['Card Product'] = form.cardProductIds;
+    if (form.creditAmount !== '') fields['Credit Amount'] = parseFloat(form.creditAmount);
+    if (form.resetCycle) fields['Reset Cycle'] = form.resetCycle;
+    if (form.priorityScore) fields['Priority Score'] = form.priorityScore;
+    if (form.benefitType) fields['Benefit Type'] = form.benefitType;
+    if (form.notes.trim()) fields['Notes'] = form.notes.trim();
+    try {
+      await createRecord(PERK_DEFINITIONS_TABLE, fields);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const filteredProducts = productSearch
+    ? products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+    : products;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: '#111827', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)',
+        padding: '1.75rem 2rem', width: '100%', maxWidth: 600, maxHeight: '90vh',
+        overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>Add Perk Definition</h2>
+          <button type="button" onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+            fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, padding: 0,
+          }}>×</button>
+        </div>
+
+        {error && (
+          <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.7rem 1rem', color: '#FF4D4D', fontSize: '0.85rem' }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          {/* Perk Name */}
+          <div>
+            <label style={lbl}>Perk Name <span style={{ color: '#FF4D4D' }}>*</span></label>
+            <input style={inp} value={form.perkName} onChange={e => setForm(p => ({ ...p, perkName: e.target.value }))} placeholder="e.g. $10 Monthly Dining Credit" autoFocus />
+          </div>
+
+          {/* Benefit Type */}
+          <div>
+            <label style={lbl}>Benefit Type</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {BENEFIT_TYPES.map(t => (
+                <button key={t} type="button" onClick={() => setForm(p => ({ ...p, benefitType: p.benefitType === t ? '' : t }))} style={{
+                  padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+                  background: form.benefitType === t ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+                  color: form.benefitType === t ? '#0B1220' : 'rgba(255,255,255,0.6)',
+                  fontWeight: form.benefitType === t ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+                }}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Reset Cycle */}
+          <div>
+            <label style={lbl}>Reset Cycle</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {RESET_CYCLES.map(c => (
+                <button key={c} type="button" onClick={() => setForm(p => ({ ...p, resetCycle: p.resetCycle === c ? '' : c }))} style={{
+                  padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+                  background: form.resetCycle === c ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+                  color: form.resetCycle === c ? '#0B1220' : 'rgba(255,255,255,0.6)',
+                  fontWeight: form.resetCycle === c ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+                }}>{c}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Credit Amount + Priority Score */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label style={lbl}>Credit Amount ($)</label>
+              <input style={inp} type="number" value={form.creditAmount} onChange={e => setForm(p => ({ ...p, creditAmount: e.target.value }))} placeholder="0" min={0} />
+            </div>
+            <div>
+              <label style={lbl}>Priority Score</label>
+              <div style={{ display: 'flex', gap: 6, paddingTop: 4 }}>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} type="button" onClick={() => setForm(p => ({ ...p, priorityScore: p.priorityScore === n ? 0 : n }))} style={{
+                    width: 28, height: 28, borderRadius: '50%', border: 'none',
+                    background: n <= form.priorityScore ? '#00D4FF' : 'rgba(255,255,255,0.12)',
+                    cursor: 'pointer', padding: 0, color: n <= form.priorityScore ? '#0B1220' : 'rgba(255,255,255,0.4)',
+                    fontWeight: 700, fontSize: '0.75rem',
+                  }}>{n}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Card Products */}
+          <div>
+            <label style={lbl}>Card Products (optional)</label>
+            <input
+              style={{ ...inp, marginBottom: 8 }}
+              placeholder="Search products…"
+              value={productSearch}
+              onChange={e => setProductSearch(e.target.value)}
+            />
+            {loadingProducts ? (
+              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>Loading products…</div>
+            ) : (
+              <div style={{
+                maxHeight: 180, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 8, background: '#0B1220',
+              }}>
+                {filteredProducts.map(p => {
+                  const selected = form.cardProductIds.includes(p.id);
+                  return (
+                    <button key={p.id} type="button" onClick={() => toggleProduct(p.id)} style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '0.5rem 0.75rem', background: selected ? 'rgba(0,212,255,0.12)' : 'transparent',
+                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      color: selected ? '#00D4FF' : 'rgba(255,255,255,0.7)',
+                      fontSize: '0.85rem', cursor: 'pointer', fontWeight: selected ? 600 : 400,
+                    }}>
+                      {selected ? '✓ ' : ''}{p.name}
+                    </button>
+                  );
+                })}
+                {filteredProducts.length === 0 && (
+                  <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>No results</div>
+                )}
+              </div>
+            )}
+            {form.cardProductIds.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: '0.75rem', color: 'rgba(0,212,255,0.8)' }}>
+                {form.cardProductIds.length} product{form.cardProductIds.length > 1 ? 's' : ''} selected
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label style={lbl}>Notes</label>
+            <textarea
+              style={{ ...inp, minHeight: 80, resize: 'vertical' }}
+              value={form.notes}
+              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+              placeholder="Optional notes…"
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
+            <button type="button" onClick={onClose} style={{
+              padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
+              background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+            }}>Cancel</button>
+            <button type="submit" disabled={submitting} style={{
+              padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
+              background: submitting ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+              color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+            }}>{submitting ? 'Saving…' : 'Add Perk'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
@@ -129,6 +352,7 @@ export function BenefitsTrackerTab() {
   const [toggling, setToggling] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [showAddBenefit, setShowAddBenefit] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -470,25 +694,46 @@ export function BenefitsTrackerTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1100 }}>
 
+      {showAddBenefit && (
+        <AddBenefitModal
+          onClose={() => setShowAddBenefit(false)}
+          onSaved={() => { /* no reload needed — def doesn't appear in this view */ }}
+        />
+      )}
+
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', width: 'fit-content' }}>
           <StatCard label="Available Perks" value={totalAvailable} accent="#00D4FF" />
           <StatCard label="Total Perks" value={total} />
         </div>
-        <button
-          type="button"
-          onClick={syncPerks}
-          disabled={syncing || loading}
-          style={{
-            padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,212,255,0.3)',
-            background: syncing ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.12)',
-            color: syncing ? 'rgba(0,212,255,0.5)' : '#00D4FF',
-            fontWeight: 600, fontSize: '0.82rem', cursor: syncing ? 'not-allowed' : 'pointer',
-            whiteSpace: 'nowrap', alignSelf: 'center', transition: 'all 0.15s',
-          }}
-        >
-          {syncing ? 'Syncing…' : 'Sync Perks to All Cards'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignSelf: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowAddBenefit(true)}
+            style={{
+              padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,230,118,0.3)',
+              background: 'rgba(0,230,118,0.1)', color: '#00E676',
+              fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
+              whiteSpace: 'nowrap', transition: 'all 0.15s',
+            }}
+          >
+            + Add Benefit
+          </button>
+          <button
+            type="button"
+            onClick={syncPerks}
+            disabled={syncing || loading}
+            style={{
+              padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,212,255,0.3)',
+              background: syncing ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.12)',
+              color: syncing ? 'rgba(0,212,255,0.5)' : '#00D4FF',
+              fontWeight: 600, fontSize: '0.82rem', cursor: syncing ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap', transition: 'all 0.15s',
+            }}
+          >
+            {syncing ? 'Syncing…' : 'Sync Perks to All Cards'}
+          </button>
+        </div>
       </div>
 
       {syncResult && !syncResult.error && (

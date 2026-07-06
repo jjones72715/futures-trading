@@ -15,7 +15,7 @@ const TABS = [
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'point-balances', label: 'Point Balances' },
   { id: 'hotels', label: 'Hotels' },
-  { id: 'benefits', label: 'Benefits Tracker' },
+  { id: 'benefits', label: 'Benefits' },
   { id: 'bonuses', label: 'Bonuses' },
   { id: 'suggestions', label: 'Suggestions' },
   { id: 'actions', label: 'Card Audit' },
