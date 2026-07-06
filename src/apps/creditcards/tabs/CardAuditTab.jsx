@@ -376,7 +376,9 @@ function PastDueCard({ card, product, productsById, form, onFormChange, onConfir
 }
 
 function PerkReviewRow({ inst, draftValue, onDraftChange }) {
-  const annualized = annualizedCreditAmount(inst.fields['Credit Amount'], inst.fields['Reset Cycle']);
+  const rawCycle = inst.fields['Reset Cycle'];
+  const resetCycle = Array.isArray(rawCycle) ? rawCycle[0] : rawCycle;
+  const annualized = annualizedCreditAmount(inst.fields['Credit Amount'], resetCycle);
   const previousValue = inst.fields['Previous Value'];
   return (
     <div style={{
