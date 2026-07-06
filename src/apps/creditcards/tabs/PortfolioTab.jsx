@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, PEOPLE_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, PEOPLE_TABLE, PERK_INSTANCES_TABLE, SPEND_BONUSES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
@@ -49,6 +49,7 @@ const FIELDS = [
 ];
 
 const PERK_INSTANCE_FIELDS = ['Card', 'Value'];
+const SPEND_BONUS_FIELDS = ['Card', 'Value'];
 
 const ROW_COLUMNS = '1.7fr 80px 0.8fr 80px 100px 90px 65px 95px 120px 60px';
 
@@ -234,12 +235,13 @@ export function PortfolioTab() {
       fetchTable(PORTFOLIO_TABLE, FIELDS, { filterByFormula: "{Status}='Active'" }),
       fetchTable(PEOPLE_TABLE, ['Name']),
       fetchTable(PERK_INSTANCES_TABLE, PERK_INSTANCE_FIELDS),
+      fetchTable(SPEND_BONUSES_TABLE, SPEND_BONUS_FIELDS),
     ])
-      .then(([records, peopleRows, perkInstances]) => {
+      .then(([records, peopleRows, perkInstances, spendBonuses]) => {
         setCards(records);
         setPersonNameById(Object.fromEntries(peopleRows.map(p => [p.id, p.fields['Name'] || p.id])));
         const byCard = {};
-        perkInstances.forEach(inst => {
+        [...perkInstances, ...spendBonuses].forEach(inst => {
           const cardId = (inst.fields['Card'] || [])[0];
           if (!cardId) return;
           if (!byCard[cardId]) byCard[cardId] = [];

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, createRecord, updateRecord } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PRODUCT_CHANGES_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PRODUCT_CHANGES_TABLE, PERK_INSTANCES_TABLE, SPEND_BONUSES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
@@ -21,6 +21,8 @@ const PERK_INSTANCE_FIELDS = [
   'Label', 'Card', 'Person', 'Perk Definition', 'Credit Amount', 'Reset Cycle',
   'Perk Type', 'Value', 'Previous Value', 'Used',
 ];
+
+const SPEND_BONUS_FIELDS = ['Bonus Description', 'Card', 'Person', 'Value', 'Previous Value'];
 
 const DECISION_OPTIONS = ['Keep', 'Cancel', 'Product Change', 'Downgrade', 'Upgrade'];
 
@@ -404,9 +406,35 @@ function PerkReviewRow({ inst, draftValue, onDraftChange }) {
   );
 }
 
-function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
+function SpendBonusReviewRow({ sb, draftValue, onDraftChange }) {
+  const previousValue = sb.fields['Previous Value'];
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 110px', gap: 8, alignItems: 'center',
+      padding: '0.6rem 0.75rem', borderRadius: 8, background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>{sb.fields['Bonus Description'] || 'Spend Bonus'}</span>
+      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)' }}>—</div>
+      <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>
+        {previousValue != null ? `Last year: ${$$(previousValue)}` : '—'}
+      </div>
+      <input
+        type="number"
+        value={draftValue}
+        onChange={e => onDraftChange(e.target.value)}
+        placeholder="$0"
+        style={{ ...inp, padding: '5px 8px', fontSize: '0.82rem' }}
+      />
+    </div>
+  );
+}
+
+function AnnualReviewPanel({ card, instances, spendBonuses, onClose, onInstancesChange, onSpendBonusesChange }) {
   const [localInstances, setLocalInstances] = useState(instances);
-  const [drafts, setDrafts] = useState(() => Object.fromEntries(instances.map(i => [i.id, i.fields['Value'] != null ? String(i.fields['Value']) : ''])));
+  const [localSpendBonuses, setLocalSpendBonuses] = useState(spendBonuses);
+  const [drafts, setDrafts] = useState(() => Object.fromEntries(
+    [...instances, ...spendBonuses].map(i => [i.id, i.fields['Value'] != null ? String(i.fields['Value']) : ''])
+  ));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [saveMsg, setSaveMsg] = useState('');
@@ -422,7 +450,7 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
   const trackable = localInstances.filter(i => i.fields['Perk Type'] !== 'Value Only');
   const valueOnly = localInstances.filter(i => i.fields['Perk Type'] === 'Value Only');
 
-  const totalPerkValue = localInstances.reduce((sum, i) => {
+  const totalPerkValue = [...localInstances, ...localSpendBonuses].reduce((sum, i) => {
     const raw = drafts[i.id];
     const v = raw === '' || raw == null ? NaN : parseFloat(raw);
     return sum + (Number.isFinite(v) ? v : 0);
@@ -437,19 +465,33 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
   async function handleSaveAll() {
     setSaving(true); setSaveError(null); setSaveMsg('');
     try {
-      await Promise.all(localInstances.map(i => {
-        const raw = drafts[i.id];
-        const value = raw === '' || raw == null ? null : parseFloat(raw);
-        return updateRecord(PERK_INSTANCES_TABLE, i.id, { 'Value': value });
-      }));
-      const updated = localInstances.map(i => {
+      await Promise.all([
+        ...localInstances.map(i => {
+          const raw = drafts[i.id];
+          const value = raw === '' || raw == null ? null : parseFloat(raw);
+          return updateRecord(PERK_INSTANCES_TABLE, i.id, { 'Value': value });
+        }),
+        ...localSpendBonuses.map(sb => {
+          const raw = drafts[sb.id];
+          const value = raw === '' || raw == null ? null : parseFloat(raw);
+          return updateRecord(SPEND_BONUSES_TABLE, sb.id, { 'Value': value });
+        }),
+      ]);
+      const updatedInstances = localInstances.map(i => {
         const raw = drafts[i.id];
         const value = raw === '' || raw == null ? null : parseFloat(raw);
         return { ...i, fields: { ...i.fields, Value: value } };
       });
-      setLocalInstances(updated);
+      const updatedSpendBonuses = localSpendBonuses.map(sb => {
+        const raw = drafts[sb.id];
+        const value = raw === '' || raw == null ? null : parseFloat(raw);
+        return { ...sb, fields: { ...sb.fields, Value: value } };
+      });
+      setLocalInstances(updatedInstances);
+      setLocalSpendBonuses(updatedSpendBonuses);
       setSaveMsg('Saved.');
-      onInstancesChange(card.id, updated);
+      onInstancesChange(card.id, updatedInstances);
+      onSpendBonusesChange(card.id, updatedSpendBonuses);
     } catch (e) {
       setSaveError(e.message);
     } finally {
@@ -485,27 +527,42 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
   }
 
   async function handleCycleThisCard() {
+    const allRecords = [...localInstances, ...localSpendBonuses];
     const confirmed = window.confirm(
       `This will clear ${card.cardName}'s current year values and move them to Previous Value. This cannot be undone. Continue?`
     );
-    if (!confirmed || localInstances.length === 0) return;
+    if (!confirmed || allRecords.length === 0) return;
 
     setCycling(true);
-    setCycleMessage(`Cycling ${localInstances.length} instance${localInstances.length !== 1 ? 's' : ''}...`);
+    setCycleMessage(`Cycling ${allRecords.length} instance${allRecords.length !== 1 ? 's' : ''}...`);
     try {
-      await Promise.all(localInstances.map(i =>
-        updateRecord(PERK_INSTANCES_TABLE, i.id, {
-          'Previous Value': i.fields['Value'] ?? null,
-          'Value': null,
-        })
-      ));
-      const updated = localInstances.map(i => ({
+      await Promise.all([
+        ...localInstances.map(i =>
+          updateRecord(PERK_INSTANCES_TABLE, i.id, {
+            'Previous Value': i.fields['Value'] ?? null,
+            'Value': null,
+          })
+        ),
+        ...localSpendBonuses.map(sb =>
+          updateRecord(SPEND_BONUSES_TABLE, sb.id, {
+            'Previous Value': sb.fields['Value'] ?? null,
+            'Value': null,
+          })
+        ),
+      ]);
+      const updatedInstances = localInstances.map(i => ({
         ...i,
         fields: { ...i.fields, 'Previous Value': i.fields['Value'] ?? null, Value: null },
       }));
-      setLocalInstances(updated);
-      setDrafts(Object.fromEntries(updated.map(i => [i.id, ''])));
-      onInstancesChange(card.id, updated);
+      const updatedSpendBonuses = localSpendBonuses.map(sb => ({
+        ...sb,
+        fields: { ...sb.fields, 'Previous Value': sb.fields['Value'] ?? null, Value: null },
+      }));
+      setLocalInstances(updatedInstances);
+      setLocalSpendBonuses(updatedSpendBonuses);
+      setDrafts(Object.fromEntries([...updatedInstances, ...updatedSpendBonuses].map(i => [i.id, ''])));
+      onInstancesChange(card.id, updatedInstances);
+      onSpendBonusesChange(card.id, updatedSpendBonuses);
       setCycleMessage(`Done — ${card.cardName} ready for ${year + 1} review`);
     } catch (e) {
       setCycleMessage(`Cycle failed: ${e.message}`);
@@ -538,6 +595,17 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
           <PerkReviewRow key={inst.id} inst={inst} draftValue={drafts[inst.id] ?? ''} onDraftChange={v => setDraft(inst.id, v)} />
         ))}
       </div>
+
+      {localSpendBonuses.length > 0 && (
+        <>
+          <div style={{ fontWeight: 700, color: '#FFD60A', fontSize: '0.85rem', marginBottom: 8 }}>Spend Bonuses</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: '1.25rem' }}>
+            {localSpendBonuses.map(sb => (
+              <SpendBonusReviewRow key={sb.id} sb={sb} draftValue={drafts[sb.id] ?? ''} onDraftChange={v => setDraft(sb.id, v)} />
+            ))}
+          </div>
+        </>
+      )}
 
       {!showAddPerk ? (
         <button type="button" onClick={() => setShowAddPerk(true)} style={{
@@ -617,10 +685,10 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
       </div>
 
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
-        <button type="button" disabled={cycling || localInstances.length === 0} onClick={handleCycleThisCard} style={{
+        <button type="button" disabled={cycling || (localInstances.length === 0 && localSpendBonuses.length === 0)} onClick={handleCycleThisCard} style={{
           width: '100%', padding: '0.7rem 1rem', borderRadius: 8, border: '1px solid rgba(255,109,0,0.4)',
           background: 'rgba(255,109,0,0.15)', color: '#FF6D00', fontWeight: 700, fontSize: '0.85rem',
-          cursor: cycling || localInstances.length === 0 ? 'not-allowed' : 'pointer',
+          cursor: cycling || (localInstances.length === 0 && localSpendBonuses.length === 0) ? 'not-allowed' : 'pointer',
         }}>
           {cycling ? (cycleMessage || 'Cycling…') : 'Cycle This Card to New Year'}
         </button>
@@ -630,7 +698,7 @@ function AnnualReviewPanel({ card, instances, onClose, onInstancesChange }) {
           </div>
         )}
         <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
-          Only affects this card's perk instances.
+          Only affects this card's perk instances and spend bonuses.
         </div>
       </div>
     </SlideOver>
@@ -745,6 +813,7 @@ export function CardAuditTab() {
   const [pastDueForms, setPastDueForms] = useState({});
   const [justResolved, setJustResolved] = useState([]);
   const [instancesByCard, setInstancesByCard] = useState({});
+  const [spendBonusesByCard, setSpendBonusesByCard] = useState({});
   const [annualReviewCard, setAnnualReviewCard] = useState(null);
   const [annualDecisionCard, setAnnualDecisionCard] = useState(null);
   const [annualDecisionSaving, setAnnualDecisionSaving] = useState(null);
@@ -754,10 +823,11 @@ export function CardAuditTab() {
     setLoading(true);
     setError(null);
     try {
-      const [portfolioRows, productRows, perkInstances] = await Promise.all([
+      const [portfolioRows, productRows, perkInstances, spendBonuses] = await Promise.all([
         fetchTable(PORTFOLIO_TABLE, PORTFOLIO_FIELDS, { filterByFormula: "{Status}='Active'" }),
         fetchTable(CARD_PRODUCTS_TABLE, PRODUCT_FIELDS),
         fetchTable(PERK_INSTANCES_TABLE, PERK_INSTANCE_FIELDS),
+        fetchTable(SPEND_BONUSES_TABLE, SPEND_BONUS_FIELDS),
       ]);
 
       const byCard = {};
@@ -768,6 +838,15 @@ export function CardAuditTab() {
         byCard[cardId].push(inst);
       });
       setInstancesByCard(byCard);
+
+      const spendByCard = {};
+      spendBonuses.forEach(sb => {
+        const cardId = (sb.fields['Card'] || [])[0];
+        if (!cardId) return;
+        if (!spendByCard[cardId]) spendByCard[cardId] = [];
+        spendByCard[cardId].push(sb);
+      });
+      setSpendBonusesByCard(spendByCard);
 
       const productsMap = Object.fromEntries(productRows.map(p => [p.id, {
         id: p.id,
@@ -819,7 +898,8 @@ export function CardAuditTab() {
     const productId = (f['Current Product'] || [])[0];
     const days = f['Days Until Annual Fee'] ?? null;
     const cardInstances = instancesByCard[row.id] || [];
-    const { netValue, hasAnyValue } = sumPerkValue(cardInstances);
+    const cardSpendBonuses = spendBonusesByCard[row.id] || [];
+    const { netValue, hasAnyValue } = sumPerkValue([...cardInstances, ...cardSpendBonuses]);
     return {
       id: row.id,
       cardName: f['Card Name'] || '—',
@@ -897,6 +977,10 @@ export function CardAuditTab() {
 
   function handleInstancesChange(cardId, updatedInstances) {
     setInstancesByCard(prev => ({ ...prev, [cardId]: updatedInstances }));
+  }
+
+  function handleSpendBonusesChange(cardId, updatedSpendBonuses) {
+    setSpendBonusesByCard(prev => ({ ...prev, [cardId]: updatedSpendBonuses }));
   }
 
   function updatePastDueForm(id, patch) {
@@ -1087,8 +1171,10 @@ export function CardAuditTab() {
         <AnnualReviewPanel
           card={annualReviewCard}
           instances={instancesByCard[annualReviewCard.id] || []}
+          spendBonuses={spendBonusesByCard[annualReviewCard.id] || []}
           onClose={() => setAnnualReviewCard(null)}
           onInstancesChange={handleInstancesChange}
+          onSpendBonusesChange={handleSpendBonusesChange}
         />
       )}
 
@@ -1096,7 +1182,10 @@ export function CardAuditTab() {
         <AnnualDecisionPanel
           card={annualDecisionCard}
           productsById={productsById}
-          netValue={sumPerkValue(instancesByCard[annualDecisionCard.id] || []).netValue}
+          netValue={sumPerkValue([
+            ...(instancesByCard[annualDecisionCard.id] || []),
+            ...(spendBonusesByCard[annualDecisionCard.id] || []),
+          ]).netValue}
           onClose={() => setAnnualDecisionCard(null)}
           onSave={draft => saveAnnualDecision(annualDecisionCard, draft)}
           saving={annualDecisionSaving === annualDecisionCard.id}

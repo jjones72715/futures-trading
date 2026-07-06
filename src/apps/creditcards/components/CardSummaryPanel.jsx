@@ -33,7 +33,7 @@ const DECISION_COLORS = {
 const PERK_FIELDS = ['Label', 'Perk Definition', 'Credit Amount', 'Reset Cycle', 'Next Reset Date', 'Priority Score', 'Used', 'Perk Type', 'Value', 'Previous Value'];
 const HOTEL_FIELDS = ['Name', 'Record Type', 'Benefit Type', 'Estimated Value', 'Expiration Date', 'Days Until Expiration'];
 const SIGNUP_FIELDS = ['Bonus Description', 'Spend Target', 'Current Spend', 'Remaining Spend', 'Effective Deadline', 'Days Remaining', 'Achieved'];
-const SPEND_FIELDS = ['Bonus Description', 'Annual Spend Target', 'Current Spend', 'Remaining Spend', 'Reset Date', 'Days Until Reset', 'Bonus Earned'];
+const SPEND_FIELDS = ['Bonus Description', 'Annual Spend Target', 'Current Spend', 'Remaining Spend', 'Reset Date', 'Days Until Reset', 'Bonus Earned', 'Value'];
 const PERK_DEF_FIELDS = ['Perk Name', 'Card Product', 'Credit Amount', 'Reset Cycle', 'Priority Score', 'Benefit Type'];
 
 const dataCache = new Map();
@@ -304,7 +304,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
     .filter(r => r.fields['Perk Type'] === 'Value Only')
     .map(r => ({ id: r.id, label: r.fields['Label'] || '—', value: r.fields['Value'] ?? null }));
 
-  const { netValue } = sumPerkValue(bundle?.perks || []);
+  const { netValue } = sumPerkValue([...(bundle?.perks || []), ...(bundle?.spend || [])]);
   const valueDifference = netValue - annualFee;
   const valueDiffColor = netValue === 0 ? 'rgba(255,255,255,0.5)' : valueDifference >= 0 ? '#00E676' : '#FF4D4D';
 
@@ -610,7 +610,10 @@ export function CardSummaryPanel({ cardId, onClose }) {
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>{fr['Bonus Description'] || '—'}</span>
-                            {earned && <Badge color="#00E676">Bonus Earned</Badge>}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <MiniStat label="Your Value" value={fr['Value'] != null ? $$(fr['Value']) : '—'} color="#00D4FF" />
+                              {earned && <Badge color="#00E676">Bonus Earned</Badge>}
+                            </div>
                           </div>
                           {!earned && (
                             <>
