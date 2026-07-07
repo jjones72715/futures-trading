@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createRecord, fetchTable } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, BANKS_TABLE, REWARDS_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, BANKS_TABLE, PERK_DEFINITIONS_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 
@@ -11,7 +11,7 @@ const EMPTY = {
   ownerIds: [], issuer: '', currentProductId: '', cardName: '',
   personalBusiness: 'Personal', openDate: '', annualFee: '',
   annualFeeMonth: '', statementCloseDay: '', last4: '',
-  rewardsProgramId: '', cancelRisk: 'Low', status: 'Active',
+  cancelRisk: 'Low', status: 'Active',
 };
 
 const inp = {
@@ -60,27 +60,21 @@ export function AddCardPanel({ onClose, onCreated }) {
 
   useEffect(() => {
     Promise.all([
-      fetchTable(CARD_PRODUCTS_TABLE, ['Product Name', 'Annual Fee', 'Issuer', 'Rewards Program']),
+      fetchTable(CARD_PRODUCTS_TABLE, ['Product Name', 'Annual Fee', 'Issuer']),
       fetchTable(BANKS_TABLE, ['Bank Name']),
-      fetchTable(REWARDS_TABLE, ['Name']),
-    ]).then(([productRecords, bankRecords, rewardRecords]) => {
+    ]).then(([productRecords, bankRecords]) => {
       const bankMap = {};
       bankRecords.forEach(r => { bankMap[r.id] = r.fields['Bank Name']; });
-      const rewardsMap = {};
-      rewardRecords.forEach(r => { rewardsMap[r.id] = r.fields['Name']; });
 
       const mapped = productRecords
         .map(r => {
           const issuerId = r.fields['Issuer']?.[0];
-          const rpId = r.fields['Rewards Program']?.[0];
           return {
             id: r.id,
             name: r.fields['Product Name'] || '',
             fee: r.fields['Annual Fee'] ?? 0,
             bank: bankMap[issuerId] || '',
             bankId: issuerId || '',
-            rpId: rpId || '',
-            rpName: rewardsMap[rpId] || '',
           };
         })
         .filter(p => p.name && p.bank)
@@ -97,9 +91,6 @@ export function AddCardPanel({ onClose, onCreated }) {
   }
 
   const allBanks = [...new Set(products.map(p => p.bank))].sort();
-  const rewardsPrograms = [...new Map(
-    products.filter(p => p.rpId).map(p => [p.rpId, { id: p.rpId, name: p.rpName }])
-  ).values()].sort((a, b) => a.name.localeCompare(b.name));
 
   function autoCardName(ownerIds, productId) {
     const nickname = ownerIds.length > 0 ? PEOPLE[ownerIds[0]] : '';
@@ -130,7 +121,6 @@ export function AddCardPanel({ onClose, onCreated }) {
       issuer: newIssuer,
       currentProductId: '',
       annualFee: '',
-      rewardsProgramId: '',
       cardName: autoCardName(prev.ownerIds, ''),
     }));
   }
@@ -141,7 +131,6 @@ export function AddCardPanel({ onClose, onCreated }) {
       ...prev,
       currentProductId: productId,
       annualFee: product ? String(product.fee) : '',
-      rewardsProgramId: product?.rpId || '',
       cardName: autoCardName(prev.ownerIds, productId),
     }));
   }
@@ -167,7 +156,6 @@ export function AddCardPanel({ onClose, onCreated }) {
     if (form.annualFeeMonth) fields['Annual Fee Post Month'] = parseInt(form.annualFeeMonth);
     if (form.statementCloseDay) fields['Statement Close Day'] = parseInt(form.statementCloseDay);
     if (form.last4) fields['Last 4/Last 5 (AMEX)'] = form.last4;
-    if (form.rewardsProgramId) fields['Rewards Program'] = [form.rewardsProgramId];
     if (form.cancelRisk) fields['Cancel Risk Level'] = form.cancelRisk;
 
     try {
@@ -373,15 +361,8 @@ export function AddCardPanel({ onClose, onCreated }) {
                       </div>
 
                       <div style={cardStyle}>
-                        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Rewards & Risk</div>
+                        <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Risk & Status</div>
                         <div style={grid2}>
-                          <div>
-                            <label style={lbl}>Rewards Program</label>
-                            <select style={inp} value={form.rewardsProgramId} onChange={e => setForm(p => ({ ...p, rewardsProgramId: e.target.value }))}>
-                              <option value="">— None —</option>
-                              {rewardsPrograms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                            </select>
-                          </div>
                           <div>
                             <label style={lbl}>Cancel Risk Level</label>
                             <select style={inp} value={form.cancelRisk} onChange={e => setForm(p => ({ ...p, cancelRisk: e.target.value }))}>
