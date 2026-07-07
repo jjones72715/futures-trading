@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { updateRecord } from '../services/airtable.js';
 import { PORTFOLIO_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
+import { stripOwnerPrefix } from '../utils/format.js';
 
 function PillBtn({ active, onClick, children }) {
   return (
@@ -75,7 +76,8 @@ export function AddAuthorizedUserPanel({ cards, personNameById, onClose, onSaved
     try {
       const updatedAUs = [...existingAUIds, auId];
       await updateRecord(PORTFOLIO_TABLE, cardId, { 'Authorized Users': updatedAUs });
-      setSuccessMsg(`${PEOPLE[auId]} added as an Authorized User on ${selectedCard.fields['Card Name'] || 'this card'}.`);
+      const cardLabel = stripOwnerPrefix(selectedCard.fields['Card Name'], PEOPLE[ownerId]) || 'this card';
+      setSuccessMsg(`${PEOPLE[auId]} added as an Authorized User on ${cardLabel}.`);
       setTimeout(() => onSaved(), 1100);
     } catch (e) {
       setError(e.message);
@@ -158,7 +160,7 @@ export function AddAuthorizedUserPanel({ cards, personNameById, onClose, onSaved
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {ownerCards.map(c => (
                         <PillBtn key={c.id} active={cardId === c.id} onClick={() => selectCard(c.id)}>
-                          {c.fields['Card Name'] || c.id}
+                          {stripOwnerPrefix(c.fields['Card Name'], PEOPLE[ownerId]) || c.id}
                         </PillBtn>
                       ))}
                     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createRecord, fetchTable, fetchFieldChoices } from '../services/airtable.js';
 import { HOTELS_TABLE, PORTFOLIO_TABLE, HOTEL_TEMPLATES_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
+import { stripOwnerPrefix } from '../utils/format.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
 const HOW_EARNED = ['Anniversary', 'Welcome Offer', 'Spend Threshold', 'Other'];
@@ -252,7 +253,7 @@ export function AddHotelBenefitTab({ onNavigateTemplates }) {
                   active={form.cardId === c.id}
                   onClick={() => setForm(prev => ({ ...prev, cardId: prev.cardId === c.id ? '' : c.id }))}
                 >
-                  {c.name}
+                  {stripOwnerPrefix(c.name, PEOPLE[form.personId])}
                 </PillBtn>
               ))}
             </div>

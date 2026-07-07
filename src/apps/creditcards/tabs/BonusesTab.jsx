@@ -7,7 +7,7 @@ import {
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
-import { $$ } from '../utils/format.js';
+import { $$, stripOwnerPrefix } from '../utils/format.js';
 
 const EMPTY_SIGNUP_FORM = { personId: '', cardId: '', description: '', spendTarget: '', approvalDate: '', bonusWindow: '' };
 const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetType: '', notes: '', priorityScore: 3 };
@@ -117,7 +117,7 @@ function PersonCardPicker({ personId, cardId, cards, onSelectPerson, onSelectCar
           ) : (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {filteredCards.map(c => (
-                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{c.name}</PillBtn>
+                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{stripOwnerPrefix(c.name, PEOPLE[personId])}</PillBtn>
               ))}
             </div>
           )}

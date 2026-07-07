@@ -7,7 +7,7 @@ import { StatCard } from '../components/StatCard.jsx';
 import { AnnualFeeBadge } from '../components/AnnualFeeBadge.jsx';
 import { TotalPerkValueCell, DifferenceCell } from '../components/NetValueGroup.jsx';
 import { annualizedCreditAmount, sumPerkValue } from '../utils/perks.js';
-import { $$ } from '../utils/format.js';
+import { $$, stripOwnerPrefix } from '../utils/format.js';
 
 const PORTFOLIO_FIELDS = [
   'Card Name', 'Owner', 'Authorized Users', 'Current Product',
@@ -926,11 +926,12 @@ export function CardAuditTab() {
     const cardInstances = instancesByCard[row.id] || [];
     const cardSpendBonuses = spendBonusesByCard[row.id] || [];
     const { netValue, hasAnyValue } = sumPerkValue([...cardInstances, ...cardSpendBonuses]);
+    const ownerName = ownerId ? (PEOPLE[ownerId] || '—') : '—';
     return {
       id: row.id,
-      cardName: f['Card Name'] || '—',
+      cardName: stripOwnerPrefix(f['Card Name'], ownerName) || '—',
       ownerId,
-      ownerName: ownerId ? (PEOPLE[ownerId] || '—') : '—',
+      ownerName,
       authorizedUserIds: f['Authorized Users'] || [],
       openDate: f['Open Date'] || '',
       productId,

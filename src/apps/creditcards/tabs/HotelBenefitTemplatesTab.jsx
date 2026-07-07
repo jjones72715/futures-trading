@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchTable, createRecord, updateRecord, deleteRecord, fetchFieldChoices } from '../services/airtable.js';
 import { HOTEL_TEMPLATES_TABLE, PORTFOLIO_TABLE, PEOPLE_TABLE, HOTELS_TABLE } from '../config/tables.js';
+import { stripOwnerPrefix } from '../utils/format.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
 const HOW_EARNED = ['Anniversary', 'Welcome Offer', 'Spend Threshold', 'Other'];
@@ -248,21 +249,26 @@ export function HotelBenefitTemplatesTab() {
   async function load() {
     setLoading(true);
     try {
-      const [tmpl, cards, people, brands] = await Promise.all([
+      const [tmpl, cardsRaw, people, brands] = await Promise.all([
         fetchTable(HOTEL_TEMPLATES_TABLE, [
           'Template Name', 'Name / Label', 'Hotel Brand', 'Card', 'Person', 'Record Type', 'How Earned',
           'Spend Threshold Amount', 'Benefit Type',
           'Reset Cycle', 'Estimated Value', 'Notes',
         ]),
-        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Status'])
-          .then(r => r.filter(x => x.fields['Status'] === 'Active')
-            .map(x => ({ id: x.id, name: x.fields['Card Name'] || x.id }))
-            .sort((a, b) => a.name.localeCompare(b.name))),
+        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Status', 'Owner']),
         fetchTable(PEOPLE_TABLE, ['Name'])
           .then(r => r.map(x => ({ id: x.id, name: x.fields['Name'] || x.id }))
             .sort((a, b) => a.name.localeCompare(b.name))),
         fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand'),
       ]);
+      const peopleById = Object.fromEntries(people.map(p => [p.id, p.name]));
+      const cards = cardsRaw
+        .filter(x => x.fields['Status'] === 'Active')
+        .map(x => {
+          const ownerId = (x.fields['Owner'] || [])[0];
+          return { id: x.id, name: stripOwnerPrefix(x.fields['Card Name'], peopleById[ownerId]) || x.id };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
       setTemplates(tmpl.sort((a, b) => (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || '')));
       setAllCards(cards);
       setAllPeople(people);
