@@ -374,7 +374,14 @@ function SignupBonusCard({ row, onOpen, onToggleAchieved }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#fff' }}>{row.cardName}</div>
+          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#fff' }}>
+            {row.cardName}
+            {row.last4 && (
+              <span style={{ marginLeft: 8, fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
+                ···{row.last4}
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>{row.personName}</div>
         </div>
         <label
@@ -513,7 +520,7 @@ function SignupBonusMonthPanel({ row, monthInputs, setMonthInputs, savingKey, on
   );
 }
 
-const SPEND_ROW_COLUMNS = '1.6fr 1fr 1fr 1fr 1fr 90px 70px';
+const SPEND_ROW_COLUMNS = '1.6fr 65px 1fr 1fr 1fr 1fr 90px 70px';
 
 function SpendBonusRow({ row, onOpen, onToggleEarned, onSetPriority }) {
   const [hovered, setHovered] = useState(false);
@@ -543,6 +550,7 @@ function SpendBonusRow({ row, onOpen, onToggleEarned, onSetPriority }) {
           </span>
         )}
       </div>
+      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{row.last4 ? `···${row.last4}` : '—'}</span>
       <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{row.personName}</span>
       <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{$$(row.annualTarget)}</span>
       <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.currentSpend)}</span>
@@ -669,6 +677,7 @@ export function BonusesTab() {
   const [signupBonuses, setSignupBonuses] = useState([]);
   const [spendBonuses, setSpendBonuses] = useState([]);
   const [cardNameById, setCardNameById] = useState({});
+  const [cardLast4ById, setCardLast4ById] = useState({});
   const [portfolioCards, setPortfolioCards] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
   const [spendDefsById, setSpendDefsById] = useState({});
@@ -695,12 +704,16 @@ export function BonusesTab() {
     const [signup, spend, cards, products, spendDefs] = await Promise.all([
       fetchTable(SIGNUP_BONUSES_TABLE, SIGNUP_FIELDS),
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Last 4/Last 5 (AMEX)']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
       fetchTable(SPEND_BONUS_DEFINITIONS_TABLE, ['Priority Score']),
     ]);
 
-    setCardNameById(Object.fromEntries(cards.map(r => [r.id, r.fields['Card Name'] || r.id])));
+    setCardNameById(Object.fromEntries(cards.map(r => {
+      const ownerId = (r.fields['Owner'] || [])[0];
+      return [r.id, stripOwnerPrefix(r.fields['Card Name'] || r.id, ownerId ? PEOPLE[ownerId] : null)];
+    })));
+    setCardLast4ById(Object.fromEntries(cards.map(r => [r.id, r.fields['Last 4/Last 5 (AMEX)'] || null])));
     setPortfolioCards(
       cards
         .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
@@ -891,6 +904,7 @@ export function BonusesTab() {
     return {
       id: r.id,
       cardName: cardId ? (cardNameById[cardId] || '—') : '—',
+      last4: cardId ? (cardLast4ById[cardId] || null) : null,
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       description: f['Bonus Description'] || '',
       spendTarget: f['Spend Target'] ?? null,
@@ -924,6 +938,7 @@ export function BonusesTab() {
     return {
       id: r.id,
       cardName: cardId ? (cardNameById[cardId] || '—') : '—',
+      last4: cardId ? (cardLast4ById[cardId] || null) : null,
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       description: f['Bonus Description'] || '',
       annualTarget: f['Annual Spend Target'] ?? null,
@@ -1080,6 +1095,7 @@ export function BonusesTab() {
                 textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
               }}>
                 <span>Card</span>
+                <span>Last 4/5</span>
                 <span>Person</span>
                 <span>Target</span>
                 <span>Current</span>

@@ -6,6 +6,7 @@ import {
 } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
+import { stripOwnerPrefix } from '../utils/format.js';
 
 function addYears(dateStr, years) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -646,15 +647,17 @@ export function BenefitsTrackerTab() {
     const def = defId ? (defsById[defId] || {}) : {};
     const cardId = (f['Card'] || [])[0];
     const personId = (f['Person'] || [])[0];
+    const personName = personId ? (PEOPLE[personId] || '—') : '—';
+    const rawLastDigits = f['Last Digits'];
     return {
       id: r.id,
       perkName: def['Perk Name'] || f['Label'] || '—',
-      cardName: cardId ? (cardsById[cardId] || '—') : '—',
+      cardName: stripOwnerPrefix(cardId ? (cardsById[cardId] || '—') : '—', personName),
       personId: personId || '',
-      personName: personId ? (PEOPLE[personId] || '—') : '—',
+      personName,
       creditAmount: f['Credit Amount'] ?? def['Credit Amount'] ?? null,
       creditType: (() => { const ct = f['Credit Type']; if (!ct) return null; if (Array.isArray(ct)) return ct[0]?.name || ct[0] || null; if (typeof ct === 'object') return ct.name || null; return ct; })(),
-      lastDigits: f['Last Digits'] ?? null,
+      lastDigits: Array.isArray(rawLastDigits) ? (rawLastDigits[0] ?? null) : (rawLastDigits ?? null),
       resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
       nextResetDate: f['Next Reset Date'] || '',
@@ -797,7 +800,7 @@ export function BenefitsTrackerTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 2fr 1fr 1fr 100px 1fr 1.2fr 60px',
+            gridTemplateColumns: '2fr 2fr 65px 1fr 1fr 100px 1fr 1.2fr 60px',
             gap: '0.75rem',
             padding: '0.5rem 1rem',
             fontSize: '0.68rem',
@@ -808,6 +811,7 @@ export function BenefitsTrackerTab() {
           }}>
             <span>Perk</span>
             <span>Card</span>
+            <span>Last 4/5</span>
             <span>Person</span>
             <span>Amount</span>
             <span>Priority</span>
@@ -822,10 +826,10 @@ export function BenefitsTrackerTab() {
             return (
               <div key={row.id} style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 2fr 1fr 1fr 100px 1fr 1.2fr 60px',
+                gridTemplateColumns: '2fr 2fr 65px 1fr 1fr 100px 1fr 1.2fr 60px',
                 gap: '0.75rem',
                 alignItems: 'center',
-                padding: '0.75rem 1rem',
+                padding: '1.1rem 1rem',
                 borderRadius: 10,
                 background: soon ? 'rgba(255,215,0,0.06)' : '#172033',
                 border: soon ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.06)',
@@ -845,11 +849,9 @@ export function BenefitsTrackerTab() {
                 </div>
                 <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {row.cardName}
-                  {row.lastDigits != null && (
-                    <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>
-                      ···{row.lastDigits}
-                    </span>
-                  )}
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>
+                  {row.lastDigits != null ? `···${row.lastDigits}` : '—'}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{row.personName}</span>
                 <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>

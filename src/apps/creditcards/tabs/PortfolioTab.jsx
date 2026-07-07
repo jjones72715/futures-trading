@@ -48,12 +48,13 @@ const FIELDS = [
   'Status',
   'Owner',
   'Authorized Users',
+  'Last 4/Last 5 (AMEX)',
 ];
 
 const PERK_INSTANCE_FIELDS = ['Card', 'Value'];
 const SPEND_BONUS_FIELDS = ['Card', 'Value'];
 
-const ROW_COLUMNS = '1.7fr 80px 0.8fr 80px 100px 90px 65px 95px 120px 60px';
+const ROW_COLUMNS = '1.7fr 65px 80px 0.8fr 80px 100px 90px 65px 95px 120px 60px';
 
 function resolveIssuer(raw) {
   if (!raw) return 'Unknown';
@@ -134,6 +135,7 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const auNames = auIds.map(id => personNameById[id] || id);
   const { netValue, hasAnyValue } = sumPerkValue(instances);
   const cardName = stripOwnerPrefix(f['Card Name'], ownerNames[0]) || '—';
+  const last4 = f['Last 4/Last 5 (AMEX)'] || null;
 
   return (
     <div
@@ -159,6 +161,10 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
           {issuer}
         </div>
+      </div>
+
+      <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>
+        {last4 ? `···${last4}` : '—'}
       </div>
 
       <div>
@@ -363,7 +369,7 @@ export function PortfolioTab() {
           display: 'grid', gridTemplateColumns: ROW_COLUMNS, gap: '0.75rem',
           padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
-          {['Card', 'Type', 'Person', 'Annual Fee', 'Total Perk Value', 'Difference', 'Days', 'Fee Date', 'Decision', 'AUs'].map((h, i) => (
+          {['Card', 'Last 4/5', 'Type', 'Person', 'Annual Fee', 'Total Perk Value', 'Difference', 'Days', 'Fee Date', 'Decision', 'AUs'].map((h, i) => (
             <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {h}
             </span>

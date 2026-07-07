@@ -13,6 +13,7 @@ const PORTFOLIO_FIELDS = [
   'Card Name', 'Owner', 'Authorized Users', 'Current Product',
   'Annual Fee Amount', 'Annual Fee Post Month', 'Days Until Annual Fee',
   'Status', 'Open Date', 'Decision', 'Willing to Upgrade', 'Decision Notes', 'Last Reviewed',
+  'Last 4/Last 5 (AMEX)',
 ];
 
 const PRODUCT_FIELDS = ['Product Name', 'Annual Fee', 'Can Upgrade To', 'Can Downgrade To', 'Signup Bonus Eligible After (Months)'];
@@ -39,7 +40,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const ROW_COLUMNS = '1.6fr 0.7fr 80px 100px 90px 65px 95px 120px 90px 95px 110px';
+const ROW_COLUMNS = '1.6fr 65px 0.7fr 80px 100px 90px 65px 95px 120px 90px 95px 110px';
 
 const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
@@ -229,6 +230,7 @@ function CardAuditRow({ card, onToggleWTU, savingWTU, tinted, onOpenAnnualReview
         <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>{card.cardName}</div>
         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{card.productName}</div>
       </div>
+      <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>{card.last4 ? `···${card.last4}` : '—'}</div>
       <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{card.ownerName}</div>
       <div style={{ fontSize: '0.85rem', color: '#fff' }}>{$$(card.annualFee)}</div>
       <div><TotalPerkValueCell netValue={card.netValue} hasAnyValue={card.hasAnyValue} mode="audit" /></div>
@@ -267,6 +269,7 @@ function Section({ title, cards, tinted, onToggleWTU, savingWTU, onOpenAnnualRev
         textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
       }}>
         <span>Card</span>
+        <span>Last 4/5</span>
         <span>Person</span>
         <span>Annual Fee</span>
         <span>Total Perk Value</span>
@@ -930,6 +933,7 @@ export function CardAuditTab() {
     return {
       id: row.id,
       cardName: stripOwnerPrefix(f['Card Name'], ownerName) || '—',
+      last4: f['Last 4/Last 5 (AMEX)'] || null,
       ownerId,
       ownerName,
       authorizedUserIds: f['Authorized Users'] || [],
