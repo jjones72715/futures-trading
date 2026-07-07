@@ -4,7 +4,7 @@ import {
   PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PEOPLE_TABLE, PERK_DEFINITIONS_TABLE,
   PERK_INSTANCES_TABLE, HOTELS_TABLE, SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE,
 } from '../config/tables.js';
-import { $$ } from '../utils/format.js';
+import { $$, stripOwnerPrefix } from '../utils/format.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 import { annualizedCreditAmount, sumPerkValue } from '../utils/perks.js';
 
@@ -240,6 +240,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
 
   const ownerIds = f['Owner'] || [];
   const auIds = f['Authorized Users'] || [];
+  const cardName = stripOwnerPrefix(f['Card Name'], ownerIds.length ? peopleNames[ownerIds[0]] : null) || '—';
   const annualFee = f['Annual Fee Amount'] || 0;
   const daysUntilFee = f['Days Until Annual Fee'];
   const currentProductId = (f['Current Product'] || [])[0];
@@ -332,7 +333,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
             <div style={{ height: 28, width: '60%', borderRadius: 6, background: 'rgba(255,255,255,0.06)' }} />
           ) : (
             <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#fff' }}>
-              {f['Card Name'] || '—'}
+              {cardName}
             </div>
           )}
           <button

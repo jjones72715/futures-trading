@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchTable } from '../services/airtable.js';
 import { PORTFOLIO_TABLE, PEOPLE_TABLE, PERK_INSTANCES_TABLE, SPEND_BONUSES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
-import { $$ } from '../utils/format.js';
+import { $$, stripOwnerPrefix } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { CardSummaryPanel, clearCardSummaryCache } from '../components/CardSummaryPanel.jsx';
@@ -133,6 +133,7 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const auIds = f['Authorized Users'] || [];
   const auNames = auIds.map(id => personNameById[id] || id);
   const { netValue, hasAnyValue } = sumPerkValue(instances);
+  const cardName = stripOwnerPrefix(f['Card Name'], ownerNames[0]) || '—';
 
   return (
     <div
@@ -153,7 +154,7 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
     >
       <div>
         <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>
-          {f['Card Name'] || '—'}
+          {cardName}
         </div>
         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
           {issuer}
