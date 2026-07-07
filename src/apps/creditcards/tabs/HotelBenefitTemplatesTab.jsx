@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchTable, createRecord, updateRecord, deleteRecord, fetchFieldChoices } from '../services/airtable.js';
 import { HOTEL_TEMPLATES_TABLE, PORTFOLIO_TABLE, PEOPLE_TABLE, HOTELS_TABLE } from '../config/tables.js';
+import { PEOPLE } from '../config/constants.js';
 import { stripOwnerPrefix } from '../utils/format.js';
 
 const RECORD_TYPES = ['Free Night', 'Hotel Credit'];
@@ -261,12 +262,11 @@ export function HotelBenefitTemplatesTab() {
             .sort((a, b) => a.name.localeCompare(b.name))),
         fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand'),
       ]);
-      const peopleById = Object.fromEntries(people.map(p => [p.id, p.name]));
       const cards = cardsRaw
         .filter(x => x.fields['Status'] === 'Active')
         .map(x => {
           const ownerId = (x.fields['Owner'] || [])[0];
-          return { id: x.id, name: stripOwnerPrefix(x.fields['Card Name'], peopleById[ownerId]) || x.id };
+          return { id: x.id, name: stripOwnerPrefix(x.fields['Card Name'], ownerId ? PEOPLE[ownerId] : null) || x.id };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
       setTemplates(tmpl.sort((a, b) => (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || '')));

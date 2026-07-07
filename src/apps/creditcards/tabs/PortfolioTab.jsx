@@ -134,7 +134,7 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const auIds = f['Authorized Users'] || [];
   const auNames = auIds.map(id => personNameById[id] || id);
   const { netValue, hasAnyValue } = sumPerkValue(instances);
-  const cardName = stripOwnerPrefix(f['Card Name'], ownerNames[0]) || '—';
+  const cardName = stripOwnerPrefix(f['Card Name'], ownerIds.length ? PEOPLE[ownerIds[0]] : null) || '—';
   const last4 = f['Last 4/Last 5 (AMEX)'] || null;
 
   return (

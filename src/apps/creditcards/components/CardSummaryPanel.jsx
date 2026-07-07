@@ -4,6 +4,7 @@ import {
   PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, PEOPLE_TABLE, PERK_DEFINITIONS_TABLE,
   PERK_INSTANCES_TABLE, HOTELS_TABLE, SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE,
 } from '../config/tables.js';
+import { PEOPLE } from '../config/constants.js';
 import { $$, stripOwnerPrefix } from '../utils/format.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 import { annualizedCreditAmount, sumPerkValue } from '../utils/perks.js';
@@ -240,7 +241,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
 
   const ownerIds = f['Owner'] || [];
   const auIds = f['Authorized Users'] || [];
-  const cardName = stripOwnerPrefix(f['Card Name'], ownerIds.length ? peopleNames[ownerIds[0]] : null) || '—';
+  const cardName = stripOwnerPrefix(f['Card Name'], ownerIds.length ? PEOPLE[ownerIds[0]] : null) || '—';
   const annualFee = f['Annual Fee Amount'] || 0;
   const daysUntilFee = f['Days Until Annual Fee'];
   const currentProductId = (f['Current Product'] || [])[0];
@@ -262,9 +263,10 @@ export function CardSummaryPanel({ cardId, onClose }) {
   const allPerkRows = perkDefsForProduct.map(def => {
     const inst = instanceByDefId[def.id];
     const cycle = extractSelectName(def.fields['Reset Cycle']) || '';
+    const projectedNextReset = cycle ? calculateNextResetDate(cycle, today) : null;
     const nextReset = inst
       ? (inst.fields['Next Reset Date'] || '')
-      : (cycle ? toAirtableDate(calculateNextResetDate(cycle, today)) : '');
+      : (projectedNextReset ? toAirtableDate(projectedNextReset) : '');
     return {
       id: inst?.id || def.id,
       label: def.fields['Perk Name'] || inst?.fields['Label'] || '—',
