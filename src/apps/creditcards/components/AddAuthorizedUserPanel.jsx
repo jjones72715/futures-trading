@@ -55,11 +55,23 @@ export function AddAuthorizedUserPanel({ cards, personNameById, onClose, onSaved
     setError(null);
   }
 
-  const ownerCards = ownerId
-    ? cards
-        .filter(c => (c.fields['Owner'] || []).includes(ownerId))
-        .sort((a, b) => (a.fields['Card Name'] || '').localeCompare(b.fields['Card Name'] || ''))
-    : [];
+  const ownerCards = (() => {
+    if (!ownerId) return [];
+    const raw = cards
+      .filter(c => (c.fields['Owner'] || []).includes(ownerId))
+      .map(c => ({
+        id: c.id,
+        name: stripOwnerPrefix(c.fields['Card Name'], PEOPLE[ownerId]) || c.id,
+        last4: c.fields['Last 4/Last 5 (AMEX)'] || null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const nameCounts = {};
+    raw.forEach(c => { nameCounts[c.name] = (nameCounts[c.name] || 0) + 1; });
+    return raw.map(c => ({
+      ...c,
+      label: nameCounts[c.name] > 1 && c.last4 ? `${c.name} ···${c.last4}` : c.name,
+    }));
+  })();
 
   const selectedCard = cards.find(c => c.id === cardId) || null;
   const existingAUIds = selectedCard ? (selectedCard.fields['Authorized Users'] || []) : [];
@@ -160,7 +172,7 @@ export function AddAuthorizedUserPanel({ cards, personNameById, onClose, onSaved
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {ownerCards.map(c => (
                         <PillBtn key={c.id} active={cardId === c.id} onClick={() => selectCard(c.id)}>
-                          {stripOwnerPrefix(c.fields['Card Name'], PEOPLE[ownerId]) || c.id}
+                          {c.label}
                         </PillBtn>
                       ))}
                     </div>

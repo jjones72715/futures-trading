@@ -1,6 +1,6 @@
-import { ALL_PEOPLE } from '../config/constants.js';
+import { ALL_PEOPLE, PEOPLE } from '../config/constants.js';
 
-const PILLS = ['All', 'Jonathan', 'Sherry', 'Judy', 'Wade', 'Amanda'];
+const PILLS = ['All', ...Object.values(PEOPLE)];
 
 export function PersonFilter({ selected, onChange }) {
   return (
