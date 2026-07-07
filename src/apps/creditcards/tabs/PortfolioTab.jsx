@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchTable } from '../services/airtable.js';
 import { PORTFOLIO_TABLE, PEOPLE_TABLE, PERK_INSTANCES_TABLE, SPEND_BONUSES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
-import { CardSummaryPanel } from '../components/CardSummaryPanel.jsx';
+import { CardSummaryPanel, clearCardSummaryCache } from '../components/CardSummaryPanel.jsx';
 import { TotalPerkValueCell, DifferenceCell } from '../components/NetValueGroup.jsx';
 import { sumPerkValue } from '../utils/perks.js';
+import { AddCardPanel } from '../components/AddCardPanel.jsx';
+import { AddAuthorizedUserPanel } from '../components/AddAuthorizedUserPanel.jsx';
 
 const BANK_NAMES = {
   'recmOSLhOAYVqi09z': 'American Express',
@@ -227,11 +229,11 @@ export function PortfolioTab() {
   const [issuerFilter, setIssuerFilter] = useState('All');
   const [decisionFilter, setDecisionFilter] = useState('All');
 
-  const [selectedCardId, setSelectedCardId] = useState(null);
+  const [panel, setPanel] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setLoading(true);
-    Promise.all([
+    return Promise.all([
       fetchTable(PORTFOLIO_TABLE, FIELDS, { filterByFormula: "{Status}='Active'" }),
       fetchTable(PEOPLE_TABLE, ['Name']),
       fetchTable(PERK_INSTANCES_TABLE, PERK_INSTANCE_FIELDS),
@@ -248,10 +250,25 @@ export function PortfolioTab() {
           byCard[cardId].push(inst);
         });
         setInstancesByCard(byCard);
+        setError(null);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  function handleCardCreated() {
+    clearCardSummaryCache();
+    setPanel(null);
+    load();
+  }
+
+  function handleAUSaved() {
+    clearCardSummaryCache();
+    setPanel(null);
+    load();
+  }
 
   const issuerOptions = ['All', ...new Set(cards.map(c => resolveIssuer(c.fields['Issuer'])))].sort((a, b) => {
     if (a === 'All') return -1;
@@ -307,6 +324,21 @@ export function PortfolioTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button type="button" onClick={() => setPanel({ type: 'add-au' })} style={{
+          padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(0,212,255,0.3)',
+          background: 'rgba(0,212,255,0.12)', color: '#00D4FF', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
+        }}>
+          + Add Authorized User
+        </button>
+        <button type="button" onClick={() => setPanel({ type: 'add-card' })} style={{
+          padding: '0.5rem 1.1rem', borderRadius: 8, border: 'none',
+          background: '#00D4FF', color: '#0B1220', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer',
+        }}>
+          + Add a Card
+        </button>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         <StatCard label="Total Active Cards" value={visibleCards.length} />
         <StatCard label="Total Annual Fees" value={$$(totalFees)} accent="#00E676" />
@@ -338,7 +370,7 @@ export function PortfolioTab() {
         </div>
 
         {withFee.map(card => (
-          <PortfolioRow key={card.id} card={card} personNameById={personNameById} instances={instancesByCard[card.id] || []} onOpen={setSelectedCardId} />
+          <PortfolioRow key={card.id} card={card} personNameById={personNameById} instances={instancesByCard[card.id] || []} onOpen={id => setPanel({ type: 'card', id })} />
         ))}
 
         {noFee.length > 0 && (
@@ -352,7 +384,7 @@ export function PortfolioTab() {
         )}
 
         {noFee.map(card => (
-          <PortfolioRow key={card.id} card={card} personNameById={personNameById} instances={instancesByCard[card.id] || []} onOpen={setSelectedCardId} />
+          <PortfolioRow key={card.id} card={card} personNameById={personNameById} instances={instancesByCard[card.id] || []} onOpen={id => setPanel({ type: 'card', id })} />
         ))}
 
         {visibleCards.length === 0 && (
@@ -362,8 +394,14 @@ export function PortfolioTab() {
         )}
       </div>
 
-      {selectedCardId && (
-        <CardSummaryPanel cardId={selectedCardId} onClose={() => setSelectedCardId(null)} />
+      {panel?.type === 'card' && (
+        <CardSummaryPanel cardId={panel.id} onClose={() => setPanel(null)} />
+      )}
+      {panel?.type === 'add-card' && (
+        <AddCardPanel onClose={() => setPanel(null)} onCreated={handleCardCreated} />
+      )}
+      {panel?.type === 'add-au' && (
+        <AddAuthorizedUserPanel cards={cards} personNameById={personNameById} onClose={() => setPanel(null)} onSaved={handleAUSaved} />
       )}
     </div>
   );
