@@ -242,6 +242,7 @@ export function CardSummaryPanel({ cardId, onClose }) {
   const ownerIds = f['Owner'] || [];
   const auIds = f['Authorized Users'] || [];
   const cardName = stripOwnerPrefix(f['Card Name'], ownerIds.length ? PEOPLE[ownerIds[0]] : null) || '—';
+  const cardType = extractSelectName(f['Personal/Business']);
   const annualFee = f['Annual Fee Amount'] || 0;
   const daysUntilFee = f['Days Until Annual Fee'];
   const currentProductId = (f['Current Product'] || [])[0];
@@ -362,14 +363,14 @@ export function CardSummaryPanel({ cardId, onClose }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
                   <span>{resolveIssuer(f['Issuer'])}</span>
-                  {f['Personal/Business'] && (
+                  {cardType && (
                     <span style={{
                       padding: '2px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
-                      background: f['Personal/Business'] === 'Business' ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.08)',
-                      color: f['Personal/Business'] === 'Business' ? '#00D4FF' : 'rgba(255,255,255,0.6)',
-                      border: `1px solid ${f['Personal/Business'] === 'Business' ? '#00D4FF44' : 'rgba(255,255,255,0.12)'}`,
+                      background: cardType === 'Business' ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.08)',
+                      color: cardType === 'Business' ? '#00D4FF' : 'rgba(255,255,255,0.6)',
+                      border: `1px solid ${cardType === 'Business' ? '#00D4FF44' : 'rgba(255,255,255,0.12)'}`,
                     }}>
-                      {f['Personal/Business']}
+                      {cardType}
                     </span>
                   )}
                   <span>{ownerIds.map(id => peopleNames[id] || id).join(', ') || '—'}</span>

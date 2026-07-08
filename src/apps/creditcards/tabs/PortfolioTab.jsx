@@ -62,6 +62,10 @@ function resolveIssuer(raw) {
   return BANK_NAMES[key] || key || 'Unknown';
 }
 
+function resolveCardType(raw) {
+  return Array.isArray(raw) ? (raw[0] || null) : (raw || null);
+}
+
 function daysUntilFeeColor(days) {
   if (days < 30) return '#FF4D4D';
   if (days < 60) return '#FFD60A';
@@ -125,7 +129,7 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const [hovered, setHovered] = useState(false);
   const f = card.fields;
   const issuer = resolveIssuer(f['Issuer']);
-  const cardType = f['Personal/Business'];
+  const cardType = resolveCardType(f['Personal/Business']);
   const annualFee = f['Annual Fee Amount'] || 0;
   const days = f['Days Until Annual Fee'];
   const feeDate = annualFee > 0 && days != null ? addDays(new Date(), days) : null;
@@ -289,7 +293,7 @@ export function PortfolioTab() {
       const owners = f['Owner'] || [];
       if (!owners.includes(PERSON_ID_BY_NAME[personFilter])) return false;
     }
-    if (typeFilter !== 'All' && f['Personal/Business'] !== typeFilter) return false;
+    if (typeFilter !== 'All' && resolveCardType(f['Personal/Business']) !== typeFilter) return false;
     if (issuerFilter !== 'All' && resolveIssuer(f['Issuer']) !== issuerFilter) return false;
     if (decisionFilter !== 'All') {
       const decision = f['Decision'] || '';

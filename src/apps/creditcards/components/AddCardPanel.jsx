@@ -8,7 +8,7 @@ const RISK_LEVELS = ['Low', 'Medium', 'High'];
 
 const EMPTY = {
   ownerIds: [], issuer: '', currentProductId: '', cardName: '',
-  personalBusiness: 'Personal', openDate: '', annualFee: '',
+  openDate: '', annualFee: '',
   statementCloseDay: '', last4: '',
   cancelRisk: 'Low', status: 'Active',
 };
@@ -148,7 +148,6 @@ export function AddCardPanel({ onClose, onCreated }) {
     };
     const selectedProduct = products.find(p => p.id === form.currentProductId);
     if (selectedProduct?.bankId) fields['Issuer'] = [selectedProduct.bankId];
-    if (form.personalBusiness) fields['Personal/Business'] = form.personalBusiness;
     if (form.currentProductId) fields['Current Product'] = [form.currentProductId];
     if (form.openDate) {
       fields['Open Date'] = form.openDate;
@@ -322,14 +321,6 @@ export function AddCardPanel({ onClose, onCreated }) {
                         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Account Details</div>
                         <div style={grid2}>
                           <div>
-                            <label style={lbl}>Personal / Business</label>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              {['Personal', 'Business'].map(opt => (
-                                <PillBtn key={opt} active={form.personalBusiness === opt} onClick={() => setForm(p => ({ ...p, personalBusiness: opt }))}>{opt}</PillBtn>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
                             <label style={lbl}>Open Date</label>
                             <input style={inp} type="date" value={form.openDate} onChange={e => setForm(p => ({ ...p, openDate: e.target.value }))} />
                           </div>
@@ -341,6 +332,9 @@ export function AddCardPanel({ onClose, onCreated }) {
                             <label style={lbl}>Statement Close Day</label>
                             <input style={inp} type="number" value={form.statementCloseDay} onChange={e => setForm(p => ({ ...p, statementCloseDay: e.target.value }))} placeholder="1–31" min={1} max={31} />
                           </div>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 12 }}>
+                          Personal / Business is set automatically from the card product you selected above.
                         </div>
                       </div>
 
