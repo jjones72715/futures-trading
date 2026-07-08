@@ -4,13 +4,12 @@ import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, BANKS_TABLE, PERK_DEFINITIONS_TAB
 import { PEOPLE } from '../config/constants.js';
 import { calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const RISK_LEVELS = ['Low', 'Medium', 'High'];
 
 const EMPTY = {
   ownerIds: [], issuer: '', currentProductId: '', cardName: '',
   personalBusiness: 'Personal', openDate: '', annualFee: '',
-  annualFeeMonth: '', statementCloseDay: '', last4: '',
+  statementCloseDay: '', last4: '',
   cancelRisk: 'Low', status: 'Active',
 };
 
@@ -151,9 +150,11 @@ export function AddCardPanel({ onClose, onCreated }) {
     if (selectedProduct?.bankId) fields['Issuer'] = [selectedProduct.bankId];
     if (form.personalBusiness) fields['Personal/Business'] = form.personalBusiness;
     if (form.currentProductId) fields['Current Product'] = [form.currentProductId];
-    if (form.openDate) fields['Open Date'] = form.openDate;
+    if (form.openDate) {
+      fields['Open Date'] = form.openDate;
+      fields['Annual Fee Post Month'] = parseInt(form.openDate.split('-')[1], 10);
+    }
     if (form.annualFee !== '') fields['Annual Fee Amount'] = parseFloat(form.annualFee);
-    if (form.annualFeeMonth) fields['Annual Fee Post Month'] = parseInt(form.annualFeeMonth);
     if (form.statementCloseDay) fields['Statement Close Day'] = parseInt(form.statementCloseDay);
     if (form.last4) fields['Last 4/Last 5 (AMEX)'] = form.last4;
     if (form.cancelRisk) fields['Cancel Risk Level'] = form.cancelRisk;
@@ -345,18 +346,14 @@ export function AddCardPanel({ onClose, onCreated }) {
 
                       <div style={cardStyle}>
                         <div style={{ fontWeight: 700, color: '#fff', marginBottom: '1rem', fontSize: '0.9rem' }}>Annual Fee</div>
-                        <div style={grid2}>
-                          <div>
-                            <label style={lbl}>Annual Fee Amount ($)</label>
-                            <input style={inp} type="number" value={form.annualFee} onChange={e => setForm(p => ({ ...p, annualFee: e.target.value }))} placeholder="0" min={0} />
-                          </div>
-                          <div>
-                            <label style={lbl}>Annual Fee Post Month</label>
-                            <select style={inp} value={form.annualFeeMonth} onChange={e => setForm(p => ({ ...p, annualFeeMonth: e.target.value }))}>
-                              <option value="">— Select month —</option>
-                              {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-                            </select>
-                          </div>
+                        <div>
+                          <label style={lbl}>Annual Fee Amount ($)</label>
+                          <input style={inp} type="number" value={form.annualFee} onChange={e => setForm(p => ({ ...p, annualFee: e.target.value }))} placeholder="0" min={0} />
+                          {form.openDate && (
+                            <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+                              Posts every {new Date(form.openDate + 'T00:00:00').toLocaleString('en-US', { month: 'long' })}, based on the Open Date above.
+                            </div>
+                          )}
                         </div>
                       </div>
 
