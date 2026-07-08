@@ -97,7 +97,18 @@ function AddBonusButton({ onClick }) {
 }
 
 function PersonCardPicker({ personId, cardId, cards, onSelectPerson, onSelectCard }) {
-  const filteredCards = personId ? cards.filter(c => c.owners.includes(personId)) : [];
+  const filteredCards = (() => {
+    if (!personId) return [];
+    const raw = cards
+      .filter(c => c.owners.includes(personId))
+      .map(c => ({ id: c.id, name: stripOwnerPrefix(c.name, PEOPLE[personId]), last4: c.last4 }));
+    const nameCounts = {};
+    raw.forEach(c => { nameCounts[c.name] = (nameCounts[c.name] || 0) + 1; });
+    return raw.map(c => ({
+      ...c,
+      label: nameCounts[c.name] > 1 && c.last4 ? `${c.name} ···${c.last4}` : c.name,
+    }));
+  })();
   return (
     <>
       <div>
@@ -117,7 +128,7 @@ function PersonCardPicker({ personId, cardId, cards, onSelectPerson, onSelectCar
           ) : (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {filteredCards.map(c => (
-                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{stripOwnerPrefix(c.name, PEOPLE[personId])}</PillBtn>
+                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{c.label}</PillBtn>
               ))}
             </div>
           )}
@@ -716,7 +727,12 @@ export function BonusesTab() {
     setCardLast4ById(Object.fromEntries(cards.map(r => [r.id, r.fields['Last 4/Last 5 (AMEX)'] || null])));
     setPortfolioCards(
       cards
-        .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
+        .map(r => ({
+          id: r.id,
+          name: r.fields['Card Name'] || r.id,
+          owners: r.fields['Owner'] || [],
+          last4: r.fields['Last 4/Last 5 (AMEX)'] || null,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
     setProductOptions(
