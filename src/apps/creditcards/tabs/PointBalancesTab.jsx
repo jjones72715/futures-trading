@@ -60,6 +60,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
   const [programs, setPrograms] = useState([]);
   const [cardProductNameById, setCardProductNameById] = useState({});
   const [portfolioNameById, setPortfolioNameById] = useState({});
+  const [portfolioRecords, setPortfolioRecords] = useState([]);
   const [balances, setBalances] = useState([]);
   const [personFilter, setPersonFilter] = useState('All');
   const [balancesOnly, setBalancesOnly] = useState(true);
@@ -74,13 +75,14 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
     return Promise.all([
       fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Rewards Program', 'Status']),
       fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Value Per Point', 'Program Value', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
     ])
       .then(([programRows, cardProductRows, portfolioRows, balanceRows]) => {
         setPrograms(programRows);
         setCardProductNameById(Object.fromEntries(cardProductRows.map(r => [r.id, r.fields['Product Name'] || r.id])));
         setPortfolioNameById(Object.fromEntries(portfolioRows.map(r => [r.id, r.fields['Card Name'] || r.id])));
+        setPortfolioRecords(portfolioRows);
         setBalances(balanceRows);
       })
       .catch(console.error)
@@ -368,6 +370,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
         <UpdateBalancePanel
           balance={editingBalance}
           portfolioNameById={portfolioNameById}
+          portfolioRecords={portfolioRecords}
           onClose={() => setEditingBalance(null)}
           onSaved={updated => setBalances(prev => prev.map(b => (b.id === updated.id ? updated : b)))}
         />

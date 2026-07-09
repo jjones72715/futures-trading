@@ -19,7 +19,7 @@ const cardStyle = {
   padding: '1.25rem 1.5rem',
 };
 
-export function UpdateBalancePanel({ balance, portfolioNameById, onClose, onSaved }) {
+export function UpdateBalancePanel({ balance, portfolioNameById, portfolioRecords, onClose, onSaved }) {
   const [mounted, setMounted] = useState(false);
   const [currentBalance, setCurrentBalance] = useState(String(balance.currentBalance ?? ''));
   const [expirationDate, setExpirationDate] = useState(balance.expirationDate || '');
@@ -37,7 +37,16 @@ export function UpdateBalancePanel({ balance, portfolioNameById, onClose, onSave
   }
 
   const ownerNames = balance.ownerIds.map(id => PEOPLE[id] || id).join(', ') || '—';
-  const cardNames = balance.cardIds.map(id => portfolioNameById[id] || id);
+
+  // Recomputed from current Portfolio data (not the balance's stored value) so
+  // this always reflects live eligibility and gets re-saved to stay in sync.
+  const ownerId = balance.ownerIds[0];
+  const eligibleCards = portfolioRecords.filter(c =>
+    c.fields['Status'] === 'Active' &&
+    (c.fields['Owner'] || []).includes(ownerId) &&
+    (c.fields['Rewards Program'] || []).includes(balance.programId)
+  );
+  const cardNames = eligibleCards.map(c => c.fields['Card Name'] || portfolioNameById[c.id] || c.id);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -51,6 +60,7 @@ export function UpdateBalancePanel({ balance, portfolioNameById, onClose, onSave
       const fields = {
         'Current Balance': parseFloat(currentBalance),
         'Last Updated': toAirtableDate(new Date()),
+        'Credit Card Portfolio': eligibleCards.map(c => c.id),
       };
       if (expirationDate) fields['Expiration Date'] = expirationDate;
       const updated = await updateRecord(POINT_BALANCES_TABLE, balance.id, fields);
