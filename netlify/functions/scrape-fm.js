@@ -36,14 +36,31 @@ function detectIssuer(name) {
   return found === 'US Bank' ? 'U.S. Bank' : found;
 }
 
+function parseAnnualFee(text) {
+  if (!text) return null;
+  if (/no annual fee|no fee/i.test(text)) return 0;
+  const m = text.replace(/,/g, '').match(/\$(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+// Live-DOM inspection (post-JavaScript) shows a "Mini" card layout, but the
+// actual HTML the server sends uses a richer "BObox" layout — this parser
+// targets the real server-rendered markup. Attribute quoting on the real
+// page is inconsistent (single or double), so quotes are matched loosely.
+const Q = `["']`;
+
 // Each "Best Consumer/Business Card Offers" heading is immediately followed
 // by one big table listing every card for that type, one card per row.
-const SECTION_RE = /<div class="BOlegacy">\s*<strong>\s*Best\s+(Consumer|Business)\s+Card Offers\s*<\/strong>[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/gi;
+const SECTION_RE = new RegExp(
+  `<div\\s+class=${Q}BOlegacy${Q}>\\s*<strong>\\s*Best\\s+(Consumer|Business)\\s+Card Offers\\s*<\\/strong>[\\s\\S]*?<table[^>]*>([\\s\\S]*?)<\\/table>`,
+  'gi'
+);
 
-// Per row: name link, then a short bonus blurb, then the "$X 1st Yr Value
-// Estimate" text. Name capture allows embedded tags (a few card names span
-// lines with a stray <br>) and gets stripped afterward.
-const ROW_RE = /<strong>\s*<a[^>]*href="[^"]*"[^>]*>([\s\S]*?)<\/a>\s*<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<br\s*\/?>[\s\S]*?\$(-?[\d,]+)\s*1st Yr Value Estimate/gi;
+const NAME_RE = new RegExp(`<div\\s+class=${Q}BOhd${Q}>\\s*<a[^>]*>([\\s\\S]*?)<\\/a>`, 'i');
+const BONUS_RE = new RegExp(`<div\\s+class=${Q}BObon${Q}>([\\s\\S]*?)(?:<span|<\\/div>)`, 'i');
+const FEE_RE = new RegExp(`<div\\s+class=${Q}BOmo${Q}>[\\s\\S]*<strong>([^<]*)<\\/strong>\\s*<\\/div>`, 'i');
+const VALUE_RE = /\$(-?[\d,]+)\s*1st Yr Value Estimate/i;
+const ROW_RE = /<tr\b[^>]*>[\s\S]*?<\/tr>/gi;
 
 function parseCards(html) {
   const consumer = [];
@@ -56,23 +73,31 @@ function parseCards(html) {
     const tableHtml = sectionMatch[2];
     const target = type === 'business' ? business : consumer;
 
-    let rowMatch;
-    ROW_RE.lastIndex = 0;
-    while ((rowMatch = ROW_RE.exec(tableHtml)) !== null) {
-      const name = stripTags(rowMatch[1]);
-      if (!name) continue;
-      const welcomeBonus = stripTags(rowMatch[2]);
-      const fmValue = parseInt(rowMatch[3].replace(/,/g, ''), 10);
+    const rows = tableHtml.match(ROW_RE) || [];
+    rows.forEach(rowHtml => {
+      const nameMatch = NAME_RE.exec(rowHtml);
+      if (!nameMatch) return;
+      const name = stripTags(nameMatch[1]);
+      if (!name) return;
+
+      const bonusMatch = BONUS_RE.exec(rowHtml);
+      const welcomeBonus = bonusMatch ? stripTags(bonusMatch[1]) : '';
+
+      const feeMatch = FEE_RE.exec(rowHtml);
+      const annualFee = feeMatch ? parseAnnualFee(stripTags(feeMatch[1])) : null;
+
+      const valueMatch = VALUE_RE.exec(rowHtml);
+      const fmValue = valueMatch ? parseInt(valueMatch[1].replace(/,/g, ''), 10) : null;
 
       target.push({
         name,
         issuer: detectIssuer(name),
         fm_value: Number.isFinite(fmValue) ? fmValue : null,
-        annual_fee: null,
+        annual_fee: annualFee,
         welcome_bonus: welcomeBonus,
         type,
       });
-    }
+    });
   }
 
   return { consumer, business };
