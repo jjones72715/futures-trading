@@ -173,20 +173,21 @@ function AddBenefitModal({ onClose, onSaved }) {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
-    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)' }} />
       <div style={{
-        background: '#111827', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)',
-        padding: '1.75rem 2rem', width: '100%', maxWidth: 600, maxHeight: '90vh',
-        overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem',
+        position: 'absolute', top: 0, right: 0, height: '100%', width: 520, maxWidth: '92vw',
+        background: '#0B1220', borderLeft: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '-8px 0 24px rgba(0,0,0,0.4)', overflowY: 'auto', padding: '1.5rem',
+        animation: 'benefitSlideIn 0.2s ease-out',
+        display: 'flex', flexDirection: 'column', gap: '1.25rem',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>Add Perk Definition</h2>
+        <style>{'@keyframes benefitSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }'}</style>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>Add Perk Definition</div>
           <button type="button" onClick={onClose} style={{
             background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
-            fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, padding: 0,
+            fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, flexShrink: 0,
           }}>×</button>
         </div>
 
