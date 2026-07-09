@@ -109,6 +109,44 @@ function PersonPills({ selected, onChange }) {
   );
 }
 
+function IssuerPills({ issuers, hidden, onToggle, onReset }) {
+  if (issuers.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Issuer
+      </span>
+      {issuers.map(issuer => {
+        const active = !hidden.has(issuer);
+        return (
+          <button
+            key={issuer}
+            type="button"
+            onClick={() => onToggle(issuer)}
+            style={{
+              padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+              background: active ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
+              color: active ? ACCENT : 'rgba(255,255,255,0.35)',
+              fontWeight: active ? 600 : 400, fontSize: '0.8rem', cursor: 'pointer',
+              transition: 'all 0.15s', textDecoration: active ? 'none' : 'line-through',
+            }}
+          >
+            {issuer}
+          </button>
+        );
+      })}
+      {hidden.size > 0 && (
+        <button type="button" onClick={onReset} style={{
+          background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+          fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline',
+        }}>
+          Show All
+        </button>
+      )}
+    </div>
+  );
+}
+
 function CantGetForm({ card, personFilter, onSave, onCancel, saving, error }) {
   const locked = personFilter !== ALL_LABEL;
   const [personId, setPersonId] = useState(locked ? idByName[personFilter] : '');
@@ -278,6 +316,7 @@ export function CardRecommendationsTab() {
   const [savingKey, setSavingKey] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [localOverrides, setLocalOverrides] = useState(new Set());
+  const [hiddenIssuers, setHiddenIssuers] = useState(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -385,30 +424,52 @@ export function CardRecommendationsTab() {
     return !hiddenForPerson(card, personId);
   }
 
+  function enrichCard(card) {
+    const matchedProductId = fuzzyMatchProduct(card.name, productList)?.id || null;
+    const matchedProduct = matchedProductId ? productsById.get(matchedProductId) : null;
+    return {
+      ...card,
+      key: `${card.type}|${card.name}`,
+      matchedProductId,
+      issuer: matchedProduct?.issuerName || card.issuer,
+      annual_fee: card.annual_fee ?? matchedProduct?.annualFee ?? null,
+    };
+  }
+
   function enrichAndFilter(cards) {
     return cards
-      .map(card => {
-        const matchedProductId = fuzzyMatchProduct(card.name, productList)?.id || null;
-        const matchedProduct = matchedProductId ? productsById.get(matchedProductId) : null;
-        return {
-          ...card,
-          key: `${card.type}|${card.name}`,
-          matchedProductId,
-          issuer: matchedProduct?.issuerName || card.issuer,
-          annual_fee: card.annual_fee ?? matchedProduct?.annualFee ?? null,
-        };
-      })
+      .map(enrichCard)
       .filter(isVisible)
+      .filter(card => !hiddenIssuers.has(card.issuer))
       .sort((a, b) => (b.fm_value ?? -Infinity) - (a.fm_value ?? -Infinity));
+  }
+
+  const allEnrichedCards = useMemo(
+    () => (fmData && !fmData.error ? [...(fmData.consumer || []), ...(fmData.business || [])].map(enrichCard) : []),
+    [fmData, productList, productsById]
+  );
+
+  const availableIssuers = useMemo(
+    () => [...new Set(allEnrichedCards.map(c => c.issuer))].sort(),
+    [allEnrichedCards]
+  );
+
+  function toggleIssuer(issuer) {
+    setHiddenIssuers(prev => {
+      const next = new Set(prev);
+      if (next.has(issuer)) next.delete(issuer);
+      else next.add(issuer);
+      return next;
+    });
   }
 
   const consumerCards = useMemo(
     () => (fmData && !fmData.error ? enrichAndFilter(fmData.consumer || []) : []),
-    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides]
+    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides, hiddenIssuers]
   );
   const businessCards = useMemo(
     () => (fmData && !fmData.error ? enrichAndFilter(fmData.business || []) : []),
-    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides]
+    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides, hiddenIssuers]
   );
 
   async function handleRefresh() {
@@ -501,6 +562,15 @@ export function CardRecommendationsTab() {
         </div>
         <style>{'@keyframes ccRecPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }'}</style>
       </div>
+
+      {fmData && !fmData.error && (
+        <IssuerPills
+          issuers={availableIssuers}
+          hidden={hiddenIssuers}
+          onToggle={toggleIssuer}
+          onReset={() => setHiddenIssuers(new Set())}
+        />
+      )}
 
       {!fmData && (
         <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', padding: '4rem 1rem' }}>
