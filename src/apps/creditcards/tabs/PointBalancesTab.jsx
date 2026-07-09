@@ -54,6 +54,19 @@ const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '1rem 1.5rem',
 };
 
+function Stat({ label, value, color }) {
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: color || '#fff', lineHeight: 1, whiteSpace: 'nowrap' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function PointBalancesTab({ onNavigateAddBalance }) {
   const [view, setView] = useState('balances');
   const [loading, setLoading] = useState(true);
@@ -73,7 +86,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
   function load() {
     setLoading(true);
     return Promise.all([
-      fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products']),
+      fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products', 'Category']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Rewards Program', 'Status']),
       fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Value Per Point', 'Program Value', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
@@ -99,6 +112,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
       expirationPolicy: p.fields['Expiration Policy'] || '',
       transferPartnerIds: p.fields['Transfer Partners'] || [],
       cardProductIds: p.fields['Card Products'] || [],
+      category: p.fields['Category'] || null,
       colorIndex: i,
     }));
 
@@ -137,19 +151,31 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
   const totalProgramsTracked = enrichedPrograms.length;
 
   // --- Balances view ---
-  const filteredBalances = enrichedBalances.filter(r => {
-    if (personFilter !== 'All') {
-      const personId = PERSON_ID_BY_NAME[personFilter];
-      if (!r.ownerIds.includes(personId)) return false;
-    }
-    if (balancesOnly && !(r.currentBalance > 0)) return false;
-    return true;
+  const personFilteredBalances = enrichedBalances.filter(r => {
+    if (personFilter === 'All') return true;
+    const personId = PERSON_ID_BY_NAME[personFilter];
+    return r.ownerIds.includes(personId);
   });
+  const filteredBalances = personFilteredBalances.filter(r => !balancesOnly || r.currentBalance > 0);
   const balancesSorted = [...filteredBalances].sort((a, b) => (b.programValue ?? 0) - (a.programValue ?? 0));
-  const totalBalanceValue = enrichedBalances
-    .filter(r => r.currentBalance > 0)
-    .reduce((s, r) => s + (r.programValue ?? 0), 0);
-  const programsWithBalance = enrichedBalances.filter(r => r.currentBalance > 0).length;
+
+  // Stats always reflect the selected person and exclude zero balances,
+  // regardless of the "Show Balances Only" toggle (which only affects the table).
+  const statsRows = personFilteredBalances.filter(r => r.currentBalance > 0);
+  const sumBy = (rows, key) => rows.reduce((s, r) => s + (r[key] ?? 0), 0);
+  const rowsInCategory = cat => statsRows.filter(r => programById[r.programId]?.fields['Category'] === cat);
+
+  const totalPoints = sumBy(statsRows, 'currentBalance');
+  const totalValue = sumBy(statsRows, 'programValue');
+  const flightRows = rowsInCategory('Flight');
+  const hotelRows = rowsInCategory('Hotel');
+  const transferableRows = rowsInCategory('Transferable');
+  const flightMiles = sumBy(flightRows, 'currentBalance');
+  const flightValue = sumBy(flightRows, 'programValue');
+  const hotelPoints = sumBy(hotelRows, 'currentBalance');
+  const hotelValue = sumBy(hotelRows, 'programValue');
+  const transferablePoints = sumBy(transferableRows, 'currentBalance');
+  const transferableValue = sumBy(transferableRows, 'programValue');
 
   if (loading) {
     return (
@@ -244,23 +270,15 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
         </>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, auto)', gap: '1rem', width: 'fit-content' }}>
-            <div style={cardStyle}>
-              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
-                Total Balance Value
-              </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#00E676', lineHeight: 1 }}>
-                {fmtDollar(totalBalanceValue)}
-              </div>
-            </div>
-            <div style={cardStyle}>
-              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>
-                Programs With Balance
-              </div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', lineHeight: 1 }}>
-                {programsWithBalance}
-              </div>
-            </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+            <Stat label="Total Points" value={fmt(totalPoints)} />
+            <Stat label="Total Value" value={fmtDollar(totalValue)} color="#00E676" />
+            <Stat label="Flight Miles" value={fmt(flightMiles)} />
+            <Stat label="Flight Value" value={fmtDollar(flightValue)} color="#00E676" />
+            <Stat label="Hotel Points" value={fmt(hotelPoints)} />
+            <Stat label="Hotel Value" value={fmtDollar(hotelValue)} color="#00E676" />
+            <Stat label="Transferable Points" value={fmt(transferablePoints)} />
+            <Stat label="Transferable Value" value={fmtDollar(transferableValue)} color="#00E676" />
           </div>
 
           <div style={cardStyle}>
