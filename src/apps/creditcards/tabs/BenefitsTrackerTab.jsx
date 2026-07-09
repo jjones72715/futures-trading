@@ -1,10 +1,333 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord, createRecord, deleteRecord } from '../services/airtable.js';
-import { PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE } from '../config/tables.js';
+import {
+  PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE,
+  SPEND_BONUS_DEFINITIONS_TABLE, SPEND_BONUSES_TABLE, CARD_PRODUCTS_TABLE,
+} from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
+import { stripOwnerPrefix } from '../utils/format.js';
 
-const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
+function addYears(dateStr, years) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCFullYear(dt.getUTCFullYear() + years);
+  return dt.toISOString().split('T')[0];
+}
+
+function nextJan1() {
+  return `${new Date().getFullYear() + 1}-01-01`;
+}
+
+function nextCardAnniversary(openDateStr) {
+  if (!openDateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let years = 1;
+  let candidate = addYears(openDateStr, years);
+  while (new Date(candidate + 'T00:00:00') <= today) {
+    years += 1;
+    candidate = addYears(openDateStr, years);
+  }
+  return candidate;
+}
+
+function calculateSpendBonusResetDate(resetType, openDateStr) {
+  return resetType === 'Card Open Date' ? nextCardAnniversary(openDateStr) : nextJan1();
+}
+
+const REAL_RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
+const ALL_RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Value Only'];
+const REAL_BENEFIT_TYPES = ['Food Credit', 'Shopping Credit', 'Membership Credit', 'Entertainment Credit', 'Hotel Credit', 'Flight Credit', 'Other Credit'];
+
+const inp = {
+  width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 8, padding: '0.6rem 0.75rem', color: '#fff', fontSize: '0.88rem',
+  outline: 'none', boxSizing: 'border-box',
+};
+const lbl = {
+  display: 'block', fontSize: '0.7rem', fontWeight: 600,
+  color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase',
+  letterSpacing: '0.05em', marginBottom: 5,
+};
+
+function ModalPill({ active, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+      background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+      color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+      fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+    }}>{children}</button>
+  );
+}
+
+function ProductPicker({ products, loadingProducts, selectedIds, onToggle }) {
+  const [search, setSearch] = useState('');
+  const filtered = search ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())) : products;
+  return (
+    <div>
+      <input
+        style={{ ...inp, marginBottom: 8 }}
+        placeholder="Search products…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+      />
+      {loadingProducts ? (
+        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>Loading products…</div>
+      ) : (
+        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, background: '#0B1220' }}>
+          {filtered.map(p => {
+            const selected = selectedIds.includes(p.id);
+            return (
+              <button key={p.id} type="button" onClick={() => onToggle(p.id)} style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '0.5rem 0.75rem', background: selected ? 'rgba(0,212,255,0.12)' : 'transparent',
+                border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                color: selected ? '#00D4FF' : 'rgba(255,255,255,0.7)',
+                fontSize: '0.85rem', cursor: 'pointer', fontWeight: selected ? 600 : 400,
+              }}>
+                {selected ? '✓ ' : ''}{p.name}
+              </button>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>No results</div>
+          )}
+        </div>
+      )}
+      {selectedIds.length > 0 && (
+        <div style={{ marginTop: 6, fontSize: '0.75rem', color: 'rgba(0,212,255,0.8)' }}>
+          {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''} selected
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddBenefitModal({ onClose, onSaved }) {
+  const [perkType, setPerkType] = useState(''); // '' | 'real' | 'value-only'
+  const [form, setForm] = useState({
+    perkName: '', cardProductIds: [], creditAmount: '', resetCycle: '',
+    priorityScore: 0, benefitType: '', notes: '',
+  });
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchTable(CARD_PRODUCTS_TABLE, ['Product Name'])
+      .then(rows => {
+        setProducts(rows.map(r => ({ id: r.id, name: r.fields['Product Name'] || '' })).sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProducts(false));
+  }, []);
+
+  function toggleProduct(id) {
+    setForm(prev => ({
+      ...prev,
+      cardProductIds: prev.cardProductIds.includes(id)
+        ? prev.cardProductIds.filter(i => i !== id)
+        : [...prev.cardProductIds, id],
+    }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    if (!form.perkName.trim()) { setError('Perk Name is required.'); return; }
+    setSubmitting(true);
+
+    let fields;
+    if (perkType === 'value-only') {
+      fields = {
+        'Perk Name': form.perkName.trim(),
+        'Reset Cycle': 'Value Only',
+        'Priority Score': 5,
+        'Benefit Type': 'Value Only',
+      };
+      if (form.creditAmount !== '') fields['Credit Amount'] = parseFloat(form.creditAmount);
+      if (form.notes.trim()) fields['Notes'] = form.notes.trim();
+      if (form.cardProductIds.length) fields['Card Product'] = form.cardProductIds;
+    } else {
+      fields = { 'Perk Name': form.perkName.trim() };
+      if (form.cardProductIds.length) fields['Card Product'] = form.cardProductIds;
+      if (form.creditAmount !== '') fields['Credit Amount'] = parseFloat(form.creditAmount);
+      if (form.resetCycle) fields['Reset Cycle'] = form.resetCycle;
+      if (form.priorityScore) fields['Priority Score'] = form.priorityScore;
+      if (form.benefitType) fields['Benefit Type'] = form.benefitType;
+      if (form.notes.trim()) fields['Notes'] = form.notes.trim();
+    }
+
+    try {
+      await createRecord(PERK_DEFINITIONS_TABLE, fields);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000 }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)' }} />
+      <div style={{
+        position: 'absolute', top: 0, right: 0, height: '100%', width: 520, maxWidth: '92vw',
+        background: '#0B1220', borderLeft: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '-8px 0 24px rgba(0,0,0,0.4)', overflowY: 'auto', padding: '1.5rem',
+        animation: 'benefitSlideIn 0.2s ease-out',
+        display: 'flex', flexDirection: 'column', gap: '1.25rem',
+      }}>
+        <style>{'@keyframes benefitSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }'}</style>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>Add Perk Definition</div>
+          <button type="button" onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+            fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, flexShrink: 0,
+          }}>×</button>
+        </div>
+
+        {/* Step 1 — Perk type */}
+        <div>
+          <label style={lbl}>Perk Type</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <ModalPill active={perkType === 'real'} onClick={() => setPerkType('real')}>Real Perk</ModalPill>
+            <ModalPill active={perkType === 'value-only'} onClick={() => setPerkType('value-only')}>Value Only Perk</ModalPill>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.7rem 1rem', color: '#FF4D4D', fontSize: '0.85rem' }}>
+            {error}
+          </div>
+        )}
+
+        {perkType === 'real' && (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            <div>
+              <label style={lbl}>Perk Name <span style={{ color: '#FF4D4D' }}>*</span></label>
+              <input style={inp} value={form.perkName} onChange={e => setForm(p => ({ ...p, perkName: e.target.value }))} placeholder="e.g. $10 Monthly Dining Credit" autoFocus />
+            </div>
+
+            <div>
+              <label style={lbl}>Benefit Type</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {REAL_BENEFIT_TYPES.map(t => (
+                  <ModalPill key={t} active={form.benefitType === t} onClick={() => setForm(p => ({ ...p, benefitType: p.benefitType === t ? '' : t }))}>{t}</ModalPill>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label style={lbl}>Reset Cycle</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {REAL_RESET_CYCLES.map(c => (
+                  <ModalPill key={c} active={form.resetCycle === c} onClick={() => setForm(p => ({ ...p, resetCycle: p.resetCycle === c ? '' : c }))}>{c}</ModalPill>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={lbl}>Credit Amount ($)</label>
+                <input style={inp} type="number" value={form.creditAmount} onChange={e => setForm(p => ({ ...p, creditAmount: e.target.value }))} placeholder="0" min={0} />
+              </div>
+              <div>
+                <label style={lbl}>Priority Score</label>
+                <div style={{ display: 'flex', gap: 6, paddingTop: 4 }}>
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n} type="button" onClick={() => setForm(p => ({ ...p, priorityScore: p.priorityScore === n ? 0 : n }))} style={{
+                      width: 28, height: 28, borderRadius: '50%', border: 'none',
+                      background: n <= form.priorityScore ? '#00D4FF' : 'rgba(255,255,255,0.12)',
+                      cursor: 'pointer', padding: 0, color: n <= form.priorityScore ? '#0B1220' : 'rgba(255,255,255,0.4)',
+                      fontWeight: 700, fontSize: '0.75rem',
+                    }}>{n}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label style={lbl}>Card Products (optional)</label>
+              <ProductPicker products={products} loadingProducts={loadingProducts} selectedIds={form.cardProductIds} onToggle={toggleProduct} />
+            </div>
+
+            <div>
+              <label style={lbl}>Notes</label>
+              <textarea style={{ ...inp, minHeight: 80, resize: 'vertical' }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes…" />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button type="button" onClick={onClose} style={{
+                padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+              }}>Cancel</button>
+              <button type="submit" disabled={submitting} style={{
+                padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
+                background: submitting ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+                color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+              }}>{submitting ? 'Saving…' : 'Add Perk'}</button>
+            </div>
+          </form>
+        )}
+
+        {perkType === 'value-only' && (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            <div style={{
+              background: 'rgba(179,136,255,0.08)', border: '1px solid rgba(179,136,255,0.2)',
+              borderRadius: 10, padding: '0.85rem 1rem',
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <div style={{ fontWeight: 700, color: '#B388FF', fontSize: '0.85rem' }}>New Value Perk Definition</div>
+              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+                Saved with Reset Cycle: Value Only · Priority Score: 5 · Benefit Type: Value Only
+              </div>
+
+              <div>
+                <label style={lbl}>Perk Name <span style={{ color: '#FF4D4D' }}>*</span></label>
+                <input style={inp} value={form.perkName} onChange={e => setForm(p => ({ ...p, perkName: e.target.value }))} placeholder="e.g. Lounge Access" autoFocus />
+              </div>
+
+              <div>
+                <label style={lbl}>Credit Amount</label>
+                <input style={inp} type="number" value={form.creditAmount} onChange={e => setForm(p => ({ ...p, creditAmount: e.target.value }))} placeholder="0" min={0} />
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Annualized face value of the perk.</div>
+              </div>
+
+              <div>
+                <label style={lbl}>Notes</label>
+                <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional context…" />
+              </div>
+            </div>
+
+            <div>
+              <label style={lbl}>Card Product</label>
+              <ProductPicker products={products} loadingProducts={loadingProducts} selectedIds={form.cardProductIds} onToggle={toggleProduct} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button type="button" onClick={onClose} style={{
+                padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+              }}>Cancel</button>
+              <button type="submit" disabled={submitting} style={{
+                padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
+                background: submitting ? 'rgba(179,136,255,0.4)' : '#B388FF',
+                color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+              }}>{submitting ? 'Saving…' : 'Add Perk'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const cardStyle = {
   background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
@@ -56,6 +379,27 @@ function isResettingSoon(dateStr) {
   return diff >= 0 && diff <= 7;
 }
 
+function buildSyncSummary(r) {
+  const parts = [];
+  if (r.deleted > 0) parts.push(`${r.deleted} orphan${r.deleted !== 1 ? 's' : ''} deleted`);
+  if (r.addedTrackable > 0 || r.addedValue > 0) {
+    parts.push(`${r.addedTrackable} trackable perk${r.addedTrackable !== 1 ? 's' : ''} and ${r.addedValue} value perk${r.addedValue !== 1 ? 's' : ''} added`);
+  }
+  if (r.patched > 0) parts.push(`${r.patched} backfilled`);
+  if (r.spendAdded > 0) parts.push(`${r.spendAdded} spend bonus${r.spendAdded !== 1 ? 'es' : ''} added`);
+
+  if (parts.length === 0) return 'All perks up to date';
+
+  let msg = parts.join(', ');
+  const cardsTouched = Math.max(r.cards || 0, r.spendCards || 0);
+  if (cardsTouched > 0) msg += ` across ${cardsTouched} card${cardsTouched !== 1 ? 's' : ''}`;
+
+  const totalSkipped = (r.skipped || 0) + (r.spendSkipped || 0);
+  if (totalSkipped > 0) msg += `, ${totalSkipped} skipped`;
+
+  return msg;
+}
+
 function isPastOrToday(dateStr) {
   if (!dateStr) return false;
   const today = new Date();
@@ -77,17 +421,21 @@ export function BenefitsTrackerTab() {
   const [toggling, setToggling] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [showAddBenefit, setShowAddBenefit] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setResetStatus('Checking for expired perks…');
 
     // Step 1 — load defs and instances together
-    const [allInst, defs, cards] = await Promise.all([
-      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits', 'Credit Type']),
+    const [allInstRaw, defs, cards] = await Promise.all([
+      fetchTable(PERK_INSTANCES_TABLE, ['Label', 'Perk Definition', 'Card', 'Person', 'Used', 'Next Reset Date', 'Priority Score', 'Reset Cycle', 'Credit Amount', 'Last Digits', 'Credit Type', 'Perk Type']),
       fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Credit Amount', 'Reset Cycle', 'Priority Score']),
       fetchTable(PORTFOLIO_TABLE, ['Card Name']),
     ]);
+
+    // Value Only perks are tracked in Card Summary / Annual Review instead — hide them here entirely
+    const allInst = allInstRaw.filter(r => r.fields['Perk Type'] !== 'Value Only');
 
     const defMap = {};
     defs.forEach(r => { defMap[r.id] = r.fields; });
@@ -137,11 +485,13 @@ export function BenefitsTrackerTab() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      // Fetch all three sources in parallel
-      const [portfolio, defs, existingInst] = await Promise.all([
-        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner']),
-        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score']),
+      // Fetch all sources in parallel
+      const [portfolio, defs, existingInst, spendDefs, existingSpendInst] = await Promise.all([
+        fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Current Product', 'Owner', 'Open Date', 'Status']),
+        fetchTable(PERK_DEFINITIONS_TABLE, ['Perk Name', 'Card Product', 'Reset Cycle', 'Credit Amount', 'Priority Score', 'Benefit Type']),
         fetchTable(PERK_INSTANCES_TABLE, ['Card', 'Perk Definition', 'Label', 'Credit Amount', 'Priority Score', 'Reset Cycle']),
+        fetchTable(SPEND_BONUS_DEFINITIONS_TABLE, ['Bonus Description', 'Card Product', 'Annual Spend Target', 'Reset Type']),
+        fetchTable(SPEND_BONUSES_TABLE, ['Card', 'Spend Bonus Definition']),
       ]);
 
       // Index defs by record ID and by Card Product record ID
@@ -210,12 +560,14 @@ export function BenefitsTrackerTab() {
             }
             const cycle = def.fields['Reset Cycle'];
             const nextDate = cycle ? calculateNextResetDate(cycle, today) : null;
+            const perkType = def.fields['Benefit Type'] === 'Value Only' ? 'Value Only' : 'Trackable';
             const instanceFields = {
               'Perk Definition': [def.id],
               'Card': [cardId],
               'Person': [personId],
               'Used': false,
               'Label': def.fields['Perk Name'] || '',
+              'Perk Type': perkType,
             };
             if (nextDate) instanceFields['Next Reset Date'] = toAirtableDate(nextDate);
             if (def.fields['Credit Amount'] != null) instanceFields['Credit Amount'] = def.fields['Credit Amount'];
@@ -228,11 +580,13 @@ export function BenefitsTrackerTab() {
       }
 
       // Fire creates sequentially to avoid rate limits
-      let added = 0;
+      let addedTrackable = 0;
+      let addedValue = 0;
       for (const c of creates) {
         try {
           await createRecord(PERK_INSTANCES_TABLE, c.fields);
-          added++;
+          if (c.fields['Perk Type'] === 'Value Only') addedValue++;
+          else addedTrackable++;
           cardsSeen.add(c.cardId);
         } catch (e) {
           console.error('Sync create failed:', e);
@@ -250,7 +604,73 @@ export function BenefitsTrackerTab() {
         }
       }
 
-      setSyncResult({ added, patched, deleted, cards: cardsSeen.size, skipped });
+      // Spend Bonus Definitions: create missing instances per active card
+      const spendDefsByProductId = {};
+      spendDefs.forEach(def => {
+        const productIds = def.fields['Card Product'] || [];
+        productIds.forEach(pid => {
+          if (!spendDefsByProductId[pid]) spendDefsByProductId[pid] = [];
+          spendDefsByProductId[pid].push(def);
+        });
+      });
+
+      const existingSpendKeys = new Set(
+        existingSpendInst.map(r => `${(r.fields['Card'] || [])[0]}::${(r.fields['Spend Bonus Definition'] || [])[0]}`)
+      );
+
+      const spendCreates = [];
+      let spendSkipped = 0;
+      const spendCardsSeen = new Set();
+
+      for (const card of portfolio) {
+        if (card.fields['Status'] !== 'Active') continue;
+        const productId = (card.fields['Current Product'] || [])[0];
+        if (!productId) continue;
+
+        const matchingDefs = spendDefsByProductId[productId] || [];
+        if (matchingDefs.length === 0) continue;
+
+        const ownerId = (card.fields['Owner'] || [])[0];
+        if (!ownerId) continue;
+
+        for (const def of matchingDefs) {
+          const key = `${card.id}::${def.id}`;
+          if (existingSpendKeys.has(key)) { spendSkipped++; continue; }
+
+          const resetDate = calculateSpendBonusResetDate(def.fields['Reset Type'], card.fields['Open Date']);
+          if (!resetDate) continue;
+
+          spendCreates.push({
+            cardId: card.id,
+            fields: {
+              'Card': [card.id],
+              'Person': [ownerId],
+              'Annual Spend Target': def.fields['Annual Spend Target'] ?? 0,
+              'Reset Date': resetDate,
+              'Bonus Earned': false,
+              'Spend Bonus Definition': [def.id],
+              'Bonus Description': def.fields['Bonus Description'] || '',
+            },
+          });
+          existingSpendKeys.add(key);
+        }
+      }
+
+      let spendAdded = 0;
+      for (const c of spendCreates) {
+        try {
+          await createRecord(SPEND_BONUSES_TABLE, c.fields);
+          spendAdded++;
+          spendCardsSeen.add(c.cardId);
+        } catch (e) {
+          console.error('Spend bonus sync create failed:', e);
+        }
+      }
+
+      setSyncResult({
+        addedTrackable, addedValue, patched, deleted, cards: cardsSeen.size, skipped,
+        spendAdded, spendCards: spendCardsSeen.size, spendSkipped,
+      });
       await load();
     } catch (e) {
       console.error('Sync failed:', e);
@@ -295,15 +715,17 @@ export function BenefitsTrackerTab() {
     const def = defId ? (defsById[defId] || {}) : {};
     const cardId = (f['Card'] || [])[0];
     const personId = (f['Person'] || [])[0];
+    const personName = personId ? (PEOPLE[personId] || '—') : '—';
+    const rawLastDigits = f['Last Digits'];
     return {
       id: r.id,
       perkName: def['Perk Name'] || f['Label'] || '—',
-      cardName: cardId ? (cardsById[cardId] || '—') : '—',
+      cardName: stripOwnerPrefix(cardId ? (cardsById[cardId] || '—') : '—', personName),
       personId: personId || '',
-      personName: personId ? (PEOPLE[personId] || '—') : '—',
+      personName,
       creditAmount: f['Credit Amount'] ?? def['Credit Amount'] ?? null,
       creditType: (() => { const ct = f['Credit Type']; if (!ct) return null; if (Array.isArray(ct)) return ct[0]?.name || ct[0] || null; if (typeof ct === 'object') return ct.name || null; return ct; })(),
-      lastDigits: f['Last Digits'] ?? null,
+      lastDigits: Array.isArray(rawLastDigits) ? (rawLastDigits[0] ?? null) : (rawLastDigits ?? null),
       resetCycle: (Array.isArray(f['Reset Cycle']) ? f['Reset Cycle'][0] : f['Reset Cycle']) || def['Reset Cycle'] || '',
       priorityScore: f['Priority Score'] != null ? f['Priority Score'] : (def['Priority Score'] ?? 0),
       nextResetDate: f['Next Reset Date'] || '',
@@ -343,37 +765,51 @@ export function BenefitsTrackerTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1100 }}>
 
+      {showAddBenefit && (
+        <AddBenefitModal
+          onClose={() => setShowAddBenefit(false)}
+          onSaved={() => { /* no reload needed — def doesn't appear in this view */ }}
+        />
+      )}
+
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', width: 'fit-content' }}>
           <StatCard label="Available Perks" value={totalAvailable} accent="#00D4FF" />
           <StatCard label="Total Perks" value={total} />
         </div>
-        <button
-          type="button"
-          onClick={syncPerks}
-          disabled={syncing || loading}
-          style={{
-            padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,212,255,0.3)',
-            background: syncing ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.12)',
-            color: syncing ? 'rgba(0,212,255,0.5)' : '#00D4FF',
-            fontWeight: 600, fontSize: '0.82rem', cursor: syncing ? 'not-allowed' : 'pointer',
-            whiteSpace: 'nowrap', alignSelf: 'center', transition: 'all 0.15s',
-          }}
-        >
-          {syncing ? 'Syncing…' : 'Sync Perks to All Cards'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignSelf: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setShowAddBenefit(true)}
+            style={{
+              padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,230,118,0.3)',
+              background: 'rgba(0,230,118,0.1)', color: '#00E676',
+              fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
+              whiteSpace: 'nowrap', transition: 'all 0.15s',
+            }}
+          >
+            + Add Benefit
+          </button>
+          <button
+            type="button"
+            onClick={syncPerks}
+            disabled={syncing || loading}
+            style={{
+              padding: '0.6rem 1.25rem', borderRadius: 9, border: '1px solid rgba(0,212,255,0.3)',
+              background: syncing ? 'rgba(0,212,255,0.08)' : 'rgba(0,212,255,0.12)',
+              color: syncing ? 'rgba(0,212,255,0.5)' : '#00D4FF',
+              fontWeight: 600, fontSize: '0.82rem', cursor: syncing ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap', transition: 'all 0.15s',
+            }}
+          >
+            {syncing ? 'Syncing…' : 'Sync Perks to All Cards'}
+          </button>
+        </div>
       </div>
 
       {syncResult && !syncResult.error && (
         <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.88rem' }}>
-          {syncResult.deleted > 0 && `${syncResult.deleted} orphan${syncResult.deleted !== 1 ? 's' : ''} deleted`}
-        {syncResult.deleted > 0 && (syncResult.added > 0 || syncResult.patched > 0) && ', '}
-        {syncResult.added > 0 && `${syncResult.added} added`}
-        {syncResult.added > 0 && syncResult.patched > 0 && ', '}
-        {syncResult.patched > 0 && `${syncResult.patched} backfilled`}
-        {(syncResult.added > 0 || syncResult.patched > 0) && syncResult.cards > 0 && ` across ${syncResult.cards} card${syncResult.cards !== 1 ? 's' : ''}`}
-        {syncResult.deleted === 0 && syncResult.added === 0 && syncResult.patched === 0 && 'All perks up to date'}
-        {syncResult.skipped > 0 && `, ${syncResult.skipped} already complete`}
+          {buildSyncSummary(syncResult)}
         </div>
       )}
       {syncResult?.error && (
@@ -394,7 +830,7 @@ export function BenefitsTrackerTab() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Cycle</span>
             <PillBtn active={cycleFilter === 'All'} onClick={() => setCycleFilter('All')}>All</PillBtn>
-            {RESET_CYCLES.map(c => (
+            {ALL_RESET_CYCLES.map(c => (
               <PillBtn key={c} active={cycleFilter === c} onClick={() => setCycleFilter(c)}>{c}</PillBtn>
             ))}
           </div>
@@ -432,7 +868,7 @@ export function BenefitsTrackerTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 2fr 1fr 1fr 100px 1fr 1.2fr 60px',
+            gridTemplateColumns: '2fr 2fr 65px 1fr 1fr 100px 1fr 1.2fr 60px',
             gap: '0.75rem',
             padding: '0.5rem 1rem',
             fontSize: '0.68rem',
@@ -443,6 +879,7 @@ export function BenefitsTrackerTab() {
           }}>
             <span>Perk</span>
             <span>Card</span>
+            <span>Last 4/5</span>
             <span>Person</span>
             <span>Amount</span>
             <span>Priority</span>
@@ -457,10 +894,10 @@ export function BenefitsTrackerTab() {
             return (
               <div key={row.id} style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 2fr 1fr 1fr 100px 1fr 1.2fr 60px',
+                gridTemplateColumns: '2fr 2fr 65px 1fr 1fr 100px 1fr 1.2fr 60px',
                 gap: '0.75rem',
                 alignItems: 'center',
-                padding: '0.75rem 1rem',
+                padding: '1.1rem 1rem',
                 borderRadius: 10,
                 background: soon ? 'rgba(255,215,0,0.06)' : '#172033',
                 border: soon ? '1px solid rgba(255,215,0,0.25)' : '1px solid rgba(255,255,255,0.06)',
@@ -480,11 +917,9 @@ export function BenefitsTrackerTab() {
                 </div>
                 <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {row.cardName}
-                  {row.lastDigits != null && (
-                    <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>
-                      ···{row.lastDigits}
-                    </span>
-                  )}
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>
+                  {row.lastDigits != null ? `···${row.lastDigits}` : '—'}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.85rem' }}>{row.personName}</span>
                 <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>

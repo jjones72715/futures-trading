@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchTable, updateRecord, createRecord } from '../services/airtable.js';
-import { SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE } from '../config/tables.js';
+import {
+  SIGNUP_BONUSES_TABLE, SPEND_BONUSES_TABLE, PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE,
+  SPEND_BONUS_DEFINITIONS_TABLE,
+} from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 import { StatCard } from '../components/StatCard.jsx';
-import { $$ } from '../utils/format.js';
+import { $$, stripOwnerPrefix } from '../utils/format.js';
 
 const EMPTY_SIGNUP_FORM = { personId: '', cardId: '', description: '', spendTarget: '', approvalDate: '', bonusWindow: '' };
-const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetDate: '' };
+const EMPTY_SPEND_FORM = { productId: '', description: '', annualTarget: '', resetType: '', notes: '', priorityScore: 3 };
+const RESET_TYPES = ['Jan 1', 'Card Open Date'];
 
 const inp = {
   width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
@@ -36,7 +40,7 @@ const SIGNUP_FIELDS = [
 const SPEND_FIELDS = [
   'Bonus Description', 'Card', 'Person', 'Annual Spend Target',
   ...MONTH_NAMES, 'Current Spend', 'Remaining Spend', 'Reset Date',
-  'Days Until Reset', 'Bonus Earned',
+  'Days Until Reset', 'Bonus Earned', 'Spend Bonus Definition',
 ];
 
 const cardStyle = {
@@ -58,6 +62,27 @@ function PillBtn({ active, onClick, children }) {
   );
 }
 
+function PriorityDots({ value, onSet, size = 14 }) {
+  return (
+    <div style={{ display: 'flex', gap: 3 }} onClick={e => e.stopPropagation()}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onSet(n)}
+          title={`Priority ${n}`}
+          style={{
+            width: size, height: size, borderRadius: '50%', border: 'none',
+            background: n <= (value || 0) ? '#00D4FF' : 'rgba(255,255,255,0.12)',
+            cursor: 'pointer', padding: 0, flexShrink: 0,
+            transition: 'background 0.1s',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function AddBonusButton({ onClick }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -72,7 +97,18 @@ function AddBonusButton({ onClick }) {
 }
 
 function PersonCardPicker({ personId, cardId, cards, onSelectPerson, onSelectCard }) {
-  const filteredCards = personId ? cards.filter(c => c.owners.includes(personId)) : [];
+  const filteredCards = (() => {
+    if (!personId) return [];
+    const raw = cards
+      .filter(c => c.owners.includes(personId))
+      .map(c => ({ id: c.id, name: stripOwnerPrefix(c.name, PEOPLE[personId]), last4: c.last4 }));
+    const nameCounts = {};
+    raw.forEach(c => { nameCounts[c.name] = (nameCounts[c.name] || 0) + 1; });
+    return raw.map(c => ({
+      ...c,
+      label: nameCounts[c.name] > 1 && c.last4 ? `${c.name} ···${c.last4}` : c.name,
+    }));
+  })();
   return (
     <>
       <div>
@@ -92,7 +128,7 @@ function PersonCardPicker({ personId, cardId, cards, onSelectPerson, onSelectCar
           ) : (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {filteredCards.map(c => (
-                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{c.name}</PillBtn>
+                <PillBtn key={c.id} active={cardId === c.id} onClick={() => onSelectCard(c.id)}>{c.label}</PillBtn>
               ))}
             </div>
           )}
@@ -172,16 +208,15 @@ function AddSignupBonusForm({ cards, form, setForm, onSubmit, onCancel, submitti
   );
 }
 
-function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSubmit, onCancel, submitting, error }) {
+function AddSpendBonusForm({ productOptions, form, setForm, onSubmit, onCancel, submitting, error }) {
   function set(field) {
     return e => setForm(prev => ({ ...prev, [field]: e.target.value }));
   }
-  const holders = form.productId ? (productHolders[form.productId] || []) : [];
   return (
     <form onSubmit={onSubmit} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>New Spend Bonus</div>
       <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', marginTop: -8 }}>
-        Pick the card product — a bonus is created for every active card of that product, one per person.
+        Creates a bonus definition, then a tracked instance for every active card of that product.
       </div>
 
       <div>
@@ -189,18 +224,10 @@ function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSu
         <select style={inp} value={form.productId} onChange={set('productId')}>
           <option value="">— Select card product —</option>
           {productOptions.map(p => (
-            <option key={p.id} value={p.id}>{p.name} ({p.count} card{p.count > 1 ? 's' : ''})</option>
+            <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
       </div>
-
-      {form.productId && (
-        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.55)' }}>
-          Will create a bonus for: {holders.length > 0
-            ? holders.map(h => PEOPLE[h.personId] || h.personId).join(', ')
-            : 'no active cards found for this product'}
-        </div>
-      )}
 
       <div>
         <label style={lbl}>Bonus Description</label>
@@ -213,9 +240,34 @@ function AddSpendBonusForm({ productOptions, productHolders, form, setForm, onSu
           <input style={inp} type="number" min="0" value={form.annualTarget} onChange={set('annualTarget')} placeholder="0" />
         </div>
         <div>
-          <label style={lbl}>Reset Date <span style={{ color: '#FF4D4D' }}>*</span></label>
-          <input style={inp} type="date" value={form.resetDate} onChange={set('resetDate')} />
+          <label style={lbl}>Reset Type <span style={{ color: '#FF4D4D' }}>*</span></label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {RESET_TYPES.map(t => (
+              <PillBtn key={t} active={form.resetType === t} onClick={() => setForm(prev => ({ ...prev, resetType: t }))}>
+                {t}
+              </PillBtn>
+            ))}
+          </div>
         </div>
+      </div>
+
+      <div>
+        <label style={lbl}>Priority Score</label>
+        <PriorityDots
+          value={form.priorityScore}
+          onSet={n => setForm(prev => ({ ...prev, priorityScore: n }))}
+          size={20}
+        />
+      </div>
+
+      <div>
+        <label style={lbl}>Notes</label>
+        <textarea
+          style={{ ...inp, minHeight: 70, resize: 'vertical' }}
+          value={form.notes}
+          onChange={set('notes')}
+          placeholder="Any additional notes…"
+        />
       </div>
 
       <FormActions submitting={submitting} onCancel={onCancel} error={error} />
@@ -290,6 +342,27 @@ function addYears(dateStr, years) {
   return dt.toISOString().split('T')[0];
 }
 
+function nextJan1() {
+  return `${new Date().getFullYear() + 1}-01-01`;
+}
+
+function nextCardAnniversary(openDateStr) {
+  if (!openDateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let years = 1;
+  let candidate = addYears(openDateStr, years);
+  while (new Date(candidate + 'T00:00:00') <= today) {
+    years += 1;
+    candidate = addYears(openDateStr, years);
+  }
+  return candidate;
+}
+
+function calculateSpendBonusResetDate(resetType, openDateStr) {
+  return resetType === 'Card Open Date' ? nextCardAnniversary(openDateStr) : nextJan1();
+}
+
 function signupMonthLabel(approvalDateStr, n) {
   if (!approvalDateStr) return `Month ${n}`;
   const [, m] = approvalDateStr.split('-').map(Number);
@@ -297,16 +370,35 @@ function signupMonthLabel(approvalDateStr, n) {
   return MONTH_NAMES[idx];
 }
 
-function SignupBonusCard({ row, monthInputs, setMonthInputs, savingKey, onSaveMonth, onToggleAchieved }) {
-  const missingMonths = [1, 2, 3, 4, 5, 6].filter(n => row.fields[`Month ${n}`] == null);
+function SignupBonusCard({ row, onOpen, onToggleAchieved }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <div style={cardStyle}>
+    <div
+      onClick={() => onOpen(row.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        ...cardStyle, cursor: 'pointer',
+        background: hovered ? '#1b2740' : '#172033',
+        transition: 'background 0.12s',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#fff' }}>{row.cardName}</div>
+          <div style={{ fontWeight: 700, fontSize: '1rem', color: '#fff' }}>
+            {row.cardName}
+            {row.last4 && (
+              <span style={{ marginLeft: 8, fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>
+                ···{row.last4}
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>{row.personName}</div>
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+        <label
+          onClick={e => e.stopPropagation()}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+        >
           <input
             type="checkbox"
             checked={row.achieved}
@@ -333,108 +425,257 @@ function SignupBonusCard({ row, monthInputs, setMonthInputs, savingKey, onSaveMo
       }}>
         Deadline: {fmtDate(row.effectiveDeadline)}{row.daysRemaining != null && ` (${row.daysRemaining} days remaining)`}
       </div>
-
-      {!row.achieved && missingMonths.length > 0 && (
-        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {missingMonths.map(n => {
-            const field = `Month ${n}`;
-            const label = signupMonthLabel(row.approvalDate, n);
-            const key = `${row.id}:${field}`;
-            return (
-              <MonthInputRow
-                key={key}
-                label={label}
-                value={monthInputs[key] || ''}
-                onChange={v => setMonthInputs(prev => ({ ...prev, [key]: v }))}
-                onSave={() => onSaveMonth(SIGNUP_BONUSES_TABLE, row.id, field, true)}
-                saving={savingKey === key}
-              />
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
 
-const SPEND_ROW_COLUMNS = '1.7fr 1fr 1fr 1fr 1fr 70px 32px';
+function SignupBonusMonthPanel({ row, monthInputs, setMonthInputs, savingKey, onSaveMonth, onClose }) {
+  const [mounted, setMounted] = useState(false);
 
-function SpendBonusRow({ row, expanded, onToggleExpand, monthInputs, setMonthInputs, savingKey, onSaveMonth, onToggleEarned }) {
-  const missingMonths = MONTH_NAMES.filter(m => row.fields[m] == null);
-  const canExpand = !row.earned && missingMonths.length > 0;
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  function handleClose() {
+    setMounted(false);
+    setTimeout(onClose, 200);
+  }
+
+  const missingMonths = [1, 2, 3, 4, 5, 6].filter(n => row.fields[`Month ${n}`] == null);
+
   return (
-    <div>
+    <>
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'fixed', inset: 0, background: '#0B1220',
+          opacity: mounted ? 0.6 : 0, transition: 'opacity 0.2s ease', zIndex: 40,
+        }}
+      />
       <div style={{
-        display: 'grid', gridTemplateColumns: SPEND_ROW_COLUMNS, gap: '0.75rem',
-        alignItems: 'center', padding: '0.75rem 1rem',
-        borderRadius: expanded ? '10px 10px 0 0' : 10,
-        background: '#172033', border: '1px solid rgba(255,255,255,0.06)',
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: '40%', minWidth: 380, maxWidth: '90vw',
+        background: '#172033', borderLeft: '1px solid #1E2D45', zIndex: 41,
+        transform: mounted ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.22s ease', boxShadow: '-12px 0 32px rgba(0,0,0,0.4)',
+        display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.cardName}
+        <div style={{
+          padding: '1.25rem 1.5rem', borderBottom: '1px solid #1E2D45',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem',
+        }}>
+          <div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>{row.cardName}</div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{row.personName}</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            style={{
+              background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+              fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, padding: '0 0.25rem', flexShrink: 0,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {row.description && (
+            <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{row.description}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <Stat label="Spend Target" value={$$(row.spendTarget)} />
+            <Stat label="Current Spend" value={$$(row.currentSpend)} color="#00D4FF" />
+            <Stat label="Remaining Spend" value={$$(row.remainingSpend)} color="#00E676" />
+          </div>
+
+          {row.daysRemaining != null && (
+            <div style={{
+              fontSize: '0.85rem', color: deadlineColor(row.daysRemaining),
+              fontWeight: row.daysRemaining < 14 ? 700 : 400,
+            }}>
+              Deadline {fmtDate(row.effectiveDeadline)} ({row.daysRemaining} days remaining)
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid #1E2D45' }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Enter Monthly Spend</div>
+            {missingMonths.length === 0 ? (
+              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.35)' }}>All months entered.</div>
+            ) : (
+              missingMonths.map(n => {
+                const field = `Month ${n}`;
+                const label = signupMonthLabel(row.approvalDate, n);
+                const key = `${row.id}:${field}`;
+                return (
+                  <MonthInputRow
+                    key={key}
+                    label={label}
+                    value={monthInputs[key] || ''}
+                    onChange={v => setMonthInputs(prev => ({ ...prev, [key]: v }))}
+                    onSave={() => onSaveMonth(SIGNUP_BONUSES_TABLE, row.id, field, true)}
+                    saving={savingKey === key}
+                  />
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const SPEND_ROW_COLUMNS = '1.6fr 65px 1fr 1fr 1fr 1fr 90px 70px';
+
+function SpendBonusRow({ row, onOpen, onToggleEarned, onSetPriority }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={() => onOpen(row.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: SPEND_ROW_COLUMNS, gap: '0.75rem',
+        alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 10, cursor: 'pointer',
+        background: hovered ? '#1b2740' : '#172033', border: '1px solid rgba(255,255,255,0.06)',
+        transition: 'background 0.12s, opacity 0.12s',
+        opacity: row.earned ? 0.45 : 1,
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.cardName}
+        </span>
+        {row.daysUntilReset != null && (
+          <span style={{
+            fontSize: '0.72rem', color: deadlineColor(row.daysUntilReset),
+            fontWeight: row.daysUntilReset < 14 ? 700 : 400,
+          }}>
+            Resets {fmtDate(row.resetDate)} ({row.daysUntilReset}d)
           </span>
+        )}
+      </div>
+      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.82rem' }}>{row.last4 ? `···${row.last4}` : '—'}</span>
+      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{row.personName}</span>
+      <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{$$(row.annualTarget)}</span>
+      <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.currentSpend)}</span>
+      <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.remainingSpend)}</span>
+      <PriorityDots value={row.priorityScore} onSet={n => onSetPriority(row.defId, n)} />
+      <div style={{ display: 'flex', justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={row.earned}
+          onChange={() => onToggleEarned(row)}
+          style={{ accentColor: '#00D4FF', width: 17, height: 17, cursor: 'pointer' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SpendBonusMonthPanel({ row, monthInputs, setMonthInputs, savingKey, onSaveMonth, onClose }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  function handleClose() {
+    setMounted(false);
+    setTimeout(onClose, 200);
+  }
+
+  const missingMonths = MONTH_NAMES.filter(m => row.fields[m] == null);
+
+  return (
+    <>
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'fixed', inset: 0, background: '#0B1220',
+          opacity: mounted ? 0.6 : 0, transition: 'opacity 0.2s ease', zIndex: 40,
+        }}
+      />
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: '40%', minWidth: 380, maxWidth: '90vw',
+        background: '#172033', borderLeft: '1px solid #1E2D45', zIndex: 41,
+        transform: mounted ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.22s ease', boxShadow: '-12px 0 32px rgba(0,0,0,0.4)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          padding: '1.25rem 1.5rem', borderBottom: '1px solid #1E2D45',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem',
+        }}>
+          <div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>{row.cardName}</div>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{row.personName}</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            style={{
+              background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+              fontSize: '1.4rem', cursor: 'pointer', lineHeight: 1, padding: '0 0.25rem', flexShrink: 0,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {row.description && (
+            <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{row.description}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <Stat label="Annual Spend Target" value={$$(row.annualTarget)} />
+            <Stat label="Current Spend" value={$$(row.currentSpend)} color="#00D4FF" />
+            <Stat label="Remaining Spend" value={$$(row.remainingSpend)} color="#00E676" />
+          </div>
+
           {row.daysUntilReset != null && (
-            <span style={{
-              fontSize: '0.72rem', color: deadlineColor(row.daysUntilReset),
+            <div style={{
+              fontSize: '0.85rem', color: deadlineColor(row.daysUntilReset),
               fontWeight: row.daysUntilReset < 14 ? 700 : 400,
             }}>
-              Resets {fmtDate(row.resetDate)} ({row.daysUntilReset}d)
-            </span>
+              Resets {fmtDate(row.resetDate)} ({row.daysUntilReset} days)
+            </div>
           )}
-        </div>
-        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>{row.personName}</span>
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>{$$(row.annualTarget)}</span>
-        <span style={{ color: '#00D4FF', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.currentSpend)}</span>
-        <span style={{ color: '#00E676', fontWeight: 700, fontSize: '0.88rem' }}>{$$(row.remainingSpend)}</span>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <input
-            type="checkbox"
-            checked={row.earned}
-            onChange={() => onToggleEarned(row)}
-            style={{ accentColor: '#00D4FF', width: 17, height: 17, cursor: 'pointer' }}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          disabled={!canExpand}
-          title={canExpand ? 'Enter monthly spend' : 'No months left to enter'}
-          style={{
-            width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(0,212,255,0.3)',
-            background: expanded ? '#00D4FF' : 'rgba(0,212,255,0.12)',
-            color: expanded ? '#0B1220' : '#00D4FF', fontWeight: 700, fontSize: '1rem', lineHeight: 1,
-            cursor: canExpand ? 'pointer' : 'not-allowed', opacity: canExpand ? 1 : 0.3,
-          }}
-        >
-          {expanded ? '–' : '+'}
-        </button>
-      </div>
 
-      {expanded && canExpand && (
-        <div style={{
-          background: '#111a2b', border: '1px solid rgba(255,255,255,0.06)', borderTop: 'none',
-          borderRadius: '0 0 10px 10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8,
-        }}>
-          {row.description && (
-            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{row.description}</div>
-          )}
-          {missingMonths.map(m => {
-            const key = `${row.id}:${m}`;
-            return (
-              <MonthInputRow
-                key={key}
-                label={m}
-                value={monthInputs[key] || ''}
-                onChange={v => setMonthInputs(prev => ({ ...prev, [key]: v }))}
-                onSave={() => onSaveMonth(SPEND_BONUSES_TABLE, row.id, m, false)}
-                saving={savingKey === key}
-              />
-            );
-          })}
+          <div style={{ borderTop: '1px solid #1E2D45' }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>Enter Monthly Spend</div>
+            {missingMonths.length === 0 ? (
+              <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.35)' }}>All months entered.</div>
+            ) : (
+              missingMonths.map(m => {
+                const key = `${row.id}:${m}`;
+                return (
+                  <MonthInputRow
+                    key={key}
+                    label={m}
+                    value={monthInputs[key] || ''}
+                    onChange={v => setMonthInputs(prev => ({ ...prev, [key]: v }))}
+                    onSave={() => onSaveMonth(SPEND_BONUSES_TABLE, row.id, m, false)}
+                    saving={savingKey === key}
+                  />
+                );
+              })
+            )}
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -447,12 +688,14 @@ export function BonusesTab() {
   const [signupBonuses, setSignupBonuses] = useState([]);
   const [spendBonuses, setSpendBonuses] = useState([]);
   const [cardNameById, setCardNameById] = useState({});
+  const [cardLast4ById, setCardLast4ById] = useState({});
   const [portfolioCards, setPortfolioCards] = useState([]);
   const [productOptions, setProductOptions] = useState([]);
-  const [productHolders, setProductHolders] = useState({});
+  const [spendDefsById, setSpendDefsById] = useState({});
   const [monthInputs, setMonthInputs] = useState({});
   const [savingKey, setSavingKey] = useState(null);
-  const [expandedSpend, setExpandedSpend] = useState({});
+  const [openSignupBonusId, setOpenSignupBonusId] = useState(null);
+  const [openSpendBonusId, setOpenSpendBonusId] = useState(null);
 
   const [showAddSignup, setShowAddSignup] = useState(false);
   const [signupForm, setSignupForm] = useState(EMPTY_SIGNUP_FORM);
@@ -463,41 +706,41 @@ export function BonusesTab() {
   const [spendForm, setSpendForm] = useState(EMPTY_SPEND_FORM);
   const [addSpendSubmitting, setAddSpendSubmitting] = useState(false);
   const [addSpendError, setAddSpendError] = useState(null);
+  const [addSpendResult, setAddSpendResult] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setResetStatus('');
 
-    const [signup, spend, cards, products] = await Promise.all([
+    const [signup, spend, cards, products, spendDefs] = await Promise.all([
       fetchTable(SIGNUP_BONUSES_TABLE, SIGNUP_FIELDS),
       fetchTable(SPEND_BONUSES_TABLE, SPEND_FIELDS),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Current Product', 'Status']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Last 4/Last 5 (AMEX)']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
+      fetchTable(SPEND_BONUS_DEFINITIONS_TABLE, ['Priority Score']),
     ]);
 
-    setCardNameById(Object.fromEntries(cards.map(r => [r.id, r.fields['Card Name'] || r.id])));
+    setCardNameById(Object.fromEntries(cards.map(r => {
+      const ownerId = (r.fields['Owner'] || [])[0];
+      return [r.id, stripOwnerPrefix(r.fields['Card Name'] || r.id, ownerId ? PEOPLE[ownerId] : null)];
+    })));
+    setCardLast4ById(Object.fromEntries(cards.map(r => [r.id, r.fields['Last 4/Last 5 (AMEX)'] || null])));
     setPortfolioCards(
       cards
-        .map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] }))
+        .map(r => ({
+          id: r.id,
+          name: r.fields['Card Name'] || r.id,
+          owners: r.fields['Owner'] || [],
+          last4: r.fields['Last 4/Last 5 (AMEX)'] || null,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
-
-    const productNameById = Object.fromEntries(products.map(p => [p.id, p.fields['Product Name'] || p.id]));
-    const holdersByProduct = {};
-    cards.forEach(r => {
-      if (r.fields['Status'] !== 'Active') return;
-      const productId = (r.fields['Current Product'] || [])[0];
-      const personId = (r.fields['Owner'] || [])[0];
-      if (!productId || !personId) return;
-      if (!holdersByProduct[productId]) holdersByProduct[productId] = [];
-      holdersByProduct[productId].push({ cardId: r.id, personId });
-    });
-    setProductHolders(holdersByProduct);
     setProductOptions(
-      Object.keys(holdersByProduct)
-        .map(id => ({ id, name: productNameById[id] || id, count: holdersByProduct[id].length }))
+      products
+        .map(p => ({ id: p.id, name: p.fields['Product Name'] || p.id }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
+    setSpendDefsById(Object.fromEntries(spendDefs.map(d => [d.id, d.fields])));
 
     const toReset = spend.filter(r => isPastOrToday(r.fields['Reset Date']));
     if (toReset.length > 0) {
@@ -553,6 +796,16 @@ export function BonusesTab() {
     }
   }
 
+  async function setSpendPriority(defId, score) {
+    if (!defId) return;
+    setSpendDefsById(prev => ({ ...prev, [defId]: { ...(prev[defId] || {}), 'Priority Score': score } }));
+    try {
+      await updateRecord(SPEND_BONUS_DEFINITIONS_TABLE, defId, { 'Priority Score': score });
+    } catch (e) {
+      console.error('Spend bonus priority update failed', e);
+    }
+  }
+
   async function handleAddSignup(e) {
     e.preventDefault();
     setAddSignupError(null);
@@ -590,27 +843,68 @@ export function BonusesTab() {
     setAddSpendError(null);
     if (!spendForm.productId) { setAddSpendError('Card Product is required.'); return; }
     if (!spendForm.annualTarget) { setAddSpendError('Annual Spend Target is required.'); return; }
-    if (!spendForm.resetDate) { setAddSpendError('Reset Date is required.'); return; }
-
-    const holders = productHolders[spendForm.productId] || [];
-    if (holders.length === 0) { setAddSpendError('No active cards found for this product.'); return; }
+    if (!spendForm.resetType) { setAddSpendError('Reset Type is required.'); return; }
 
     setAddSpendSubmitting(true);
-    const baseFields = {
-      'Annual Spend Target': parseFloat(spendForm.annualTarget),
-      'Reset Date': spendForm.resetDate,
-    };
-    if (spendForm.description.trim()) baseFields['Bonus Description'] = spendForm.description.trim();
-
     try {
-      const created = await Promise.all(holders.map(h => createRecord(SPEND_BONUSES_TABLE, {
-        ...baseFields,
-        'Card': [h.cardId],
-        'Person': [h.personId],
-      })));
-      setSpendBonuses(prev => [...prev, ...created]);
+      const description = spendForm.description.trim();
+      const target = parseFloat(spendForm.annualTarget);
+
+      // 1. Create the Spend Bonus Definition
+      const defFields = {
+        'Bonus Description': description,
+        'Card Product': [spendForm.productId],
+        'Annual Spend Target': target,
+        'Reset Type': spendForm.resetType,
+        'Priority Score': spendForm.priorityScore,
+      };
+      if (spendForm.notes.trim()) defFields['Notes'] = spendForm.notes.trim();
+      const definition = await createRecord(SPEND_BONUS_DEFINITIONS_TABLE, defFields);
+
+      // 2. Fetch all active Portfolio cards matching this Card Product
+      const filter = `AND(FIND("${spendForm.productId}",ARRAYJOIN({Current Product})),{Status}='Active')`;
+      const matchingCards = await fetchTable(PORTFOLIO_TABLE, ['Owner', 'Open Date', 'Status'], { filterByFormula: filter });
+
+      // 3. Existing instances, for the Card + Definition duplicate check
+      const existingInstances = await fetchTable(SPEND_BONUSES_TABLE, ['Card', 'Spend Bonus Definition']);
+      const existingKeys = new Set(
+        existingInstances.map(r => `${(r.fields['Card'] || [])[0]}::${(r.fields['Spend Bonus Definition'] || [])[0]}`)
+      );
+
+      // 4. Create an instance per matching card
+      let created = 0;
+      const cardsSeen = new Set();
+      for (const card of matchingCards) {
+        const ownerId = (card.fields['Owner'] || [])[0];
+        if (!ownerId) continue;
+        const key = `${card.id}::${definition.id}`;
+        if (existingKeys.has(key)) continue;
+
+        const resetDate = calculateSpendBonusResetDate(spendForm.resetType, card.fields['Open Date']);
+        if (!resetDate) continue;
+
+        try {
+          await createRecord(SPEND_BONUSES_TABLE, {
+            'Card': [card.id],
+            'Person': [ownerId],
+            'Annual Spend Target': target,
+            'Reset Date': resetDate,
+            'Bonus Earned': false,
+            'Spend Bonus Definition': [definition.id],
+            'Bonus Description': description,
+          });
+          created++;
+          cardsSeen.add(card.id);
+        } catch (err) {
+          console.error('Spend bonus instance create failed', err);
+        }
+      }
+
+      setAddSpendResult(`Spend bonus added — ${created} instance${created !== 1 ? 's' : ''} created across ${cardsSeen.size} card${cardsSeen.size !== 1 ? 's' : ''}`);
+      setTimeout(() => setAddSpendResult(null), 6000);
       setSpendForm(EMPTY_SPEND_FORM);
       setShowAddSpend(false);
+      await load();
     } catch (err) {
       console.error('Add spend bonus failed', err);
       setAddSpendError(String(err.message || err));
@@ -626,6 +920,7 @@ export function BonusesTab() {
     return {
       id: r.id,
       cardName: cardId ? (cardNameById[cardId] || '—') : '—',
+      last4: cardId ? (cardLast4ById[cardId] || null) : null,
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       description: f['Bonus Description'] || '',
       spendTarget: f['Spend Target'] ?? null,
@@ -655,9 +950,11 @@ export function BonusesTab() {
     const f = r.fields;
     const cardId = (f['Card'] || [])[0];
     const personId = (f['Person'] || [])[0];
+    const defId = (f['Spend Bonus Definition'] || [])[0] || '';
     return {
       id: r.id,
       cardName: cardId ? (cardNameById[cardId] || '—') : '—',
+      last4: cardId ? (cardLast4ById[cardId] || null) : null,
       personName: personId ? (PEOPLE[personId] || '—') : '—',
       description: f['Bonus Description'] || '',
       annualTarget: f['Annual Spend Target'] ?? null,
@@ -666,6 +963,8 @@ export function BonusesTab() {
       resetDate: f['Reset Date'] || '',
       daysUntilReset: f['Days Until Reset'] ?? null,
       earned: !!f['Bonus Earned'],
+      defId,
+      priorityScore: defId ? (spendDefsById[defId]?.['Priority Score'] ?? 0) : 0,
       fields: f,
     };
   });
@@ -675,11 +974,14 @@ export function BonusesTab() {
   const spendActiveCount = spendActive.length;
   const spendActiveRemaining = spendActive.reduce((s, row) => s + (row.remainingSpend ?? 0), 0);
 
-  const spendSorted = [...spendVisible.filter(row => !showActiveOnly || !row.earned)].sort((a, b) => {
-    if (a.daysUntilReset == null && b.daysUntilReset == null) return 0;
-    if (a.daysUntilReset == null) return 1;
-    if (b.daysUntilReset == null) return -1;
-    return a.daysUntilReset - b.daysUntilReset;
+  // Completed bonuses sink to the bottom (grayed out); active ones sort by
+  // priority score (5 → 1), then by least remaining spend first.
+  const spendSorted = [...spendVisible].sort((a, b) => {
+    if (a.earned !== b.earned) return a.earned ? 1 : -1;
+    if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore;
+    const aRem = a.remainingSpend ?? Infinity;
+    const bRem = b.remainingSpend ?? Infinity;
+    return aRem - bRem;
   });
 
   if (loading) {
@@ -706,15 +1008,17 @@ export function BonusesTab() {
             </span>
             <PersonFilter selected={personFilter} onChange={setPersonFilter} />
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', width: 'fit-content' }}>
-            <input
-              type="checkbox"
-              checked={showActiveOnly}
-              onChange={e => setShowActiveOnly(e.target.checked)}
-              style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
-            />
-            Show Active Only
-          </label>
+          {view === 'signup' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', width: 'fit-content' }}>
+              <input
+                type="checkbox"
+                checked={showActiveOnly}
+                onChange={e => setShowActiveOnly(e.target.checked)}
+                style={{ accentColor: '#00D4FF', width: 15, height: 15 }}
+              />
+              Show Active Only
+            </label>
+          )}
         </div>
       </div>
 
@@ -758,10 +1062,7 @@ export function BonusesTab() {
                 <SignupBonusCard
                   key={row.id}
                   row={row}
-                  monthInputs={monthInputs}
-                  setMonthInputs={setMonthInputs}
-                  savingKey={savingKey}
-                  onSaveMonth={saveMonth}
+                  onOpen={setOpenSignupBonusId}
                   onToggleAchieved={r => toggleFlag(SIGNUP_BONUSES_TABLE, r.id, 'Achieved', r.achieved, true)}
                 />
               ))}
@@ -775,12 +1076,20 @@ export function BonusesTab() {
             <StatCard label="Total Remaining Spend" value={$$(spendActiveRemaining)} accent="#00E676" />
           </div>
 
+          {addSpendResult && (
+            <div style={{
+              background: 'rgba(0,230,118,0.1)', border: '1px solid rgba(0,230,118,0.35)',
+              borderRadius: 10, padding: '0.75rem 1rem', color: '#00E676', fontSize: '0.85rem', fontWeight: 600,
+            }}>
+              {addSpendResult}
+            </div>
+          )}
+
           {!showAddSpend && <AddBonusButton onClick={() => setShowAddSpend(true)} />}
 
           {showAddSpend && (
             <AddSpendBonusForm
               productOptions={productOptions}
-              productHolders={productHolders}
               form={spendForm}
               setForm={setSpendForm}
               onSubmit={handleAddSpend}
@@ -802,25 +1111,22 @@ export function BonusesTab() {
                 textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600,
               }}>
                 <span>Card</span>
+                <span>Last 4/5</span>
                 <span>Person</span>
                 <span>Target</span>
                 <span>Current</span>
                 <span>Remaining</span>
+                <span>Priority</span>
                 <span style={{ textAlign: 'center' }}>Earned</span>
-                <span />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {spendSorted.map(row => (
                   <SpendBonusRow
                     key={row.id}
                     row={row}
-                    expanded={!!expandedSpend[row.id]}
-                    onToggleExpand={() => setExpandedSpend(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
-                    monthInputs={monthInputs}
-                    setMonthInputs={setMonthInputs}
-                    savingKey={savingKey}
-                    onSaveMonth={saveMonth}
+                    onOpen={setOpenSpendBonusId}
                     onToggleEarned={r => toggleFlag(SPEND_BONUSES_TABLE, r.id, 'Bonus Earned', r.earned, false)}
+                    onSetPriority={setSpendPriority}
                   />
                 ))}
               </div>
@@ -828,6 +1134,36 @@ export function BonusesTab() {
           )}
         </>
       )}
+
+      {openSignupBonusId && (() => {
+        const activeRow = signupEnriched.find(r => r.id === openSignupBonusId);
+        if (!activeRow) return null;
+        return (
+          <SignupBonusMonthPanel
+            row={activeRow}
+            monthInputs={monthInputs}
+            setMonthInputs={setMonthInputs}
+            savingKey={savingKey}
+            onSaveMonth={saveMonth}
+            onClose={() => setOpenSignupBonusId(null)}
+          />
+        );
+      })()}
+
+      {openSpendBonusId && (() => {
+        const activeRow = spendEnriched.find(r => r.id === openSpendBonusId);
+        if (!activeRow) return null;
+        return (
+          <SpendBonusMonthPanel
+            row={activeRow}
+            monthInputs={monthInputs}
+            setMonthInputs={setMonthInputs}
+            savingKey={savingKey}
+            onSaveMonth={saveMonth}
+            onClose={() => setOpenSpendBonusId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

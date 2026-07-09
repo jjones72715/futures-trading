@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { fetchTable, updateRecord } from '../services/airtable.js';
 import { HOTELS_TABLE, PORTFOLIO_TABLE, PERK_INSTANCES_TABLE } from '../config/tables.js';
 import { PEOPLE, ALL_PEOPLE } from '../config/constants.js';
-import { $$ } from '../utils/format.js';
+import { $$, stripOwnerPrefix } from '../utils/format.js';
 import { StatCard } from '../components/StatCard.jsx';
 import { PersonFilter } from '../components/PersonFilter.jsx';
 
@@ -80,6 +80,7 @@ export function HotelsTab() {
   const [hotelRecords, setHotelRecords] = useState([]);
   const [perkCredits, setPerkCredits] = useState([]);
   const [cardNames, setCardNames] = useState({});
+  const [cardLast4, setCardLast4] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPerson, setSelectedPerson] = useState(ALL_PEOPLE);
@@ -91,12 +92,18 @@ export function HotelsTab() {
     Promise.all([
       fetchTable(HOTELS_TABLE, HOTEL_FIELDS),
       fetchTable(PERK_INSTANCES_TABLE, PERK_FIELDS),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Last 4/Last 5 (AMEX)']),
     ])
       .then(([hotelData, perkData, cardData]) => {
         const nameMap = {};
-        cardData.forEach(r => { nameMap[r.id] = r.fields['Card Name'] || r.id; });
+        const last4Map = {};
+        cardData.forEach(r => {
+          const ownerId = (r.fields['Owner'] || [])[0];
+          nameMap[r.id] = stripOwnerPrefix(r.fields['Card Name'] || r.id, ownerId ? PEOPLE[ownerId] : null);
+          last4Map[r.id] = r.fields['Last 4/Last 5 (AMEX)'] || null;
+        });
         setCardNames(nameMap);
+        setCardLast4(last4Map);
         setHotelRecords(hotelData);
         const credits = perkData.filter(r => {
           const ct = extractSelectName(r.fields['Credit Type']);
@@ -208,8 +215,8 @@ export function HotelsTab() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <SectionHeader title="Free Nights" count={freeNights.length} />
         <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 100px 1fr 1.2fr 90px 90px 80px 60px', gap: '0.75rem', padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            {['Card', 'Brand', 'Person', 'Benefit Type', 'Est. Value', 'Expires', 'Days Left', 'Used'].map((h, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 65px 100px 1fr 1.2fr 90px 90px 80px 60px', gap: '0.75rem', padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            {['Card', 'Last 4/5', 'Brand', 'Person', 'Benefit Type', 'Est. Value', 'Expires', 'Days Left', 'Used'].map((h, i) => (
               <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
             ))}
           </div>
@@ -225,8 +232,9 @@ export function HotelsTab() {
             const highlight = urgencyStyle(days);
             const dateColor = urgent ? '#FFD700' : warning ? '#FF8C00' : 'rgba(255,255,255,0.6)';
             return (
-              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 100px 1fr 1.2fr 90px 90px 80px 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1, ...highlight }}>
+              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 65px 100px 1fr 1.2fr 90px 90px 80px 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1, ...highlight }}>
                 <span style={{ fontSize: '0.85rem', color: urgent ? '#FFD700' : warning ? '#FF8C00' : '#fff', fontWeight: 500 }}>{cardIds.map(id => cardNames[id] || id).join(', ') || '—'}</span>
+                <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>{cardLast4[cardIds[0]] ? `···${cardLast4[cardIds[0]]}` : '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)' }}>{r.fields['Hotel Brand'] || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{getPersonName(personIds)}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{r.fields['Benefit Type'] || '—'}</span>
@@ -246,8 +254,8 @@ export function HotelsTab() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <SectionHeader title="Hotel Credits" count={hotelCredits.length} />
         <div style={{ background: '#172033', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 100px 1.2fr 60px', gap: '0.75rem', padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            {['Card', 'Perk', 'Person', 'Amount', 'Next Reset', 'Used'].map((h, i) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 65px 2fr 1fr 100px 1.2fr 60px', gap: '0.75rem', padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            {['Card', 'Last 4/5', 'Perk', 'Person', 'Amount', 'Next Reset', 'Used'].map((h, i) => (
               <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
             ))}
           </div>
@@ -264,8 +272,9 @@ export function HotelsTab() {
             const highlight = urgencyStyle(days);
             const dateColor = urgent ? '#FFD700' : warning ? '#FF8C00' : 'rgba(255,255,255,0.6)';
             return (
-              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 100px 1.2fr 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1, ...highlight }}>
+              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '2fr 65px 2fr 1fr 100px 1.2fr 60px', gap: '0.75rem', padding: '0.65rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center', opacity: used ? 0.4 : 1, ...highlight }}>
                 <span style={{ fontSize: '0.85rem', color: urgent ? '#FFD700' : warning ? '#FF8C00' : '#fff', fontWeight: 500 }}>{cardIds.map(id => cardNames[id] || id).join(', ') || '—'}</span>
+                <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>{cardLast4[cardIds[0]] ? `···${cardLast4[cardIds[0]]}` : '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{r.fields['Label'] || '—'}</span>
                 <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>{getPersonName(personIds)}</span>
                 <span style={{ fontSize: '0.82rem', color: '#00D4FF', fontWeight: 700 }}>{r.fields['Credit Amount'] != null ? `$${r.fields['Credit Amount']}` : '—'}</span>
