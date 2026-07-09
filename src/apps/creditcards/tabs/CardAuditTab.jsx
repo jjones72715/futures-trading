@@ -102,6 +102,27 @@ function monthYearLabel(d) {
   return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function ordinal(n) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+// Fee is paid when the card opens (1st Annual Fee), then again on each anniversary.
+function annualFeeNumber(openDateStr, feeDate) {
+  if (!openDateStr || !feeDate) return null;
+  const open = new Date(openDateStr + 'T00:00:00');
+  let years = feeDate.getFullYear() - open.getFullYear();
+  const anniversaryThisYear = new Date(feeDate.getFullYear(), open.getMonth(), open.getDate());
+  if (feeDate < anniversaryThisYear) years -= 1;
+  return years + 1;
+}
+
 function urgencyTint(days) {
   if (days == null) return 'transparent';
   if (days <= 30) return 'rgba(255,61,0,0.16)';
@@ -197,6 +218,22 @@ function ProductChips({ productIds, productsById }) {
   );
 }
 
+function AnnualFeeNumberTag({ n }) {
+  if (n == null) return null;
+  const early = n <= 2;
+  return (
+    <div
+      title={early ? `Keep this card open until the 3rd Annual Fee.` : undefined}
+      style={{
+        fontSize: '0.7rem', marginTop: 2, fontWeight: early ? 700 : 400,
+        color: early ? '#FF6D45' : 'rgba(255,255,255,0.35)',
+      }}
+    >
+      {ordinal(n)} Annual Fee{early ? ' ⚠️' : ''}
+    </div>
+  );
+}
+
 function RowActionBtn({ onClick, disabled, title, active, children }) {
   return (
     <button
@@ -236,7 +273,10 @@ function CardAuditRow({ card, onToggleWTU, savingWTU, tinted, onOpenAnnualReview
       <div><TotalPerkValueCell netValue={card.netValue} hasAnyValue={card.hasAnyValue} mode="audit" /></div>
       <div><DifferenceCell netValue={card.netValue} annualFee={card.annualFee} hasAnyValue={card.hasAnyValue} mode="audit" /></div>
       <div><AnnualFeeBadge days={card.daysUntilFee} /></div>
-      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>{fmtDate(card.feeDate)}</div>
+      <div>
+        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>{fmtDate(card.feeDate)}</div>
+        <AnnualFeeNumberTag n={card.annualFeeNumber} />
+      </div>
       <div><DecisionBadge decision={card.decision} /></div>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <input
@@ -308,7 +348,10 @@ function PastDueCard({ card, product, productsById, form, onFormChange, onConfir
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>{card.cardName}</div>
-          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>{card.ownerName} · Fee was due {fmtDate(card.feeDate)}</div>
+          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
+            {card.ownerName} · Fee was due {fmtDate(card.feeDate)}
+            {card.annualFeeNumber != null && ` · ${ordinal(card.annualFeeNumber)} Annual Fee`}
+          </div>
         </div>
         <DecisionBadge decision={decision} />
       </div>
@@ -748,6 +791,22 @@ function AnnualDecisionPanel({ card, productsById, netValue, onClose, onSave, sa
     <SlideOver onClose={onClose} width={480}>
       <SlideOverHeader title={`${card.cardName} — Annual Decision`} onClose={onClose} />
 
+      {card.annualFeeNumber != null && (
+        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', marginTop: -12, marginBottom: '1rem' }}>
+          This is the {ordinal(card.annualFeeNumber)} Annual Fee.
+        </div>
+      )}
+
+      {card.annualFeeNumber != null && card.annualFeeNumber <= 2 && (
+        <div style={{
+          background: 'rgba(255,109,0,0.12)', border: '1px solid rgba(255,109,0,0.4)',
+          borderRadius: 10, padding: '0.75rem 1rem', color: '#FF6D45', fontSize: '0.85rem', fontWeight: 600,
+          marginBottom: '1.25rem',
+        }}>
+          ⚠️ This card needs to stay open until the 3rd Annual Fee.
+        </div>
+      )}
+
       <div style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
         <div>
           <div style={lbl}>Net Value</div>
@@ -943,6 +1002,7 @@ export function CardAuditTab() {
       annualFee: f['Annual Fee Amount'] ?? null,
       daysUntilFee: days,
       feeDate: days != null ? addDays(todayDate(), days) : null,
+      annualFeeNumber: annualFeeNumber(f['Open Date'] || '', days != null ? addDays(todayDate(), days) : null),
       decision: f['Decision'] || '',
       willingToUpgrade: !!f['Willing to Upgrade'],
       decisionNotes: f['Decision Notes'] || '',
