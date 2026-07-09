@@ -36,13 +36,6 @@ function detectIssuer(name) {
   return found === 'US Bank' ? 'U.S. Bank' : found;
 }
 
-function parseAnnualFee(text) {
-  if (!text) return null;
-  if (/no annual fee|no fee/i.test(text)) return 0;
-  const m = text.replace(/,/g, '').match(/\$(\d+(?:\.\d+)?)/);
-  return m ? parseFloat(m[1]) : null;
-}
-
 // Real-page tags carry extra classes/attributes beyond the one we care
 // about (e.g. class="BOhd some-other-class"), so match the class as one
 // token among possibly several rather than requiring an exact attribute
@@ -61,10 +54,16 @@ const SECTION_RE = new RegExp(
   'gi'
 );
 
-const NAME_RE = new RegExp(`${classAttr('BOhd')}\\s*<a[^>]*>([\\s\\S]*?)<\\/a>`, 'i');
-const BONUS_RE = new RegExp(`${classAttr('BObon')}([\\s\\S]*?)(?:<span|<\\/div>)`, 'i');
-const FEE_RE = new RegExp(`${classAttr('BOmo')}[\\s\\S]*<strong[^>]*>([^<]*)<\\/strong>\\s*<\\/div>`, 'i');
-const VALUE_RE = /\$(-?[\d,]+)\s*1st Yr Value Estimate/i;
+// The 178/56-row comparison tables use a compact per-card layout: name
+// wrapped in <strong><a>, a short bonus blurb, then a <br>, then the value
+// estimate somewhere after. (A separate, richer "BObox" widget with Annual
+// Fee/review text/earning-rate tables exists elsewhere on the page for
+// individual card spotlights, but it is not what populates these tables —
+// Annual Fee genuinely isn't present here, hence null; the frontend
+// backfills it from our own Card Products table when a card matches one
+// we already track.) Name capture tolerates embedded tags (a few card
+// names span lines with a stray <br>).
+const NAME_BONUS_VALUE_RE = /<strong[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>\s*<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<br\s*\/?>[\s\S]*?\$(-?[\d,]+)\s*1st Yr Value Estimate/i;
 const ROW_RE = /<tr\b[^>]*>[\s\S]*?<\/tr>/gi;
 
 function parseCards(html) {
@@ -82,43 +81,34 @@ function parseCards(html) {
     const rows = tableHtml.match(ROW_RE) || [];
     let matchedRows = 0;
     rows.forEach(rowHtml => {
-      const nameMatch = NAME_RE.exec(rowHtml);
-      if (!nameMatch) return;
-      const name = stripTags(nameMatch[1]);
+      const match = NAME_BONUS_VALUE_RE.exec(rowHtml);
+      if (!match) return;
+      const name = stripTags(match[1]);
       if (!name) return;
       matchedRows += 1;
 
-      const bonusMatch = BONUS_RE.exec(rowHtml);
-      const welcomeBonus = bonusMatch ? stripTags(bonusMatch[1]) : '';
-
-      const feeMatch = FEE_RE.exec(rowHtml);
-      const annualFee = feeMatch ? parseAnnualFee(stripTags(feeMatch[1])) : null;
-
-      const valueMatch = VALUE_RE.exec(rowHtml);
-      const fmValue = valueMatch ? parseInt(valueMatch[1].replace(/,/g, ''), 10) : null;
+      const welcomeBonus = stripTags(match[2]);
+      const fmValue = parseInt(match[3].replace(/,/g, ''), 10);
 
       target.push({
         name,
         issuer: detectIssuer(name),
         fm_value: Number.isFinite(fmValue) ? fmValue : null,
-        annual_fee: annualFee,
+        annual_fee: null,
         welcome_bonus: welcomeBonus,
         type,
       });
     });
 
-    sections.push({ type, rowCount: rows.length, matchedRows });
+    sections.push({
+      type,
+      rowCount: rows.length,
+      matchedRows,
+      sampleRow: matchedRows === 0 && rows[0] ? rows[0].slice(0, 800) : undefined,
+    });
   }
 
   return { consumer, business, sections };
-}
-
-function snippetAround(html, marker, radius) {
-  const idx = html.indexOf(marker);
-  if (idx === -1) return null;
-  const start = Math.max(0, idx - radius);
-  const end = Math.min(html.length, idx + marker.length + radius);
-  return html.slice(start, end);
 }
 
 export const handler = async () => {
@@ -158,7 +148,6 @@ export const handler = async () => {
       htmlLength: html.length,
       markers: {
         BOlegacy: html.includes('BOlegacy'),
-        BObox: html.includes('BObox'),
         BOtinfo: html.includes('BOtinfo'),
         tablepress: html.includes('tablepress'),
         consumerHeading: /Best\s+Consumer\s+Card Offers/i.test(html),
@@ -168,8 +157,6 @@ export const handler = async () => {
       },
       sectionsMatched: sections.length,
       sections,
-      snippetAroundBOlegacy: snippetAround(html, 'BOlegacy', 600),
-      snippetAroundBOhd: snippetAround(html, 'BOhd', 400),
     };
     return {
       statusCode: 200,
