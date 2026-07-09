@@ -9,7 +9,6 @@ const EMPTY = {
   programId: '',
   currentBalance: '',
   expirationDate: '',
-  cardIds: [],
 };
 
 const inp = {
@@ -68,27 +67,11 @@ export function AddPointBalanceTab() {
   }, []);
 
   function selectOwner(id) {
-    setForm(prev => ({ ...prev, ownerId: prev.ownerId === id ? '' : id, programId: '', cardIds: [] }));
+    setForm(prev => ({ ...prev, ownerId: prev.ownerId === id ? '' : id, programId: '' }));
   }
 
   function selectProgram(id) {
-    if (form.programId === id) {
-      setForm(prev => ({ ...prev, programId: '', cardIds: [] }));
-      return;
-    }
-    const eligible = portfolio.filter(c =>
-      c.fields['Status'] === 'Active' &&
-      (c.fields['Owner'] || []).includes(form.ownerId) &&
-      (c.fields['Rewards Program'] || []).includes(id)
-    );
-    setForm(prev => ({ ...prev, programId: id, cardIds: eligible.map(c => c.id) }));
-  }
-
-  function toggleCard(id) {
-    setForm(prev => ({
-      ...prev,
-      cardIds: prev.cardIds.includes(id) ? prev.cardIds.filter(c => c !== id) : [...prev.cardIds, id],
-    }));
+    setForm(prev => ({ ...prev, programId: prev.programId === id ? '' : id }));
   }
 
   function set(field) {
@@ -102,12 +85,6 @@ export function AddPointBalanceTab() {
       .filter(Boolean)
   );
   const availablePrograms = programs.filter(p => !trackedProgramIds.has(p.id));
-
-  const eligibleCards = portfolio.filter(c =>
-    c.fields['Status'] === 'Active' &&
-    (c.fields['Owner'] || []).includes(form.ownerId) &&
-    (c.fields['Rewards Program'] || []).includes(form.programId)
-  );
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -131,7 +108,13 @@ export function AddPointBalanceTab() {
       'Last Updated': toAirtableDate(new Date()),
     };
     if (form.expirationDate) fields['Expiration Date'] = form.expirationDate;
-    if (form.cardIds.length) fields['Credit Card Portfolio'] = form.cardIds;
+
+    const eligibleCards = portfolio.filter(c =>
+      c.fields['Status'] === 'Active' &&
+      (c.fields['Owner'] || []).includes(form.ownerId) &&
+      (c.fields['Rewards Program'] || []).includes(form.programId)
+    );
+    if (eligibleCards.length) fields['Credit Card Portfolio'] = eligibleCards.map(c => c.id);
 
     try {
       const result = await createRecord(POINT_BALANCES_TABLE, fields);
@@ -187,26 +170,6 @@ export function AddPointBalanceTab() {
               {availablePrograms.map(p => (
                 <PillBtn key={p.id} active={form.programId === p.id} onClick={() => selectProgram(p.id)}>
                   {p.fields['Program Name'] || p.id}
-                </PillBtn>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Linked Cards — auto-populated from cards that earn this program */}
-      {form.ownerId && form.programId && (
-        <div style={cardStyle}>
-          <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.85rem', fontSize: '0.9rem' }}>Linked Cards</div>
-          {eligibleCards.length === 0 ? (
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.88rem' }}>
-              No active cards found for {PEOPLE[form.ownerId]} that earn this program. You can still add the balance without a linked card.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {eligibleCards.map(c => (
-                <PillBtn key={c.id} active={form.cardIds.includes(c.id)} onClick={() => toggleCard(c.id)}>
-                  {c.fields['Card Name'] || c.id}
                 </PillBtn>
               ))}
             </div>
