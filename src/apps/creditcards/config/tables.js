@@ -14,3 +14,4 @@ export const SIGNUP_BONUSES_TABLE = 'tblRVlvqetNHxlclv';
 export const SPEND_BONUSES_TABLE = 'tbl2VXLEeFzSkU3h7';
 export const SUGGESTIONS_TABLE = 'tblCkyQNxt6qaWed8';
 export const SPEND_BONUS_DEFINITIONS_TABLE = 'tblJxh4wm9tod7PNs';
+export const CARD_INELIGIBILITY_TABLE = 'tbleRVNNSESr61fqx';

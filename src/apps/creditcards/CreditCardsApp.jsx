@@ -9,6 +9,7 @@ import { AddPointBalanceTab } from './tabs/AddPointBalanceTab.jsx';
 import { BonusesTab } from './tabs/BonusesTab.jsx';
 import { SuggestionsTab } from './tabs/SuggestionsTab.jsx';
 import { CardAuditTab } from './tabs/CardAuditTab.jsx';
+import { CardRecommendationsTab } from './tabs/CardRecommendationsTab.jsx';
 
 const TABS = [
   { id: 'home', label: 'Home' },
@@ -76,6 +77,7 @@ export default function CreditCardsApp() {
         {tab === 'suggestions' && <SuggestionsTab />}
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'actions' && <CardAuditTab />}
+        {tab === 'recommendations' && <CardRecommendationsTab />}
         {tab === 'add-balance' && (
           <div>
             <button onClick={() => setTab('point-balances')} style={{
@@ -98,7 +100,7 @@ export default function CreditCardsApp() {
             <HotelBenefitTemplatesTab />
           </div>
         )}
-        {!['home', 'portfolio', 'point-balances', 'benefits', 'bonuses', 'suggestions', 'hotels', 'actions', 'add-balance', 'hotel-templates'].includes(tab) && (
+        {!['home', 'portfolio', 'point-balances', 'benefits', 'bonuses', 'suggestions', 'hotels', 'actions', 'recommendations', 'add-balance', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',
