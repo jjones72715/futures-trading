@@ -106,6 +106,26 @@ function BlockTitle({ children, accent, badge }) {
   );
 }
 
+function SubBox({ label, value, valueColor, accent, valueSize = '1.9rem' }) {
+  return (
+    <div style={{
+      flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.04)', borderRadius: 10,
+      border: '1px solid rgba(255,255,255,0.08)', padding: '0.85rem 1rem',
+      display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8,
+    }}>
+      <div style={{ fontSize: '0.66rem', fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize: valueSize, fontWeight: 800, color: valueColor, lineHeight: 1.05,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Dashboard ---------------- */
 
 export function DashboardTab({ onNavigate }) {
@@ -243,14 +263,17 @@ export function DashboardTab({ onNavigate }) {
   const leastValuable = [...valuedCards].sort((a, b) => a.netScore - b.netScore).slice(0, 5);
 
   /* ---- Block 7: Top Programs ---- */
-  const programRows = balancesFiltered
-    .map(b => ({
-      id: b.id,
-      programName: programNameById[resolveSingle(b.fields['Program'])] || '—',
-      points: b.fields['Current Balance'] || 0,
-      valuePerPoint: resolveSingle(b.fields['Value Per Point']),
-      programValue: b.fields['Program Value'] || 0,
-    }))
+  const programTotals = {};
+  balancesFiltered.forEach(b => {
+    const programId = resolveSingle(b.fields['Program']);
+    if (!programId) return;
+    if (!programTotals[programId]) {
+      programTotals[programId] = { id: programId, programName: programNameById[programId] || '—', points: 0, programValue: 0 };
+    }
+    programTotals[programId].points += b.fields['Current Balance'] || 0;
+    programTotals[programId].programValue += b.fields['Program Value'] || 0;
+  });
+  const programRows = Object.values(programTotals)
     .sort((a, b) => b.programValue - a.programValue)
     .slice(0, 5);
 
@@ -279,14 +302,16 @@ export function DashboardTab({ onNavigate }) {
       const openDate = c.fields['Open Date'];
       if (!openDate) return false;
       return new Date(openDate + 'T00:00:00') > cutoff;
-    });
-    let dropDate = null;
-    if (cards.length > 0) {
-      const earliest = cards.reduce((min, c) => (c.fields['Open Date'] < min ? c.fields['Open Date'] : min), cards[0].fields['Open Date']);
-      dropDate = new Date(earliest + 'T00:00:00');
-      dropDate.setMonth(dropDate.getMonth() + 24);
+    }).sort((a, b) => a.fields['Open Date'].localeCompare(b.fields['Open Date']));
+
+    const count = cards.length;
+    const neededToFall = count - 4;
+    let fourDate = null;
+    if (neededToFall > 0) {
+      fourDate = new Date(cards[neededToFall - 1].fields['Open Date'] + 'T00:00:00');
+      fourDate.setMonth(fourDate.getMonth() + 24);
     }
-    return { count: cards.length, dropDate };
+    return { count, fourDate };
   }
 
   const per524 = FILTER_PEOPLE.map(name => ({ name, ...personal524(PERSON_ID_BY_NAME[name]) }));
@@ -355,26 +380,18 @@ export function DashboardTab({ onNavigate }) {
           </Block>
 
           <Block {...accents.fees} ready={portfolioReady} skeleton={<SkeletonStatBlock />}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: accents.fees.accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Annual Fees
-            </div>
-            <div style={{ fontSize: '2.4rem', fontWeight: 800, color: accents.fees.accent, lineHeight: 1.1, marginTop: 6 }}>
-              {$$(totalFees)}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: feesDueSoonCount > 0 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)', marginTop: 6 }}>
-              {feesDueSoonCount} card{feesDueSoonCount !== 1 ? 's' : ''} with fees due in 60 days
+            <BlockTitle accent={accents.fees.accent}>Annual Fees</BlockTitle>
+            <div style={{ display: 'flex', gap: '0.75rem', flex: 1 }}>
+              <SubBox label="Total Annual Fees" value={$$(totalFees)} valueColor="#00C853" accent={accents.fees.accent} valueSize="1.6rem" />
+              <SubBox label="Due in 60 Days" value={feesDueSoonCount} valueColor="#FF1744" accent={accents.fees.accent} valueSize="1.6rem" />
             </div>
           </Block>
 
           <Block {...accents.points} ready={pointsReady} skeleton={<SkeletonStatBlock />}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: accents.points.accent, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Points / Miles
-            </div>
-            <div style={{ fontSize: '1.7rem', fontWeight: 800, color: accents.points.accent, lineHeight: 1.2, marginTop: 6, whiteSpace: 'nowrap' }}>
-              {fmtNum(totalPoints)} pts <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: '1.2rem' }}>—</span> {$$(totalPointsValue)}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>
-              Total points value across all programs
+            <BlockTitle accent={accents.points.accent}>Points / Miles</BlockTitle>
+            <div style={{ display: 'flex', gap: '0.75rem', flex: 1 }}>
+              <SubBox label="Total Points" value={`${fmtNum(totalPoints)} pts`} valueColor="#FFD700" accent={accents.points.accent} valueSize="1.25rem" />
+              <SubBox label="Total Value" value={$$(totalPointsValue)} valueColor="#FFD700" accent={accents.points.accent} valueSize="1.6rem" />
             </div>
           </Block>
         </div>
@@ -459,45 +476,40 @@ export function DashboardTab({ onNavigate }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', minHeight: 0 }}>
           <Block {...accents.programs} ready={pointsReady} skeleton={<SkeletonListBlock rows={5} />}>
             <BlockTitle accent={accents.programs.accent}>Top Programs</BlockTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', flex: 1, justifyContent: 'space-evenly' }}>
               {programRows.length === 0 ? (
                 <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.82rem' }}>No point balances yet.</div>
               ) : programRows.map(p => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '0.78rem', fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.08)',
-                    padding: '2px 8px', borderRadius: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '40%',
-                  }}>
+                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 10, alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.02rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.programName}
                   </span>
-                  <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>{fmtNum(p.points)} pts</span>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: accents.programs.accent }}>{$$(p.programValue)}</span>
+                  <span style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>{fmtNum(p.points)} pts</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 700, color: '#FFD700', textAlign: 'right' }}>{$$(p.programValue)}</span>
                 </div>
               ))}
-            </div>
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 8, paddingTop: 8, flexShrink: 0 }}>
-              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: accents.programs.accent }}>{$$(totalPointsValue)}</span>
-              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', marginLeft: 8 }}>total points value</span>
             </div>
           </Block>
 
           <Block {...accents.hotel} ready={hotelsReady} skeleton={<SkeletonListBlock rows={5} />}>
             <BlockTitle accent={accents.hotel.accent}>Hotel Benefits</BlockTitle>
-            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: 8, flexShrink: 0 }}>
-              <div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: accents.hotel.accent }}>{freeNightsAvailable}</div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Free Nights Available</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: expiringCerts.length > 0 ? '#FFD700' : 'rgba(255,255,255,0.3)' }}>{expiringCerts.length}</div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)' }}>Expiring in 60 days</div>
-              </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: 10, flexShrink: 0 }}>
+              <SubBox label="Free Nights Available" value={freeNightsAvailable} valueColor="#00BCD4" accent={accents.hotel.accent} valueSize="1.6rem" />
+              <SubBox
+                label="Expiring in 60 Days"
+                value={expiringCerts.length}
+                valueColor={expiringCerts.length > 0 ? '#FFD700' : 'rgba(255,255,255,0.3)'}
+                accent={accents.hotel.accent}
+                valueSize="1.6rem"
+              />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, overflowY: 'auto', flex: 1 }}>
-              {expiringCerts.map(h => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', flex: 1, justifyContent: expiringCerts.length ? 'flex-start' : 'center' }}>
+              {expiringCerts.length === 0 ? (
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', textAlign: 'center' }}>No certs expiring soon.</div>
+              ) : expiringCerts.map(h => {
                 const days = h.fields['Days Until Expiration'];
                 return (
-                  <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                  <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
                     <span style={{ color: '#FFD700', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.fields['Name'] || 'Free Night'}</span>
                     <span style={{ color: '#FFD700', flexShrink: 0, marginLeft: 8 }}>{h.fields['Expiration Date'] || '—'} ({days}d)</span>
                   </div>
@@ -523,21 +535,22 @@ export function DashboardTab({ onNavigate }) {
                 </div>
               </>
             ) : selected524 && (
-              <>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: selected524.count >= 5 ? '#FF5C5C' : '#00E676' }}>
-                  {selected524.count}/24
-                </div>
-                {selected524.count >= 5 && selected524.dropDate && (
-                  <div style={{ fontSize: '0.82rem', color: '#FF5C5C', marginTop: 6 }}>
-                    → {selected524.count - 1}/24 on {fmtDate(selected524.dropDate)}
-                  </div>
-                )}
-                {selected524.count < 5 && selected524.dropDate && (
-                  <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', marginTop: 6 }}>
-                    Next card falls off {fmtDate(selected524.dropDate)}
-                  </div>
-                )}
-              </>
+              <div style={{ display: 'flex', gap: '0.75rem', flex: 1 }}>
+                <SubBox
+                  label="Current Status"
+                  value={`${selected524.count}/24`}
+                  valueColor={selected524.count >= 5 ? '#FF5C5C' : '#00E676'}
+                  accent={accents.chase.accent}
+                  valueSize="1.7rem"
+                />
+                <SubBox
+                  label="4/24 Date"
+                  value={selected524.count <= 4 ? '✓ Eligible' : fmtDate(selected524.fourDate)}
+                  valueColor={selected524.count <= 4 ? '#00E676' : '#fff'}
+                  accent={accents.chase.accent}
+                  valueSize={selected524.count <= 4 ? '1.4rem' : '1.5rem'}
+                />
+              </div>
             )}
           </Block>
         </div>
