@@ -37,6 +37,7 @@ function calculateSpendBonusResetDate(resetType, openDateStr) {
 }
 
 const REAL_RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
+const ALL_RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Value Only'];
 const REAL_BENEFIT_TYPES = ['Food Credit', 'Shopping Credit', 'Membership Credit', 'Entertainment Credit', 'Hotel Credit', 'Flight Credit', 'Other Credit'];
 
 const inp = {
@@ -828,7 +829,7 @@ export function BenefitsTrackerTab() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginRight: 4 }}>Cycle</span>
             <PillBtn active={cycleFilter === 'All'} onClick={() => setCycleFilter('All')}>All</PillBtn>
-            {RESET_CYCLES.map(c => (
+            {ALL_RESET_CYCLES.map(c => (
               <PillBtn key={c} active={cycleFilter === c} onClick={() => setCycleFilter(c)}>{c}</PillBtn>
             ))}
           </div>
