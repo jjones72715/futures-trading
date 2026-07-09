@@ -15,91 +15,62 @@ function stripTags(html) {
   return decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
-function parseMoney(text) {
-  if (!text) return null;
-  const match = text.replace(/,/g, '').match(/\$?\s*(\d+(?:\.\d+)?)/);
-  if (!match) return null;
-  const n = parseFloat(match[1]);
-  return Number.isFinite(n) ? n : null;
+// FM has no bank/issuer text on this page — cards are identified only by
+// name, so issuer is inferred from known bank names appearing in it.
+// Co-brand cards that don't include the issuing bank in their name (e.g.
+// "United Explorer Card" is a Chase product) will resolve to "Unknown" here;
+// the frontend improves on this by cross-referencing our own Card Products
+// table when a card matches a known product.
+const ISSUER_KEYWORDS = [
+  'American Express', 'Capital One', 'Wells Fargo', 'Bank of America',
+  'U.S. Bank', 'US Bank', 'Morgan Stanley', 'Barclays', 'Citizens',
+  'Chase', 'Citi', 'Discover', 'UBS', 'HSBC', 'PNC', 'BECU', 'PenFed',
+  'Synchrony', 'USAA', 'Huntington', 'First Tech', 'Fairwinds', 'Brex',
+  'Robinhood', 'SoFi', 'Bilt', 'Venmo', 'Paypal', 'FNBO', 'Schwab', 'Amex',
+];
+
+function detectIssuer(name) {
+  const lower = name.toLowerCase();
+  const found = ISSUER_KEYWORDS.find(k => lower.includes(k.toLowerCase()));
+  if (!found) return 'Unknown';
+  return found === 'US Bank' ? 'U.S. Bank' : found;
 }
 
-// Column roles are resolved from each table's own header row (keyword match)
-// rather than assumed positions, since FM's column order isn't guaranteed.
-function resolveColumnRoles(headerCells) {
-  const roles = {};
-  headerCells.forEach((text, i) => {
-    const t = text.toLowerCase();
-    if (roles.value === undefined && /(value|worth|estimate)/.test(t)) roles.value = i;
-    else if (roles.fee === undefined && /fee/.test(t)) roles.fee = i;
-    else if (roles.bonus === undefined && /(bonus|offer|welcome)/.test(t)) roles.bonus = i;
-    else if (roles.name === undefined && /(card|name)/.test(t)) roles.name = i;
-  });
-  if (roles.name === undefined) roles.name = 0;
-  return roles;
-}
+// Each "Best Consumer/Business Card Offers" heading is immediately followed
+// by one big table listing every card for that type, one card per row.
+const SECTION_RE = /<div class="BOlegacy">\s*<strong>\s*Best\s+(Consumer|Business)\s+Card Offers\s*<\/strong>[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/gi;
 
-function extractRows(tableHtml) {
-  return (tableHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || []).map(rowHtml => {
-    const isHeaderRow = /<th[\s>]/i.test(rowHtml);
-    const cells = (rowHtml.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || []).map(stripTags);
-    return { cells, isHeaderRow };
-  });
-}
-
-function issuerAndTypeFromHeading(headingText) {
-  const isBusiness = /business/i.test(headingText);
-  const type = isBusiness ? 'business' : 'consumer';
-  const issuer = headingText
-    .replace(/(personal|consumer|business)/gi, '')
-    .replace(/cards?/gi, '')
-    .replace(/best|offers?|top/gi, '')
-    .trim();
-  return { issuer: issuer || 'Unknown', type };
-}
+// Per row: name link, then a short bonus blurb, then the "$X 1st Yr Value
+// Estimate" text. Name capture allows embedded tags (a few card names span
+// lines with a stray <br>) and gets stripped afterward.
+const ROW_RE = /<strong>\s*<a[^>]*href="[^"]*"[^>]*>([\s\S]*?)<\/a>\s*<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<br\s*\/?>[\s\S]*?\$(-?[\d,]+)\s*1st Yr Value Estimate/gi;
 
 function parseCards(html) {
   const consumer = [];
   const business = [];
 
-  const sectionRe = /<h[2-4][^>]*>([\s\S]*?)<\/h[2-4]>([\s\S]*?)(?=<h[2-4][^>]*>|$)/gi;
   let sectionMatch;
-  while ((sectionMatch = sectionRe.exec(html)) !== null) {
-    const headingText = stripTags(sectionMatch[1]);
-    const sectionHtml = sectionMatch[2];
-    if (!headingText || !/card/i.test(headingText)) continue;
+  SECTION_RE.lastIndex = 0;
+  while ((sectionMatch = SECTION_RE.exec(html)) !== null) {
+    const type = sectionMatch[1].toLowerCase();
+    const tableHtml = sectionMatch[2];
+    const target = type === 'business' ? business : consumer;
 
-    const { issuer, type } = issuerAndTypeFromHeading(headingText);
+    let rowMatch;
+    ROW_RE.lastIndex = 0;
+    while ((rowMatch = ROW_RE.exec(tableHtml)) !== null) {
+      const name = stripTags(rowMatch[1]);
+      if (!name) continue;
+      const welcomeBonus = stripTags(rowMatch[2]);
+      const fmValue = parseInt(rowMatch[3].replace(/,/g, ''), 10);
 
-    const tableRe = /<table[^>]*>([\s\S]*?)<\/table>/gi;
-    let tableMatch;
-    while ((tableMatch = tableRe.exec(sectionHtml)) !== null) {
-      const rows = extractRows(tableMatch[1]);
-      if (rows.length === 0) continue;
-
-      const headerRow = rows.find(r => r.isHeaderRow) || rows[0];
-      const roles = resolveColumnRoles(headerRow.cells);
-
-      rows.forEach(row => {
-        if (row === headerRow || row.isHeaderRow) return;
-        const { cells } = row;
-        if (cells.length < 2) return;
-
-        const name = cells[roles.name];
-        if (!name || /^(card|name)$/i.test(name)) return;
-
-        const fmValue = roles.value !== undefined ? parseMoney(cells[roles.value]) : null;
-        const annualFee = roles.fee !== undefined ? parseMoney(cells[roles.fee]) : null;
-        const welcomeBonus = roles.bonus !== undefined ? (cells[roles.bonus] || '') : '';
-
-        const target = type === 'business' ? business : consumer;
-        target.push({
-          name,
-          issuer,
-          fm_value: fmValue,
-          annual_fee: annualFee,
-          welcome_bonus: welcomeBonus,
-          type,
-        });
+      target.push({
+        name,
+        issuer: detectIssuer(name),
+        fm_value: Number.isFinite(fmValue) ? fmValue : null,
+        annual_fee: null,
+        welcome_bonus: welcomeBonus,
+        type,
       });
     }
   }

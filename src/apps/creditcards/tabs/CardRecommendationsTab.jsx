@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTable, createRecord } from '../services/airtable.js';
-import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, CARD_INELIGIBILITY_TABLE } from '../config/tables.js';
+import { PORTFOLIO_TABLE, CARD_PRODUCTS_TABLE, CARD_INELIGIBILITY_TABLE, BANKS_TABLE } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { $$ } from '../utils/format.js';
 
@@ -15,7 +15,8 @@ const RELEVANT_PEOPLE = RELEVANT_NAMES
   .map(name => ({ id: idByName[name], name }));
 
 const PORTFOLIO_FIELDS = ['Owner', 'Current Product', 'Status', 'Open Date', 'Personal/Business'];
-const PRODUCT_FIELDS = ['Product Name'];
+const PRODUCT_FIELDS = ['Product Name', 'Annual Fee', 'Issuer'];
+const BANK_FIELDS = ['Bank Name'];
 const INELIGIBILITY_FIELDS = ['Person', 'Card Product', 'Ineligible From', 'Months Until Eligible', 'Eligible Again Date', 'Notes'];
 
 const cardStyle = {
@@ -264,6 +265,7 @@ export function CardRecommendationsTab() {
   const [ineligibility, setIneligibility] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
   const [products, setProducts] = useState([]);
+  const [banks, setBanks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
@@ -281,14 +283,16 @@ export function CardRecommendationsTab() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [ineligRows, portfolioRows, productRows] = await Promise.all([
+      const [ineligRows, portfolioRows, productRows, bankRows] = await Promise.all([
         fetchTable(CARD_INELIGIBILITY_TABLE, INELIGIBILITY_FIELDS),
         fetchTable(PORTFOLIO_TABLE, PORTFOLIO_FIELDS),
         fetchTable(CARD_PRODUCTS_TABLE, PRODUCT_FIELDS),
+        fetchTable(BANKS_TABLE, BANK_FIELDS),
       ]);
       setIneligibility(ineligRows);
       setPortfolio(portfolioRows);
       setProducts(productRows);
+      setBanks(bankRows);
     } catch (e) {
       setLoadError(e.message);
     } finally {
@@ -298,9 +302,24 @@ export function CardRecommendationsTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  const banksById = useMemo(
+    () => new Map(banks.map(b => [b.id, b.fields['Bank Name'] || ''])),
+    [banks]
+  );
+
   const productList = useMemo(
-    () => products.map(p => ({ id: p.id, name: p.fields['Product Name'] || '' })),
-    [products]
+    () => products.map(p => ({
+      id: p.id,
+      name: p.fields['Product Name'] || '',
+      annualFee: p.fields['Annual Fee'] ?? null,
+      issuerName: banksById.get(firstOf(p.fields['Issuer'])) || null,
+    })),
+    [products, banksById]
+  );
+
+  const productsById = useMemo(
+    () => new Map(productList.map(p => [p.id, p])),
+    [productList]
   );
 
   const activeProductIdsByPerson = useMemo(() => {
@@ -370,7 +389,14 @@ export function CardRecommendationsTab() {
     return cards
       .map(card => {
         const matchedProductId = fuzzyMatchProduct(card.name, productList)?.id || null;
-        return { ...card, key: `${card.type}|${card.name}`, matchedProductId };
+        const matchedProduct = matchedProductId ? productsById.get(matchedProductId) : null;
+        return {
+          ...card,
+          key: `${card.type}|${card.name}`,
+          matchedProductId,
+          issuer: matchedProduct?.issuerName || card.issuer,
+          annual_fee: card.annual_fee ?? matchedProduct?.annualFee ?? null,
+        };
       })
       .filter(isVisible)
       .sort((a, b) => (b.fm_value ?? -Infinity) - (a.fm_value ?? -Infinity));
@@ -378,11 +404,11 @@ export function CardRecommendationsTab() {
 
   const consumerCards = useMemo(
     () => (fmData && !fmData.error ? enrichAndFilter(fmData.consumer || []) : []),
-    [fmData, productList, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides]
+    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides]
   );
   const businessCards = useMemo(
     () => (fmData && !fmData.error ? enrichAndFilter(fmData.business || []) : []),
-    [fmData, productList, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides]
+    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides]
   );
 
   async function handleRefresh() {
