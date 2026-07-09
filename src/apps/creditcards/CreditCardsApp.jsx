@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { PortfolioTab } from './tabs/PortfolioTab.jsx';
 import { HotelsTab } from './tabs/HotelsTab.jsx';
-import { AddHotelBenefitTab } from './tabs/AddHotelBenefitTab.jsx';
 import { HotelBenefitTemplatesTab } from './tabs/HotelBenefitTemplatesTab.jsx';
 import { BenefitsTrackerTab } from './tabs/BenefitsTrackerTab.jsx';
 import { PointBalancesTab } from './tabs/PointBalancesTab.jsx';
@@ -19,7 +18,6 @@ const TABS = [
   { id: 'suggestions', label: 'Suggestions' },
   { id: 'actions', label: 'Card Audit' },
   { id: 'recommendations', label: 'Card Recommendations' },
-  { id: 'add-hotel', label: 'Add Hotel Benefit' },
 ];
 
 export default function CreditCardsApp() {
@@ -70,12 +68,11 @@ export default function CreditCardsApp() {
       <div style={{ padding: '1.5rem 2rem' }}>
         {tab === 'portfolio' && <PortfolioTab />}
         {tab === 'point-balances' && <PointBalancesTab onNavigateAddBalance={() => setTab('add-balance')} />}
-        {tab === 'benefits' && <BenefitsTrackerTab />}
+        {tab === 'benefits' && <BenefitsTrackerTab onNavigateHotelTemplates={() => setTab('hotel-templates')} />}
         {tab === 'bonuses' && <BonusesTab />}
         {tab === 'suggestions' && <SuggestionsTab />}
         {tab === 'hotels' && <HotelsTab />}
         {tab === 'actions' && <CardAuditTab />}
-        {tab === 'add-hotel' && <AddHotelBenefitTab onNavigateTemplates={() => setTab('hotel-templates')} />}
         {tab === 'add-balance' && (
           <div>
             <button onClick={() => setTab('point-balances')} style={{
@@ -89,16 +86,16 @@ export default function CreditCardsApp() {
         )}
         {tab === 'hotel-templates' && (
           <div>
-            <button onClick={() => setTab('add-hotel')} style={{
+            <button onClick={() => setTab('benefits')} style={{
               background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.85rem',
               cursor: 'pointer', fontWeight: 600, padding: '0 0 1.25rem 0', display: 'block',
             }}>
-              ← Back to Add Hotel Benefit
+              ← Back to Benefits
             </button>
             <HotelBenefitTemplatesTab />
           </div>
         )}
-        {!['portfolio', 'point-balances', 'benefits', 'bonuses', 'suggestions', 'hotels', 'actions', 'add-hotel', 'add-balance', 'hotel-templates'].includes(tab) && (
+        {!['portfolio', 'point-balances', 'benefits', 'bonuses', 'suggestions', 'hotels', 'actions', 'add-balance', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',

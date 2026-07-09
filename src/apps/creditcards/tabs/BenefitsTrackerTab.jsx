@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchTable, updateRecord, createRecord, deleteRecord } from '../services/airtable.js';
+import { fetchTable, updateRecord, createRecord, deleteRecord, fetchFieldChoices } from '../services/airtable.js';
 import {
   PERK_INSTANCES_TABLE, PERK_DEFINITIONS_TABLE, PORTFOLIO_TABLE,
   SPEND_BONUS_DEFINITIONS_TABLE, SPEND_BONUSES_TABLE, CARD_PRODUCTS_TABLE,
+  HOTELS_TABLE, HOTEL_TEMPLATES_TABLE,
 } from '../config/tables.js';
 import { PEOPLE } from '../config/constants.js';
 import { advanceUntilFuture, calculateNextResetDate, toAirtableDate } from '../utils/dates.js';
@@ -105,24 +106,289 @@ function ProductPicker({ products, loadingProducts, selectedIds, onToggle }) {
   );
 }
 
-function AddBenefitModal({ onClose, onSaved }) {
-  const [perkType, setPerkType] = useState(''); // '' | 'real' | 'value-only'
+const HOTEL_HOW_EARNED = ['Anniversary', 'Welcome Offer', 'Spend Threshold', 'Other'];
+const HOTEL_RESET_CYCLES = ['Annual', 'Anniversary', 'Semi-Annual', 'Monthly', 'One-Time'];
+const HOTEL_EMPTY = {
+  name: '', cardId: '', personId: '', recordType: 'Free Night', hotelBrand: '',
+  howEarned: '', spendThreshold: '', benefitType: '', resetCycle: '',
+  nextResetDate: '', estimatedValue: '', expirationDate: '', notes: '',
+};
+
+function HotelFreeNightForm({ onClose, onNavigateTemplates, allCards, hotelBrands, templates }) {
+  const [form, setForm] = useState(HOTEL_EMPTY);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
+
+  function applyTemplate(templateId) {
+    if (!templateId) return;
+    const rec = templates.find(t => t.id === templateId);
+    if (!rec) return;
+    const f = rec.fields;
+    setForm(prev => ({
+      ...prev,
+      name: f['Name / Label'] || prev.name,
+      hotelBrand: f['Hotel Brand'] || prev.hotelBrand,
+      recordType: f['Record Type'] || prev.recordType,
+      howEarned: f['How Earned'] || prev.howEarned,
+      spendThreshold: f['Spend Threshold Amount'] != null ? String(f['Spend Threshold Amount']) : prev.spendThreshold,
+      benefitType: f['Benefit Type'] || prev.benefitType,
+      resetCycle: f['Reset Cycle'] || prev.resetCycle,
+      estimatedValue: f['Estimated Value'] != null ? String(f['Estimated Value']) : prev.estimatedValue,
+      notes: f['Notes'] || prev.notes,
+      cardId: prev.cardId || ((f['Card'] || [])[0] || ''),
+      personId: prev.personId || ((f['Person'] || [])[0] || ''),
+    }));
+  }
+
+  function selectPerson(id) {
+    setForm(prev => ({ ...prev, personId: prev.personId === id ? '' : id, cardId: '' }));
+  }
+
+  const filteredCards = form.personId ? allCards.filter(c => c.owners.includes(form.personId)) : [];
+
+  function pill(field, value) {
+    const active = form[field] === value;
+    return (
+      <button key={value} type="button" onClick={() => setForm(prev => ({ ...prev, [field]: prev[field] === value ? '' : value }))} style={{
+        padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+        background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+        color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+        fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+      }}>{value}</button>
+    );
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    if (!form.personId) { setError('Person is required.'); return; }
+    if (!form.cardId)   { setError('Card is required.'); return; }
+    setSubmitting(true);
+    const fields = {
+      'Record Type': form.recordType || 'Free Night',
+      'Card': [form.cardId],
+      'Person': [form.personId],
+    };
+    if (form.name.trim())        fields['Name'] = form.name.trim();
+    if (form.hotelBrand)         fields['Hotel Brand'] = form.hotelBrand;
+    if (form.howEarned)          fields['How Earned'] = form.howEarned;
+    if (form.spendThreshold)     fields['Spend Threshold Amount'] = parseFloat(form.spendThreshold);
+    if (form.benefitType.trim()) fields['Benefit Type'] = form.benefitType.trim();
+    if (form.resetCycle)         fields['Reset Cycle'] = form.resetCycle;
+    if (form.nextResetDate)      fields['Next Reset Date'] = form.nextResetDate;
+    if (form.estimatedValue)     fields['Estimated Value'] = parseFloat(form.estimatedValue);
+    if (form.expirationDate)     fields['Expiration Date'] = form.expirationDate;
+    if (form.notes.trim())       fields['Notes'] = form.notes.trim();
+    try {
+      await createRecord(HOTELS_TABLE, fields);
+      setSuccess(true);
+      setForm(HOTEL_EMPTY);
+      setTimeout(() => { setSuccess(false); onClose(); }, 3000);
+    } catch (err) {
+      setError(String(err.message || err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const sectionCard = {
+    background: '#172033', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
+    padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Template selector */}
+      <div style={sectionCard}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>Load from Template</span>
+          {onNavigateTemplates && (
+            <button type="button" onClick={onNavigateTemplates} style={{
+              background: 'none', border: 'none', color: '#00D4FF', fontSize: '0.78rem',
+              cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0,
+            }}>Manage Templates</button>
+          )}
+        </div>
+        {templates.length === 0 ? (
+          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem' }}>No templates yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {templates.map(t => (
+              <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="radio" name="hotel-template" value={t.id}
+                  style={{ accentColor: '#00D4FF', width: 15, height: 15, flexShrink: 0 }}
+                  onChange={() => applyTemplate(t.id)} />
+                <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem' }}>{t.fields['Template Name']}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Person */}
+      <div style={sectionCard}>
+        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>Person <span style={{ color: '#FF4D4D' }}>*</span></span>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {Object.entries(PEOPLE).map(([id, name]) => {
+            const active = form.personId === id;
+            return (
+              <button key={id} type="button" onClick={() => selectPerson(id)} style={{
+                padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+                background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+                color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+                fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+              }}>{name}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Card */}
+      {form.personId && (
+        <div style={sectionCard}>
+          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>Card <span style={{ color: '#FF4D4D' }}>*</span></span>
+          {filteredCards.length === 0 ? (
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>No active cards for {PEOPLE[form.personId]}.</div>
+          ) : (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {filteredCards.map(c => {
+                const active = form.cardId === c.id;
+                const label = c.name.replace(new RegExp(`^${PEOPLE[form.personId]}\\s*[-–]\\s*`, 'i'), '');
+                return (
+                  <button key={c.id} type="button" onClick={() => setForm(prev => ({ ...prev, cardId: prev.cardId === c.id ? '' : c.id }))} style={{
+                    padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+                    background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+                    color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+                    fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+                  }}>{label}</button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Hotel Brand */}
+      {hotelBrands.length > 0 && (
+        <div style={sectionCard}>
+          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>Hotel Brand</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{hotelBrands.map(b => pill('hotelBrand', b))}</div>
+        </div>
+      )}
+
+      {/* Benefit Details */}
+      <div style={sectionCard}>
+        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>Benefit Details</span>
+        <div>
+          <label style={lbl}>Name / Label (optional)</label>
+          <input style={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Hilton Free Night Cert" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <label style={lbl}>Benefit Type</label>
+            <input style={inp} value={form.benefitType} onChange={e => setForm(p => ({ ...p, benefitType: e.target.value }))} placeholder="e.g. Cat 1-4" />
+          </div>
+          <div>
+            <label style={lbl}>Estimated Value ($)</label>
+            <input style={inp} type="number" min="0" value={form.estimatedValue} onChange={e => setForm(p => ({ ...p, estimatedValue: e.target.value }))} placeholder="0" />
+          </div>
+        </div>
+      </div>
+
+      {/* How Earned */}
+      <div style={sectionCard}>
+        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>How Earned</span>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{HOTEL_HOW_EARNED.map(h => pill('howEarned', h))}</div>
+        {form.howEarned === 'Spend Threshold' && (
+          <div>
+            <label style={lbl}>Spend Threshold Amount ($)</label>
+            <input style={{ ...inp, maxWidth: 180 }} type="number" min="0" value={form.spendThreshold} onChange={e => setForm(p => ({ ...p, spendThreshold: e.target.value }))} placeholder="0" />
+          </div>
+        )}
+      </div>
+
+      {/* Reset & Expiration */}
+      <div style={sectionCard}>
+        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.88rem' }}>Reset & Expiration</span>
+        <div>
+          <label style={lbl}>Reset Cycle</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{HOTEL_RESET_CYCLES.map(r => pill('resetCycle', r))}</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div>
+            <label style={lbl}>Next Reset Date</label>
+            <input style={inp} type="date" value={form.nextResetDate} onChange={e => setForm(p => ({ ...p, nextResetDate: e.target.value }))} />
+          </div>
+          <div>
+            <label style={lbl}>Expiration Date</label>
+            <input style={inp} type="date" value={form.expirationDate} onChange={e => setForm(p => ({ ...p, expirationDate: e.target.value }))} />
+          </div>
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <label style={lbl}>Notes</label>
+        <textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Any additional notes…" />
+      </div>
+
+      {success && (
+        <div style={{ background: '#00E67622', border: '1px solid #00E676', borderRadius: 8, padding: '0.7rem 1rem', color: '#00E676', fontWeight: 600, fontSize: '0.85rem' }}>
+          Hotel benefit added!
+        </div>
+      )}
+      {error && (
+        <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.7rem 1rem', color: '#FF4D4D', fontSize: '0.85rem' }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
+        <button type="button" onClick={onClose} style={{
+          padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
+          background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+        }}>Cancel</button>
+        <button type="submit" disabled={submitting} style={{
+          padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
+          background: submitting ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+          color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
+          cursor: submitting ? 'not-allowed' : 'pointer',
+        }}>{submitting ? 'Saving…' : 'Add Hotel Benefit'}</button>
+      </div>
+    </form>
+  );
+}
+
+function AddBenefitModal({ onClose, onSaved, onNavigateHotelTemplates }) {
+  const [perkType, setPerkType] = useState(''); // '' | 'real' | 'value-only' | 'hotel'
   const [form, setForm] = useState({
     perkName: '', cardProductIds: [], creditAmount: '', resetCycle: '',
     priorityScore: 0, benefitType: '', notes: '',
   });
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [allCards, setAllCards] = useState([]);
+  const [hotelBrands, setHotelBrands] = useState([]);
+  const [hotelTemplates, setHotelTemplates] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchTable(CARD_PRODUCTS_TABLE, ['Product Name'])
-      .then(rows => {
-        setProducts(rows.map(r => ({ id: r.id, name: r.fields['Product Name'] || '' })).sort((a, b) => a.name.localeCompare(b.name)));
-      })
-      .catch(() => {})
-      .finally(() => setLoadingProducts(false));
+    Promise.all([
+      fetchTable(CARD_PRODUCTS_TABLE, ['Product Name'])
+        .then(rows => rows.map(r => ({ id: r.id, name: r.fields['Product Name'] || '' })).sort((a, b) => a.name.localeCompare(b.name))),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Status', 'Owner'])
+        .then(rows => rows.filter(r => r.fields['Status'] === 'Active').map(r => ({ id: r.id, name: r.fields['Card Name'] || r.id, owners: r.fields['Owner'] || [] })).sort((a, b) => a.name.localeCompare(b.name))),
+      fetchFieldChoices(HOTELS_TABLE, 'Hotel Brand').catch(() => []),
+      fetchTable(HOTEL_TEMPLATES_TABLE, ['Template Name', 'Name / Label', 'Hotel Brand', 'Card', 'Person', 'Record Type', 'How Earned', 'Spend Threshold Amount', 'Benefit Type', 'Reset Cycle', 'Estimated Value', 'Notes'])
+        .then(r => r.sort((a, b) => (a.fields['Template Name'] || '').localeCompare(b.fields['Template Name'] || ''))).catch(() => []),
+    ]).then(([prods, cards, brands, tmpl]) => {
+      setProducts(prods);
+      setAllCards(cards);
+      setHotelBrands(brands);
+      setHotelTemplates(tmpl);
+    }).catch(() => {}).finally(() => setLoadingProducts(false));
   }, []);
 
   function toggleProduct(id) {
@@ -194,9 +460,10 @@ function AddBenefitModal({ onClose, onSaved }) {
         {/* Step 1 — Perk type */}
         <div>
           <label style={lbl}>Perk Type</label>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <ModalPill active={perkType === 'real'} onClick={() => setPerkType('real')}>Real Perk</ModalPill>
             <ModalPill active={perkType === 'value-only'} onClick={() => setPerkType('value-only')}>Value Only Perk</ModalPill>
+            <ModalPill active={perkType === 'hotel'} onClick={() => setPerkType('hotel')}>Hotel Free Night</ModalPill>
           </div>
         </div>
 
@@ -324,6 +591,16 @@ function AddBenefitModal({ onClose, onSaved }) {
             </div>
           </form>
         )}
+
+        {perkType === 'hotel' && (
+          <HotelFreeNightForm
+            onClose={onClose}
+            onNavigateTemplates={onNavigateHotelTemplates ? () => { onClose(); onNavigateHotelTemplates(); } : null}
+            allCards={allCards}
+            hotelBrands={hotelBrands}
+            templates={hotelTemplates}
+          />
+        )}
       </div>
     </div>
   );
@@ -408,7 +685,7 @@ function isPastOrToday(dateStr) {
   return d <= today;
 }
 
-export function BenefitsTrackerTab() {
+export function BenefitsTrackerTab({ onNavigateHotelTemplates }) {
   const [instances, setInstances] = useState([]);
   const [defsById, setDefsById] = useState({});
   const [cardsById, setCardsById] = useState({});
@@ -768,7 +1045,8 @@ export function BenefitsTrackerTab() {
       {showAddBenefit && (
         <AddBenefitModal
           onClose={() => setShowAddBenefit(false)}
-          onSaved={() => { /* no reload needed — def doesn't appear in this view */ }}
+          onSaved={() => {}}
+          onNavigateHotelTemplates={onNavigateHotelTemplates ? () => { setShowAddBenefit(false); onNavigateHotelTemplates(); } : null}
         />
       )}
 
