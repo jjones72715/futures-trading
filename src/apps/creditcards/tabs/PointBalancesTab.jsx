@@ -186,7 +186,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 1350 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
       {/* View toggle */}
       <div style={{ display: 'flex', gap: 8 }}>
