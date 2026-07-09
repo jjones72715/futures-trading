@@ -263,14 +263,17 @@ export function DashboardTab({ onNavigate }) {
   const leastValuable = [...valuedCards].sort((a, b) => a.netScore - b.netScore).slice(0, 5);
 
   /* ---- Block 7: Top Programs ---- */
-  const programRows = balancesFiltered
-    .map(b => ({
-      id: b.id,
-      programName: programNameById[resolveSingle(b.fields['Program'])] || '—',
-      points: b.fields['Current Balance'] || 0,
-      valuePerPoint: resolveSingle(b.fields['Value Per Point']),
-      programValue: b.fields['Program Value'] || 0,
-    }))
+  const programTotals = {};
+  balancesFiltered.forEach(b => {
+    const programId = resolveSingle(b.fields['Program']);
+    if (!programId) return;
+    if (!programTotals[programId]) {
+      programTotals[programId] = { id: programId, programName: programNameById[programId] || '—', points: 0, programValue: 0 };
+    }
+    programTotals[programId].points += b.fields['Current Balance'] || 0;
+    programTotals[programId].programValue += b.fields['Program Value'] || 0;
+  });
+  const programRows = Object.values(programTotals)
     .sort((a, b) => b.programValue - a.programValue)
     .slice(0, 5);
 
