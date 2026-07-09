@@ -65,12 +65,14 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
   const [programs, setPrograms] = useState([]);
   const [cardProductNameById, setCardProductNameById] = useState({});
   const [portfolioNameById, setPortfolioNameById] = useState({});
+  const [portfolioRecords, setPortfolioRecords] = useState([]);
   const [balances, setBalances] = useState([]);
   const [personFilter, setPersonFilter] = useState('All');
   const [balancesOnly, setBalancesOnly] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editBalance, setEditBalance] = useState('');
   const [editExpiration, setEditExpiration] = useState('');
+  const [editCardIds, setEditCardIds] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
@@ -83,13 +85,14 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
     return Promise.all([
       fetchTable(REWARDS_TABLE, ['Program Name', 'Value Per Point', 'Expiration Policy', 'Transfer Partners', 'Card Products']),
       fetchTable(CARD_PRODUCTS_TABLE, ['Product Name']),
-      fetchTable(PORTFOLIO_TABLE, ['Card Name']),
+      fetchTable(PORTFOLIO_TABLE, ['Card Name', 'Owner', 'Rewards Program', 'Status']),
       fetchTable(POINT_BALANCES_TABLE, ['Person', 'Program', 'Current Balance', 'Value Per Point', 'Program Value', 'Credit Card Portfolio', 'Last Updated', 'Expiration Date', 'Days Until Expiration']),
     ])
       .then(([programRows, cardProductRows, portfolioRows, balanceRows]) => {
         setPrograms(programRows);
         setCardProductNameById(Object.fromEntries(cardProductRows.map(r => [r.id, r.fields['Product Name'] || r.id])));
         setPortfolioNameById(Object.fromEntries(portfolioRows.map(r => [r.id, r.fields['Card Name'] || r.id])));
+        setPortfolioRecords(portfolioRows);
         setBalances(balanceRows);
       })
       .catch(console.error)
@@ -101,11 +104,16 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
     setEditingId(row.id);
     setEditBalance(row.currentBalance != null ? String(row.currentBalance) : '');
     setEditExpiration(row.expirationDate || '');
+    setEditCardIds(row.cardIds || []);
   }
 
   function cancelEdit() {
     setEditingId(null);
     setSaveError(null);
+  }
+
+  function toggleEditCard(id) {
+    setEditCardIds(prev => (prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]));
   }
 
   async function saveEdit(row) {
@@ -119,6 +127,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
       const fields = {
         'Current Balance': parseFloat(editBalance),
         'Last Updated': toAirtableDate(new Date()),
+        'Credit Card Portfolio': editCardIds,
       };
       if (editExpiration) fields['Expiration Date'] = editExpiration;
       const updated = await updateRecord(POINT_BALANCES_TABLE, row.id, fields);
@@ -154,6 +163,7 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
     const currentBalance = b.fields['Current Balance'] ?? 0;
     return {
       id: b.id,
+      programId,
       programName: program?.fields['Program Name'] || '—',
       ownerIds: b.fields['Person'] || [],
       currentBalance,
@@ -405,56 +415,90 @@ export function PointBalancesTab({ onNavigateAddBalance }) {
                       </span>
                     </div>
 
-                    {isEditing && (
-                      <div style={{
-                        display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end',
-                        padding: '0.85rem 1rem', borderRadius: '0 0 10px 10px',
-                        background: '#111a2b', border: '1px solid rgba(0,212,255,0.25)', borderTop: 'none',
-                      }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            New Balance
-                          </label>
-                          <input
-                            style={{ ...inp, width: 130 }}
-                            type="number"
-                            min="0"
-                            autoFocus
-                            value={editBalance}
-                            onChange={e => setEditBalance(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Expiration Date
-                          </label>
-                          <input
-                            style={{ ...inp, width: 150 }}
-                            type="date"
-                            value={editExpiration}
-                            onChange={e => setEditExpiration(e.target.value)}
-                          />
-                        </div>
-                        <button type="button" onClick={() => saveEdit(row)} disabled={saving} style={{
-                          padding: '0.5rem 1.1rem', borderRadius: 8, border: 'none',
-                          background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
-                          color: '#0B1220', fontWeight: 700, fontSize: '0.82rem',
-                          cursor: saving ? 'not-allowed' : 'pointer',
+                    {isEditing && (() => {
+                      const editOwnerId = row.ownerIds[0];
+                      const eligibleCards = portfolioRecords.filter(c =>
+                        c.fields['Status'] === 'Active' &&
+                        (c.fields['Owner'] || []).includes(editOwnerId) &&
+                        (c.fields['Rewards Program'] || []).includes(row.programId)
+                      );
+                      return (
+                        <div style={{
+                          display: 'flex', flexDirection: 'column', gap: '0.75rem',
+                          padding: '0.85rem 1rem', borderRadius: '0 0 10px 10px',
+                          background: '#111a2b', border: '1px solid rgba(0,212,255,0.25)', borderTop: 'none',
                         }}>
-                          {saving ? 'Saving…' : 'Save'}
-                        </button>
-                        <button type="button" onClick={cancelEdit} disabled={saving} style={{
-                          padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
-                          background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600,
-                          fontSize: '0.82rem', cursor: 'pointer',
-                        }}>
-                          Cancel
-                        </button>
-                        {saveError && (
-                          <span style={{ color: '#FF4D4D', fontSize: '0.8rem' }}>{saveError}</span>
-                        )}
-                      </div>
-                    )}
+                          {eligibleCards.length > 0 && (
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Linked Cards
+                              </label>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {eligibleCards.map(c => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => toggleEditCard(c.id)}
+                                    style={{
+                                      padding: '4px 14px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.12)',
+                                      background: editCardIds.includes(c.id) ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+                                      color: editCardIds.includes(c.id) ? '#0B1220' : 'rgba(255,255,255,0.6)',
+                                      fontWeight: editCardIds.includes(c.id) ? 700 : 400, cursor: 'pointer', fontSize: '0.78rem',
+                                    }}
+                                  >
+                                    {c.fields['Card Name'] || c.id}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                New Balance
+                              </label>
+                              <input
+                                style={{ ...inp, width: 130 }}
+                                type="number"
+                                min="0"
+                                autoFocus
+                                value={editBalance}
+                                onChange={e => setEditBalance(e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Expiration Date
+                              </label>
+                              <input
+                                style={{ ...inp, width: 150 }}
+                                type="date"
+                                value={editExpiration}
+                                onChange={e => setEditExpiration(e.target.value)}
+                              />
+                            </div>
+                            <button type="button" onClick={() => saveEdit(row)} disabled={saving} style={{
+                              padding: '0.5rem 1.1rem', borderRadius: 8, border: 'none',
+                              background: saving ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+                              color: '#0B1220', fontWeight: 700, fontSize: '0.82rem',
+                              cursor: saving ? 'not-allowed' : 'pointer',
+                            }}>
+                              {saving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button type="button" onClick={cancelEdit} disabled={saving} style={{
+                              padding: '0.5rem 1.1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)',
+                              background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600,
+                              fontSize: '0.82rem', cursor: 'pointer',
+                            }}>
+                              Cancel
+                            </button>
+                            {saveError && (
+                              <span style={{ color: '#FF4D4D', fontSize: '0.8rem' }}>{saveError}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
