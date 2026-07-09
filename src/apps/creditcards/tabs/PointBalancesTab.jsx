@@ -17,8 +17,8 @@ function fmtDollar(n) {
 }
 
 function fmtVPP(n) {
-  if (n == null) return '—';
-  return `$${Number(n).toFixed(3)}`;
+  if (!n) return '—';
+  return `${(n * 100).toFixed(2)}¢`;
 }
 
 function fmtDate(dateStr) {
