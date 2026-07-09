@@ -132,10 +132,27 @@ export const handler = async () => {
   }
 
   if (consumer.length === 0 && business.length === 0) {
+    // Diagnostics so the app itself can show what the server actually sent
+    // back, instead of guessing again from a browser DevTools snapshot
+    // (which showed post-JavaScript markup that never matches the raw HTML).
+    const debug = {
+      htmlLength: html.length,
+      markers: {
+        BOlegacy: html.includes('BOlegacy'),
+        BObox: html.includes('BObox'),
+        BOtinfo: html.includes('BOtinfo'),
+        tablepress: html.includes('tablepress'),
+        consumerHeading: /Best\s+Consumer\s+Card Offers/i.test(html),
+        businessHeading: /Best\s+Business\s+Card Offers/i.test(html),
+        cloudflareChallenge: /Just a moment|cf-browser-verification|Enable JavaScript and cookies to continue|cf_chl_opt/i.test(html),
+        accessDenied: /Access Denied|403 Forbidden/i.test(html),
+      },
+      snippet: html.slice(0, 2000),
+    };
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Parse failed — FM page structure may have changed' }),
+      body: JSON.stringify({ error: 'Parse failed — FM page structure may have changed', debug }),
     };
   }
 

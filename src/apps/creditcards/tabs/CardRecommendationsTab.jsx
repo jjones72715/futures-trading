@@ -515,8 +515,18 @@ export function CardRecommendationsTab() {
       )}
 
       {fmData?.error && fmData.error.startsWith('Parse failed') && (
-        <div style={{ textAlign: 'center', color: '#FF4D4D', padding: '3rem 1rem' }}>
-          Frequent Miler page format may have changed — contact developer to update parser
+        <div style={{ padding: '1.5rem 1rem' }}>
+          <div style={{ textAlign: 'center', color: '#FF4D4D', paddingBottom: '1rem' }}>
+            Frequent Miler page format may have changed — contact developer to update parser
+          </div>
+          {fmData.debug && (
+            <pre style={{
+              ...cardStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', maxHeight: 400, overflowY: 'auto',
+            }}>
+              {JSON.stringify(fmData.debug, null, 2)}
+            </pre>
+          )}
         </div>
       )}
 
