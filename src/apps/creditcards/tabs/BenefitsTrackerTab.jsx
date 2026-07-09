@@ -36,8 +36,8 @@ function calculateSpendBonusResetDate(resetType, openDateStr) {
   return resetType === 'Card Open Date' ? nextCardAnniversary(openDateStr) : nextJan1();
 }
 
-const RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Value Only'];
-const BENEFIT_TYPES = ['Food Credit', 'Shopping Credit', 'Membership Credit', 'Entertainment Credit', 'Hotel Credit', 'Flight Credit', 'Other Credit', 'Value Only'];
+const REAL_RESET_CYCLES = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
+const REAL_BENEFIT_TYPES = ['Food Credit', 'Shopping Credit', 'Membership Credit', 'Entertainment Credit', 'Hotel Credit', 'Flight Credit', 'Other Credit'];
 
 const inp = {
   width: '100%', background: '#0B1220', border: '1px solid rgba(255,255,255,0.12)',
@@ -50,18 +50,70 @@ const lbl = {
   letterSpacing: '0.05em', marginBottom: 5,
 };
 
-const EMPTY_BENEFIT = {
-  perkName: '', cardProductIds: [], creditAmount: '', resetCycle: '',
-  priorityScore: 0, benefitType: '', notes: '',
-};
+function ModalPill({ active, onClick, children }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
+      background: active ? '#00D4FF' : 'rgba(255,255,255,0.06)',
+      color: active ? '#0B1220' : 'rgba(255,255,255,0.6)',
+      fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
+    }}>{children}</button>
+  );
+}
+
+function ProductPicker({ products, loadingProducts, selectedIds, onToggle }) {
+  const [search, setSearch] = useState('');
+  const filtered = search ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())) : products;
+  return (
+    <div>
+      <input
+        style={{ ...inp, marginBottom: 8 }}
+        placeholder="Search products…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+      />
+      {loadingProducts ? (
+        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>Loading products…</div>
+      ) : (
+        <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, background: '#0B1220' }}>
+          {filtered.map(p => {
+            const selected = selectedIds.includes(p.id);
+            return (
+              <button key={p.id} type="button" onClick={() => onToggle(p.id)} style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '0.5rem 0.75rem', background: selected ? 'rgba(0,212,255,0.12)' : 'transparent',
+                border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                color: selected ? '#00D4FF' : 'rgba(255,255,255,0.7)',
+                fontSize: '0.85rem', cursor: 'pointer', fontWeight: selected ? 600 : 400,
+              }}>
+                {selected ? '✓ ' : ''}{p.name}
+              </button>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>No results</div>
+          )}
+        </div>
+      )}
+      {selectedIds.length > 0 && (
+        <div style={{ marginTop: 6, fontSize: '0.75rem', color: 'rgba(0,212,255,0.8)' }}>
+          {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''} selected
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AddBenefitModal({ onClose, onSaved }) {
-  const [form, setForm] = useState(EMPTY_BENEFIT);
+  const [perkType, setPerkType] = useState(''); // '' | 'real' | 'value-only'
+  const [form, setForm] = useState({
+    perkName: '', cardProductIds: [], creditAmount: '', resetCycle: '',
+    priorityScore: 0, benefitType: '', notes: '',
+  });
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [productSearch, setProductSearch] = useState('');
 
   useEffect(() => {
     fetchTable(CARD_PRODUCTS_TABLE, ['Product Name'])
@@ -86,13 +138,28 @@ function AddBenefitModal({ onClose, onSaved }) {
     setError(null);
     if (!form.perkName.trim()) { setError('Perk Name is required.'); return; }
     setSubmitting(true);
-    const fields = { 'Perk Name': form.perkName.trim() };
-    if (form.cardProductIds.length) fields['Card Product'] = form.cardProductIds;
-    if (form.creditAmount !== '') fields['Credit Amount'] = parseFloat(form.creditAmount);
-    if (form.resetCycle) fields['Reset Cycle'] = form.resetCycle;
-    if (form.priorityScore) fields['Priority Score'] = form.priorityScore;
-    if (form.benefitType) fields['Benefit Type'] = form.benefitType;
-    if (form.notes.trim()) fields['Notes'] = form.notes.trim();
+
+    let fields;
+    if (perkType === 'value-only') {
+      fields = {
+        'Perk Name': form.perkName.trim(),
+        'Reset Cycle': 'Value Only',
+        'Priority Score': 5,
+        'Benefit Type': 'Value Only',
+      };
+      if (form.creditAmount !== '') fields['Credit Amount'] = parseFloat(form.creditAmount);
+      if (form.notes.trim()) fields['Notes'] = form.notes.trim();
+      if (form.cardProductIds.length) fields['Card Product'] = form.cardProductIds;
+    } else {
+      fields = { 'Perk Name': form.perkName.trim() };
+      if (form.cardProductIds.length) fields['Card Product'] = form.cardProductIds;
+      if (form.creditAmount !== '') fields['Credit Amount'] = parseFloat(form.creditAmount);
+      if (form.resetCycle) fields['Reset Cycle'] = form.resetCycle;
+      if (form.priorityScore) fields['Priority Score'] = form.priorityScore;
+      if (form.benefitType) fields['Benefit Type'] = form.benefitType;
+      if (form.notes.trim()) fields['Notes'] = form.notes.trim();
+    }
+
     try {
       await createRecord(PERK_DEFINITIONS_TABLE, fields);
       onSaved();
@@ -103,10 +170,6 @@ function AddBenefitModal({ onClose, onSaved }) {
       setSubmitting(false);
     }
   }
-
-  const filteredProducts = productSearch
-    ? products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()))
-    : products;
 
   return (
     <div style={{
@@ -126,136 +189,139 @@ function AddBenefitModal({ onClose, onSaved }) {
           }}>×</button>
         </div>
 
+        {/* Step 1 — Perk type */}
+        <div>
+          <label style={lbl}>Perk Type</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <ModalPill active={perkType === 'real'} onClick={() => setPerkType('real')}>Real Perk</ModalPill>
+            <ModalPill active={perkType === 'value-only'} onClick={() => setPerkType('value-only')}>Value Only Perk</ModalPill>
+          </div>
+        </div>
+
         {error && (
           <div style={{ background: '#FF4D4D22', border: '1px solid #FF4D4D', borderRadius: 8, padding: '0.7rem 1rem', color: '#FF4D4D', fontSize: '0.85rem' }}>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-          {/* Perk Name */}
-          <div>
-            <label style={lbl}>Perk Name <span style={{ color: '#FF4D4D' }}>*</span></label>
-            <input style={inp} value={form.perkName} onChange={e => setForm(p => ({ ...p, perkName: e.target.value }))} placeholder="e.g. $10 Monthly Dining Credit" autoFocus />
-          </div>
-
-          {/* Benefit Type */}
-          <div>
-            <label style={lbl}>Benefit Type</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {BENEFIT_TYPES.map(t => (
-                <button key={t} type="button" onClick={() => setForm(p => ({ ...p, benefitType: p.benefitType === t ? '' : t }))} style={{
-                  padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
-                  background: form.benefitType === t ? '#00D4FF' : 'rgba(255,255,255,0.06)',
-                  color: form.benefitType === t ? '#0B1220' : 'rgba(255,255,255,0.6)',
-                  fontWeight: form.benefitType === t ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
-                }}>{t}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Reset Cycle */}
-          <div>
-            <label style={lbl}>Reset Cycle</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {RESET_CYCLES.map(c => (
-                <button key={c} type="button" onClick={() => setForm(p => ({ ...p, resetCycle: p.resetCycle === c ? '' : c }))} style={{
-                  padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)',
-                  background: form.resetCycle === c ? '#00D4FF' : 'rgba(255,255,255,0.06)',
-                  color: form.resetCycle === c ? '#0B1220' : 'rgba(255,255,255,0.6)',
-                  fontWeight: form.resetCycle === c ? 700 : 400, cursor: 'pointer', fontSize: '0.8rem',
-                }}>{c}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Credit Amount + Priority Score */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        {perkType === 'real' && (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
             <div>
-              <label style={lbl}>Credit Amount ($)</label>
-              <input style={inp} type="number" value={form.creditAmount} onChange={e => setForm(p => ({ ...p, creditAmount: e.target.value }))} placeholder="0" min={0} />
+              <label style={lbl}>Perk Name <span style={{ color: '#FF4D4D' }}>*</span></label>
+              <input style={inp} value={form.perkName} onChange={e => setForm(p => ({ ...p, perkName: e.target.value }))} placeholder="e.g. $10 Monthly Dining Credit" autoFocus />
             </div>
+
             <div>
-              <label style={lbl}>Priority Score</label>
-              <div style={{ display: 'flex', gap: 6, paddingTop: 4 }}>
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} type="button" onClick={() => setForm(p => ({ ...p, priorityScore: p.priorityScore === n ? 0 : n }))} style={{
-                    width: 28, height: 28, borderRadius: '50%', border: 'none',
-                    background: n <= form.priorityScore ? '#00D4FF' : 'rgba(255,255,255,0.12)',
-                    cursor: 'pointer', padding: 0, color: n <= form.priorityScore ? '#0B1220' : 'rgba(255,255,255,0.4)',
-                    fontWeight: 700, fontSize: '0.75rem',
-                  }}>{n}</button>
+              <label style={lbl}>Benefit Type</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {REAL_BENEFIT_TYPES.map(t => (
+                  <ModalPill key={t} active={form.benefitType === t} onClick={() => setForm(p => ({ ...p, benefitType: p.benefitType === t ? '' : t }))}>{t}</ModalPill>
                 ))}
               </div>
             </div>
-          </div>
 
-          {/* Card Products */}
-          <div>
-            <label style={lbl}>Card Products (optional)</label>
-            <input
-              style={{ ...inp, marginBottom: 8 }}
-              placeholder="Search products…"
-              value={productSearch}
-              onChange={e => setProductSearch(e.target.value)}
-            />
-            {loadingProducts ? (
-              <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>Loading products…</div>
-            ) : (
-              <div style={{
-                maxHeight: 180, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 8, background: '#0B1220',
-              }}>
-                {filteredProducts.map(p => {
-                  const selected = form.cardProductIds.includes(p.id);
-                  return (
-                    <button key={p.id} type="button" onClick={() => toggleProduct(p.id)} style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '0.5rem 0.75rem', background: selected ? 'rgba(0,212,255,0.12)' : 'transparent',
-                      border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
-                      color: selected ? '#00D4FF' : 'rgba(255,255,255,0.7)',
-                      fontSize: '0.85rem', cursor: 'pointer', fontWeight: selected ? 600 : 400,
-                    }}>
-                      {selected ? '✓ ' : ''}{p.name}
-                    </button>
-                  );
-                })}
-                {filteredProducts.length === 0 && (
-                  <div style={{ padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)' }}>No results</div>
-                )}
+            <div>
+              <label style={lbl}>Reset Cycle</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {REAL_RESET_CYCLES.map(c => (
+                  <ModalPill key={c} active={form.resetCycle === c} onClick={() => setForm(p => ({ ...p, resetCycle: p.resetCycle === c ? '' : c }))}>{c}</ModalPill>
+                ))}
               </div>
-            )}
-            {form.cardProductIds.length > 0 && (
-              <div style={{ marginTop: 6, fontSize: '0.75rem', color: 'rgba(0,212,255,0.8)' }}>
-                {form.cardProductIds.length} product{form.cardProductIds.length > 1 ? 's' : ''} selected
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={lbl}>Credit Amount ($)</label>
+                <input style={inp} type="number" value={form.creditAmount} onChange={e => setForm(p => ({ ...p, creditAmount: e.target.value }))} placeholder="0" min={0} />
               </div>
-            )}
-          </div>
+              <div>
+                <label style={lbl}>Priority Score</label>
+                <div style={{ display: 'flex', gap: 6, paddingTop: 4 }}>
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n} type="button" onClick={() => setForm(p => ({ ...p, priorityScore: p.priorityScore === n ? 0 : n }))} style={{
+                      width: 28, height: 28, borderRadius: '50%', border: 'none',
+                      background: n <= form.priorityScore ? '#00D4FF' : 'rgba(255,255,255,0.12)',
+                      cursor: 'pointer', padding: 0, color: n <= form.priorityScore ? '#0B1220' : 'rgba(255,255,255,0.4)',
+                      fontWeight: 700, fontSize: '0.75rem',
+                    }}>{n}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-          {/* Notes */}
-          <div>
-            <label style={lbl}>Notes</label>
-            <textarea
-              style={{ ...inp, minHeight: 80, resize: 'vertical' }}
-              value={form.notes}
-              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-              placeholder="Optional notes…"
-            />
-          </div>
+            <div>
+              <label style={lbl}>Card Products (optional)</label>
+              <ProductPicker products={products} loadingProducts={loadingProducts} selectedIds={form.cardProductIds} onToggle={toggleProduct} />
+            </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
-            <button type="button" onClick={onClose} style={{
-              padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
-              background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
-            }}>Cancel</button>
-            <button type="submit" disabled={submitting} style={{
-              padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
-              background: submitting ? 'rgba(0,212,255,0.4)' : '#00D4FF',
-              color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-            }}>{submitting ? 'Saving…' : 'Add Perk'}</button>
-          </div>
-        </form>
+            <div>
+              <label style={lbl}>Notes</label>
+              <textarea style={{ ...inp, minHeight: 80, resize: 'vertical' }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes…" />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button type="button" onClick={onClose} style={{
+                padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+              }}>Cancel</button>
+              <button type="submit" disabled={submitting} style={{
+                padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
+                background: submitting ? 'rgba(0,212,255,0.4)' : '#00D4FF',
+                color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+              }}>{submitting ? 'Saving…' : 'Add Perk'}</button>
+            </div>
+          </form>
+        )}
+
+        {perkType === 'value-only' && (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            <div style={{
+              background: 'rgba(179,136,255,0.08)', border: '1px solid rgba(179,136,255,0.2)',
+              borderRadius: 10, padding: '0.85rem 1rem',
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <div style={{ fontWeight: 700, color: '#B388FF', fontSize: '0.85rem' }}>New Value Perk Definition</div>
+              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+                Saved with Reset Cycle: Value Only · Priority Score: 5 · Benefit Type: Value Only
+              </div>
+
+              <div>
+                <label style={lbl}>Perk Name <span style={{ color: '#FF4D4D' }}>*</span></label>
+                <input style={inp} value={form.perkName} onChange={e => setForm(p => ({ ...p, perkName: e.target.value }))} placeholder="e.g. Lounge Access" autoFocus />
+              </div>
+
+              <div>
+                <label style={lbl}>Credit Amount</label>
+                <input style={inp} type="number" value={form.creditAmount} onChange={e => setForm(p => ({ ...p, creditAmount: e.target.value }))} placeholder="0" min={0} />
+                <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Annualized face value of the perk.</div>
+              </div>
+
+              <div>
+                <label style={lbl}>Notes</label>
+                <textarea style={{ ...inp, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional context…" />
+              </div>
+            </div>
+
+            <div>
+              <label style={lbl}>Card Product</label>
+              <ProductPicker products={products} loadingProducts={loadingProducts} selectedIds={form.cardProductIds} onToggle={toggleProduct} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button type="button" onClick={onClose} style={{
+                padding: '0.65rem 1.5rem', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem',
+              }}>Cancel</button>
+              <button type="submit" disabled={submitting} style={{
+                padding: '0.65rem 1.75rem', borderRadius: 9, border: 'none',
+                background: submitting ? 'rgba(179,136,255,0.4)' : '#B388FF',
+                color: '#0B1220', fontWeight: 700, fontSize: '0.88rem',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+              }}>{submitting ? 'Saving…' : 'Add Perk'}</button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
