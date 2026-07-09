@@ -456,7 +456,7 @@ export default function App() {
               {tab === "snapshot" && <SnapshotTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} />}
               {tab === "purchases" && <PurchaseTab />}
               {tab === "mgmt" && <AccountManagementTab />}
-              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} onClearDones={() => { setDones({}); localStorage.removeItem("tradingDones"); }} />}
+              {tab === "accounts" && <AllAccountsTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} dones={dones} onDone={onDone} onClearDones={() => { setDones({}); localStorage.removeItem("tradingDones"); }} onLoad={load} />}
               {tab === "reconcile" && <PLTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "traderpl" && <TraderPLTab />}
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}

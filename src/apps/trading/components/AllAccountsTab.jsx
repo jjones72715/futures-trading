@@ -4,7 +4,7 @@ import { fetchTable, updateRecord } from "../services/airtable.js";
 import { BASE, EVAL_TYPE_TABLE, PERF_TABLE, EVAL_TABLE, PAYOUT_TABLE, PAYOUT_STRATEGIES_TABLE, TRADERS_TABLE } from "../config/tables.js";
 import { BreachModal } from "./BreachModal.jsx";
 
-export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDones }) {
+export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onClearDones, onLoad }) {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
   const standardPerf = perfAccounts.filter(a => !a.payoutAccount && a.status === "Active");
   const livePerf = perfAccounts.filter(a => a.status === "Live" || (a.payoutAccount && a.status === "Active"));
@@ -115,38 +115,15 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
     const tableId = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
     await updateRecord(tableId, a.id, { "Score": num });
   }
+  const [saveError, setSaveError] = React.useState(null);
   async function saveBalance(a, val) {
     const num = parseFloat(val);
     if (isNaN(num)) return;
-    await updateRecord(PERF_TABLE, a.id, { "Current Balance": num });
-  }
-  async function submitAllScores() {
-    setScoreSaving(true);
-    try {
-      const scoreUpdates = allShown.filter(a => {
-        const v = scoreInputs[a.id];
-        return v !== "" && v !== undefined && !isNaN(parseFloat(v));
-      });
-      const balanceUpdates = allShown.filter(a => {
-        const v = newBalanceInputs[a.id];
-        return v !== "" && v !== undefined && !isNaN(parseFloat(v));
-      });
-      const tdUpdates = allShown.filter(a => countTradingDays[a.id]);
-      await Promise.all([
-        ...scoreUpdates.map(a => saveScore(a, scoreInputs[a.id])),
-        ...balanceUpdates.map(a => saveBalance(a, newBalanceInputs[a.id])),
-        ...tdUpdates.map(a => {
-          const table = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
-          const field = a.type === "perf" ? "Trading Days this Cycle" : "Trading Days Completed";
-          return updateRecord(table, a.id, { [field]: (a.tradingDays || 0) + 1 });
-        }),
-      ]);
-      setScoreSaved(true);
-      setTimeout(() => setScoreSaved(false), 3000);
-    } catch (e) {}
-    setScoreSaving(false);
+    const table = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
+    await updateRecord(table, a.id, { "Current Balance": num });
   }
   async function submitForToday(a) {
+    setSaveError(null);
     try {
       const ops = [];
       const sv = scoreInputs[a.id];
@@ -159,8 +136,10 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
         ops.push(updateRecord(table, a.id, { [field]: (a.tradingDays || 0) + 1 }));
       }
       await Promise.all(ops);
-    } catch (e) {}
-    if (onDone) onDone(a.id);
+      if (onDone) onDone(a.id);
+    } catch (e) {
+      setSaveError(`Save failed for ${a.name || a.id}: ${e.message || "unknown error"}. Please try again.`);
+    }
   }
 
   const [dayCompleting, setDayCompleting] = React.useState(false);
@@ -168,13 +147,13 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
 
   async function completeDay() {
     setDayCompleting(true);
-    await submitAllScores();
     if (onClearDones) onClearDones();
     setScoreInputs({});
     setNewBalanceInputs({});
     setCountTradingDays({});
     setDayCompleted(true);
     setTimeout(() => setDayCompleted(false), 3000);
+    if (onLoad) await onLoad();
     setDayCompleting(false);
   }
   const FEED_ORDER = ["DX Feed", "Rithmic", "Tradovate", "Project X"];
@@ -586,10 +565,16 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
           onBreached={id => { setBlowns(prev => ({ ...prev, [id]: true })); setTimeout(() => window.location.reload(), 30000); }}
         />
       )}
+      {saveError && (
+        <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#fca5a5", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>⚠ {saveError}</span>
+          <button onClick={() => setSaveError(null)} style={{ background: "none", border: "none", color: "#fca5a5", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>✕</button>
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button onClick={completeDay} disabled={scoreSaving || dayCompleting}
-          style={{ background: dayCompleted ? "#1e3a5f" : "#1d4ed8", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: (scoreSaving || dayCompleting) ? "not-allowed" : "pointer" }}>
-          {dayCompleting ? "Completing..." : dayCompleted ? "✓ Day Complete" : "Complete Day"}
+        <button onClick={completeDay} disabled={dayCompleting}
+          style={{ background: dayCompleted ? "#1e3a5f" : "#1d4ed8", border: "1px solid #3b82f6", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, color: "#fff", cursor: dayCompleting ? "not-allowed" : "pointer" }}>
+          {dayCompleting ? "Reloading..." : dayCompleted ? "✓ Day Complete" : "Complete Day"}
         </button>
       </div>
       {TraderFeedSection({ accounts: evalAccounts, color: "#ec4899", title: "Evaluation Accounts" })}
