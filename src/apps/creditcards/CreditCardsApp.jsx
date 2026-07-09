@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardTab } from './tabs/DashboardTab.jsx';
 import { PortfolioTab } from './tabs/PortfolioTab.jsx';
 import { HotelsTab } from './tabs/HotelsTab.jsx';
 import { HotelBenefitTemplatesTab } from './tabs/HotelBenefitTemplatesTab.jsx';
@@ -10,6 +11,7 @@ import { SuggestionsTab } from './tabs/SuggestionsTab.jsx';
 import { CardAuditTab } from './tabs/CardAuditTab.jsx';
 
 const TABS = [
+  { id: 'home', label: 'Home' },
   { id: 'portfolio', label: 'Portfolio' },
   { id: 'point-balances', label: 'Point Balances' },
   { id: 'hotels', label: 'Hotels' },
@@ -21,7 +23,7 @@ const TABS = [
 ];
 
 export default function CreditCardsApp() {
-  const [tab, setTab] = useState('portfolio');
+  const [tab, setTab] = useState('home');
 
   return (
     <div style={{
@@ -66,6 +68,7 @@ export default function CreditCardsApp() {
       </div>
 
       <div style={{ padding: '1.5rem 2rem' }}>
+        {tab === 'home' && <DashboardTab onNavigate={setTab} />}
         {tab === 'portfolio' && <PortfolioTab />}
         {tab === 'point-balances' && <PointBalancesTab onNavigateAddBalance={() => setTab('add-balance')} />}
         {tab === 'benefits' && <BenefitsTrackerTab onNavigateHotelTemplates={() => setTab('hotel-templates')} />}
@@ -95,7 +98,7 @@ export default function CreditCardsApp() {
             <HotelBenefitTemplatesTab />
           </div>
         )}
-        {!['portfolio', 'point-balances', 'benefits', 'bonuses', 'suggestions', 'hotels', 'actions', 'add-balance', 'hotel-templates'].includes(tab) && (
+        {!['home', 'portfolio', 'point-balances', 'benefits', 'bonuses', 'suggestions', 'hotels', 'actions', 'add-balance', 'hotel-templates'].includes(tab) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             height: '40vh', color: 'rgba(255,255,255,0.25)', fontSize: '1.1rem',
