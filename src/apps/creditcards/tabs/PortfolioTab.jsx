@@ -21,6 +21,7 @@ const BANK_NAMES = {
   'rec9ePERLvVM24fqx': 'Citi',
   'rec2BUeHI8gDyNcya': 'Discover',
   'rec8clRqXmQ4EjDEI': 'Mercury',
+  'recUmaVINH99SUQpb': 'Other',
   'recRyPOXcDNKrWK53': 'U.S. Bank',
   'recRKg9TA1IQpRkmH': 'Wells Fargo',
 };
