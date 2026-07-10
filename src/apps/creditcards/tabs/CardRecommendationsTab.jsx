@@ -284,6 +284,8 @@ export function CardRecommendationsTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState(null);
   const [refreshDebug, setRefreshDebug] = useState(null);
+  const [refreshSummary, setRefreshSummary] = useState(null);
+  const [showMissingSlugs, setShowMissingSlugs] = useState(false);
 
   const [openFormKey, setOpenFormKey] = useState(null);
   const [savingKey, setSavingKey] = useState(null);
@@ -430,6 +432,8 @@ export function CardRecommendationsTab() {
     setRefreshing(true);
     setRefreshError(null);
     setRefreshDebug(null);
+    setRefreshSummary(null);
+    setShowMissingSlugs(false);
     try {
       const res = await fetch('/.netlify/functions/scrape-fm');
       const data = await res.json();
@@ -437,6 +441,7 @@ export function CardRecommendationsTab() {
         setRefreshError('Could not reach Frequent Miler — try again later');
         setRefreshDebug(data.debug || null);
       } else {
+        setRefreshSummary(data);
         await load();
       }
     } catch (e) {
@@ -541,6 +546,39 @@ export function CardRecommendationsTab() {
             }}>
               {JSON.stringify(refreshDebug, null, 2)}
             </pre>
+          )}
+        </div>
+      )}
+
+      {refreshSummary && (
+        <div style={{ ...cardStyle, fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)' }}>
+          Updated {refreshSummary.updated} card{refreshSummary.updated === 1 ? '' : 's'}
+          {refreshSummary.unmatched > 0 && (
+            <> · {refreshSummary.unmatched} FM card{refreshSummary.unmatched === 1 ? '' : 's'} not in Card Products</>
+          )}
+          {refreshSummary.missing_slug_count > 0 && (
+            <>
+              {' · '}
+              <span style={{ color: '#FFD60A', fontWeight: 600 }}>
+                {refreshSummary.missing_slug_count} Card Product{refreshSummary.missing_slug_count === 1 ? '' : 's'} missing FM Slug
+              </span>
+              {' '}
+              <button
+                type="button"
+                onClick={() => setShowMissingSlugs(v => !v)}
+                style={{ background: 'none', border: 'none', color: ACCENT, fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+              >
+                {showMissingSlugs ? 'hide' : 'show'}
+              </button>
+            </>
+          )}
+          {refreshSummary.missing_slug_count === 0 && refreshSummary.unmatched === 0 && (
+            <> · every Card Product has an FM Slug</>
+          )}
+          {showMissingSlugs && refreshSummary.missing_slug_names?.length > 0 && (
+            <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem', color: 'rgba(255,255,255,0.55)' }}>
+              {refreshSummary.missing_slug_names.map(name => <li key={name}>{name}</li>)}
+            </ul>
           )}
         </div>
       )}

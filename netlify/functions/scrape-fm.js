@@ -91,12 +91,14 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchAllCardProductSlugs() {
-  const map = new Map();
+async function fetchAllCardProducts() {
+  const slugMap = new Map();
+  const missingSlugProducts = [];
   let offset;
   do {
     const params = new URLSearchParams();
     params.set('fields[]', 'FM Slug');
+    params.append('fields[]', 'Product Name');
     params.set('pageSize', '100');
     if (offset) params.set('offset', offset);
     const res = await fetch(`${AIRTABLE_BASE_URL}/${BASE}/${CARD_PRODUCTS_TABLE}?${params.toString()}`, {
@@ -106,11 +108,16 @@ async function fetchAllCardProductSlugs() {
     const data = await res.json();
     (data.records || []).forEach(r => {
       const slug = (r.fields['FM Slug'] || '').trim();
-      if (slug) map.set(slug.toLowerCase(), r.id);
+      if (slug) {
+        slugMap.set(slug.toLowerCase(), r.id);
+      } else {
+        missingSlugProducts.push(r.fields['Product Name'] || r.id);
+      }
     });
     offset = data.offset;
   } while (offset);
-  return map;
+  missingSlugProducts.sort((a, b) => a.localeCompare(b));
+  return { slugMap, missingSlugProducts };
 }
 
 async function patchCardProducts(updates) {
@@ -179,9 +186,9 @@ export const handler = async () => {
     };
   }
 
-  let slugMap;
+  let slugMap, missingSlugProducts;
   try {
-    slugMap = await fetchAllCardProductSlugs();
+    ({ slugMap, missingSlugProducts } = await fetchAllCardProducts());
   } catch (e) {
     return {
       statusCode: 502,
@@ -228,6 +235,8 @@ export const handler = async () => {
       updated: updates.length,
       unmatched: unmatchedSlugs.length,
       unmatched_slugs: unmatchedSlugs,
+      missing_slug_count: missingSlugProducts.length,
+      missing_slug_names: missingSlugProducts,
     }),
   };
 };
