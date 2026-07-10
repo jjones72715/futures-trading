@@ -1647,7 +1647,38 @@ async function createRecord(tableId, fields) {
   return res.json();
 }
 
-export const handler = async () => {
+function escapeForFormula(value) {
+  return value.replace(/'/g, "\\'");
+}
+
+// Re-checks live, right before creating, whether this slug already exists —
+// closes the race window from a prior run where multiple overlapping
+// invocations each trusted a stale initial snapshot and created duplicates
+// for the same slug.
+async function findExistingBySlug(slug) {
+  const params = new URLSearchParams();
+  params.set('filterByFormula', `{FM Slug}='${escapeForFormula(slug)}'`);
+  params.set('maxRecords', '1');
+  params.append('fields[]', 'FM Slug');
+  const res = await fetch(`${AIRTABLE_BASE_URL}/${BASE}/${CARD_PRODUCTS_TABLE}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${TOKEN}` },
+  });
+  if (!res.ok) throw new Error(`Slug check failed: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return data.records && data.records.length > 0 ? data.records[0].id : null;
+}
+
+// Processes CARDS in bounded chunks (?start=&count=, default 0/50) so each
+// invocation finishes in a few seconds — comfortably under Netlify's
+// function timeout, instead of the ~56+ seconds the full 223-card list at
+// 250ms/card required, which is what caused runs to get killed mid-way and
+// duplicate-happy re-triggers to race each other.
+export const handler = async (event) => {
+  const params = (event && event.queryStringParameters) || {};
+  const start = Math.max(0, parseInt(params.start, 10) || 0);
+  const count = Math.max(1, parseInt(params.count, 10) || 50);
+  const chunk = CARDS.slice(start, start + count);
+
   try {
     const bankRecords = await fetchAllRecords(BANKS_TABLE, ['Bank Name']);
     const banksByName = new Map(bankRecords.map(r => [r.fields['Bank Name'], r.id]));
@@ -1665,13 +1696,15 @@ export const handler = async () => {
     let created = 0;
     let fellThroughToOther = 0;
 
-    for (const card of CARDS) {
+    for (const card of chunk) {
       const issuerName = detectIssuer(card.name, card.slug);
       if (issuerName === 'Other') fellThroughToOther++;
       const bankId = banksByName.get(issuerName);
 
-      const existingId = productsBySlug.get(card.slug);
       try {
+        let existingId = productsBySlug.get(card.slug);
+        if (!existingId) existingId = await findExistingBySlug(card.slug);
+
         if (existingId) {
           await patchRecord(CARD_PRODUCTS_TABLE, existingId, {
             'FM Value Estimate': card.fmValue,
@@ -1679,6 +1712,7 @@ export const handler = async () => {
             'Welcome Bonus': card.welcomeBonus,
             'Personal/Business': card.type,
           });
+          productsBySlug.set(card.slug, existingId);
           updated++;
           results.push({ action: 'UPDATED', name: card.name, slug: card.slug, value: card.fmValue, issuer: issuerName });
         } else {
@@ -1703,11 +1737,15 @@ export const handler = async () => {
       await sleep(250);
     }
 
+    const nextStart = start + count < CARDS.length ? start + count : null;
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        summary: { total: CARDS.length, updated, created, fellThroughToOther },
+        range: { start, count, processed: chunk.length, total: CARDS.length },
+        nextStart,
+        summary: { updated, created, fellThroughToOther },
         results,
       }),
     };
