@@ -1,5 +1,10 @@
 const FM_URL = 'https://frequentmiler.com/best-credit-card-offers/';
 
+const TOKEN = "patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60";
+const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0';
+const BASE = 'apph7JP85hB5dLyob';
+const CARD_PRODUCTS_TABLE = 'tbloTLQR2DwcqR2Vq';
+
 const ENTITY_MAP = {
   '&nbsp;': ' ', '&amp;': '&', '&quot;': '"', '&#039;': "'",
   '&#8217;': '’', '&rsquo;': '’', '&#8216;': '‘', '&lsquo;': '‘',
@@ -15,25 +20,10 @@ function stripTags(html) {
   return decodeEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
-// FM has no bank/issuer text on this page — cards are identified only by
-// name, so issuer is inferred from known bank names appearing in it.
-// Co-brand cards that don't include the issuing bank in their name (e.g.
-// "United Explorer Card" is a Chase product) will resolve to "Unknown" here;
-// the frontend improves on this by cross-referencing our own Card Products
-// table when a card matches a known product.
-const ISSUER_KEYWORDS = [
-  'American Express', 'Capital One', 'Wells Fargo', 'Bank of America',
-  'U.S. Bank', 'US Bank', 'Morgan Stanley', 'Barclays', 'Citizens',
-  'Chase', 'Citi', 'Discover', 'UBS', 'HSBC', 'PNC', 'BECU', 'PenFed',
-  'Synchrony', 'USAA', 'Huntington', 'First Tech', 'Fairwinds', 'Brex',
-  'Robinhood', 'SoFi', 'Bilt', 'Venmo', 'Paypal', 'FNBO', 'Schwab', 'Amex',
-];
-
-function detectIssuer(name) {
-  const lower = name.toLowerCase();
-  const found = ISSUER_KEYWORDS.find(k => lower.includes(k.toLowerCase()));
-  if (!found) return 'Unknown';
-  return found === 'US Bank' ? 'U.S. Bank' : found;
+function extractSlug(href) {
+  if (!href) return null;
+  const slug = href.split('#')[0].replace(/^\//, '').replace(/\/$/, '');
+  return slug || null;
 }
 
 // Real-page tags carry extra classes/attributes beyond the one we care
@@ -54,21 +44,14 @@ const SECTION_RE = new RegExp(
   'gi'
 );
 
-// The 178/56-row comparison tables use a compact per-card layout: name
-// wrapped in <strong><a>, a short bonus blurb, then a <br>, then the value
-// estimate somewhere after. (A separate, richer "BObox" widget with Annual
-// Fee/review text/earning-rate tables exists elsewhere on the page for
-// individual card spotlights, but it is not what populates these tables —
-// Annual Fee genuinely isn't present here, hence null; the frontend
-// backfills it from our own Card Products table when a card matches one
-// we already track.) Name capture tolerates embedded tags (a few card
-// names span lines with a stray <br>).
-const NAME_BONUS_VALUE_RE = /<strong[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>\s*<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<br\s*\/?>[\s\S]*?\$(-?[\d,]+)\s*1st Yr Value Estimate/i;
+// Per card: name + href wrapped in <strong><a>, a short bonus blurb, then
+// the value estimate somewhere after. Name capture tolerates embedded tags
+// (a few card names span lines with a stray <br>).
+const NAME_HREF_VALUE_RE = /<strong[^>]*>\s*<a[^>]*\bhref=(["'])([^"']*)\1[^>]*>([\s\S]*?)<\/a>\s*<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<br\s*\/?>[\s\S]*?\$(-?[\d,]+)\s*1st Yr Value Estimate/i;
 const ROW_RE = /<tr\b[^>]*>[\s\S]*?<\/tr>/gi;
 
 function parseCards(html) {
-  const consumer = [];
-  const business = [];
+  const cards = [];
   const sections = [];
 
   let sectionMatch;
@@ -76,28 +59,21 @@ function parseCards(html) {
   while ((sectionMatch = SECTION_RE.exec(html)) !== null) {
     const type = sectionMatch[1].toLowerCase();
     const tableHtml = sectionMatch[2];
-    const target = type === 'business' ? business : consumer;
 
     const rows = tableHtml.match(ROW_RE) || [];
     let matchedRows = 0;
     rows.forEach(rowHtml => {
-      const match = NAME_BONUS_VALUE_RE.exec(rowHtml);
+      const match = NAME_HREF_VALUE_RE.exec(rowHtml);
       if (!match) return;
-      const name = stripTags(match[1]);
-      if (!name) return;
+      const slug = extractSlug(match[2]);
+      const name = stripTags(match[3]);
+      if (!slug || !name) return;
+
+      const fmValue = parseInt(match[5].replace(/,/g, ''), 10);
+      if (!Number.isFinite(fmValue)) return;
+
       matchedRows += 1;
-
-      const welcomeBonus = stripTags(match[2]);
-      const fmValue = parseInt(match[3].replace(/,/g, ''), 10);
-
-      target.push({
-        name,
-        issuer: detectIssuer(name),
-        fm_value: Number.isFinite(fmValue) ? fmValue : null,
-        annual_fee: null,
-        welcome_bonus: welcomeBonus,
-        type,
-      });
+      cards.push({ slug, name, fmValue });
     });
 
     sections.push({
@@ -108,7 +84,49 @@ function parseCards(html) {
     });
   }
 
-  return { consumer, business, sections };
+  return { cards, sections };
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchAllCardProductSlugs() {
+  const map = new Map();
+  let offset;
+  do {
+    const params = new URLSearchParams();
+    params.set('fields[]', 'FM Slug');
+    params.set('pageSize', '100');
+    if (offset) params.set('offset', offset);
+    const res = await fetch(`${AIRTABLE_BASE_URL}/${BASE}/${CARD_PRODUCTS_TABLE}?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    if (!res.ok) throw new Error(`Airtable list failed: ${res.status}`);
+    const data = await res.json();
+    (data.records || []).forEach(r => {
+      const slug = (r.fields['FM Slug'] || '').trim();
+      if (slug) map.set(slug.toLowerCase(), r.id);
+    });
+    offset = data.offset;
+  } while (offset);
+  return map;
+}
+
+async function patchCardProducts(updates) {
+  for (let i = 0; i < updates.length; i += 10) {
+    const batch = updates.slice(i, i + 10);
+    const res = await fetch(`${AIRTABLE_BASE_URL}/${BASE}/${CARD_PRODUCTS_TABLE}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: batch, typecast: true }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Airtable patch failed: ${res.status} ${text}`);
+    }
+    if (i + 10 < updates.length) await sleep(220);
+  }
 }
 
 export const handler = async () => {
@@ -131,19 +149,15 @@ export const handler = async () => {
     };
   }
 
-  let consumer, business, sections;
+  let cards, sections;
   try {
-    ({ consumer, business, sections } = parseCards(html));
+    ({ cards, sections } = parseCards(html));
   } catch (e) {
-    consumer = [];
-    business = [];
+    cards = [];
     sections = [];
   }
 
-  if (consumer.length === 0 && business.length === 0) {
-    // Diagnostics so the app itself can show what the server actually sent
-    // back, instead of guessing again from a browser DevTools snapshot
-    // (which showed post-JavaScript markup that never matches the raw HTML).
+  if (cards.length === 0) {
     const debug = {
       htmlLength: html.length,
       markers: {
@@ -165,13 +179,55 @@ export const handler = async () => {
     };
   }
 
+  let slugMap;
+  try {
+    slugMap = await fetchAllCardProductSlugs();
+  } catch (e) {
+    return {
+      statusCode: 502,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Failed to read Card Products from Airtable' }),
+    };
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const updates = [];
+  const unmatchedSlugs = [];
+  const seenSlugs = new Set();
+
+  cards.forEach(card => {
+    if (seenSlugs.has(card.slug)) return;
+    seenSlugs.add(card.slug);
+
+    const recordId = slugMap.get(card.slug.toLowerCase());
+    if (recordId) {
+      updates.push({
+        id: recordId,
+        fields: { 'FM Value Estimate': card.fmValue, 'FM Last Updated': today },
+      });
+    } else {
+      console.log(`No Card Products match for slug: ${card.slug}`);
+      unmatchedSlugs.push(card.slug);
+    }
+  });
+
+  try {
+    await patchCardProducts(updates);
+  } catch (e) {
+    return {
+      statusCode: 502,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Failed to update Card Products in Airtable' }),
+    };
+  }
+
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      scraped_at: new Date().toISOString(),
-      consumer,
-      business,
+      updated: updates.length,
+      unmatched: unmatchedSlugs.length,
+      unmatched_slugs: unmatchedSlugs,
     }),
   };
 };

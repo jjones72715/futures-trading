@@ -14,10 +14,10 @@ const RELEVANT_PEOPLE = RELEVANT_NAMES
   .filter(name => idByName[name])
   .map(name => ({ id: idByName[name], name }));
 
+const PRODUCT_FIELDS = ['Product Name', 'Issuer', 'Personal/Business', 'Annual Fee', 'FM Value Estimate', 'FM Last Updated'];
 const PORTFOLIO_FIELDS = ['Owner', 'Current Product', 'Status', 'Open Date', 'Personal/Business'];
-const PRODUCT_FIELDS = ['Product Name', 'Annual Fee', 'Issuer'];
+const INELIGIBILITY_FIELDS = ['Person', 'Card Product', 'Eligible Again Date'];
 const BANK_FIELDS = ['Bank Name'];
-const INELIGIBILITY_FIELDS = ['Person', 'Card Product', 'Ineligible From', 'Months Until Eligible', 'Eligible Again Date', 'Notes'];
 
 const cardStyle = {
   background: CARD_BG, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
@@ -46,42 +46,14 @@ function monthsAgoStr(n) {
   return d.toISOString().split('T')[0];
 }
 
+function fmtDateStr(s) {
+  if (!s) return '—';
+  const [y, m, d] = s.split('-');
+  return `${parseInt(m)}/${parseInt(d)}/${y}`;
+}
+
 function firstOf(val) {
   return Array.isArray(val) ? val[0] : val;
-}
-
-function normalizeName(s) {
-  return (s || '')
-    .toLowerCase()
-    .replace(/[®℠™]/g, '')
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function fuzzyMatchProduct(fmName, products) {
-  const normFm = normalizeName(fmName);
-  if (!normFm) return null;
-
-  let match = products.find(p => normalizeName(p.name) === normFm);
-  if (match) return match;
-
-  match = products.find(p => {
-    const np = normalizeName(p.name);
-    return np && (normFm.includes(np) || np.includes(normFm));
-  });
-  if (match) return match;
-
-  const fmTokens = new Set(normFm.split(' ').filter(Boolean));
-  let best = null, bestScore = 0;
-  products.forEach(p => {
-    const pTokens = normalizeName(p.name).split(' ').filter(Boolean);
-    if (pTokens.length === 0) return;
-    const overlap = pTokens.filter(t => fmTokens.has(t)).length;
-    const score = overlap / pTokens.length;
-    if (score > bestScore) { bestScore = score; best = p; }
-  });
-  return bestScore >= 0.6 ? best : null;
 }
 
 function PersonPills({ selected, onChange }) {
@@ -147,7 +119,7 @@ function IssuerPills({ issuers, hidden, onToggle, onReset }) {
   );
 }
 
-function CantGetForm({ card, personFilter, onSave, onCancel, saving, error }) {
+function CantGetForm({ personFilter, onSave, onCancel, saving, error }) {
   const locked = personFilter !== ALL_LABEL;
   const [personId, setPersonId] = useState(locked ? idByName[personFilter] : '');
   const [months, setMonths] = useState('');
@@ -210,37 +182,40 @@ function CantGetForm({ card, personFilter, onSave, onCancel, saving, error }) {
   );
 }
 
-function CardRow({ card, cardKey, isOpen, onToggleForm, personFilter, onSave, saving, error }) {
-  const [hovered, setHovered] = useState(false);
+function PersonalBusinessBadge({ value }) {
+  if (!value) return null;
+  const isBusiness = value === 'Business';
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 8px', borderRadius: 20, fontSize: '0.65rem', fontWeight: 700,
+      background: isBusiness ? 'rgba(179,136,255,0.12)' : 'rgba(0,230,118,0.12)',
+      color: isBusiness ? '#B388FF' : '#00E676',
+      border: `1px solid ${isBusiness ? 'rgba(179,136,255,0.3)' : 'rgba(0,230,118,0.3)'}`,
+    }}>
+      {value}
+    </span>
+  );
+}
+
+function CardRow({ card, isOpen, onToggleForm, personFilter, onSave, saving, error }) {
   return (
     <div>
-      <div
-        style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 6 }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
           <div>
             <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.92rem' }}>{card.name}</div>
             <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{card.issuer}</div>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: ACCENT }}>{$$(card.fm_value)}</div>
-            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)' }}>{$$(card.annual_fee)} AF</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: ACCENT }}>{$$(card.fmValue)}</div>
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)' }}>{$$(card.annualFee)} AF</div>
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10 }}>
-          <div style={{
-            fontSize: '0.8rem', color: '#fff', flex: 1,
-            whiteSpace: hovered ? 'normal' : 'nowrap',
-            overflow: hovered ? 'visible' : 'hidden',
-            textOverflow: 'ellipsis',
-          }}>
-            {card.welcome_bonus || '—'}
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <PersonalBusinessBadge value={card.personalBusiness} />
           <button
             type="button"
-            onClick={() => onToggleForm(cardKey)}
+            onClick={() => onToggleForm(card.id)}
             style={{
               padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
               background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)',
@@ -253,9 +228,8 @@ function CardRow({ card, cardKey, isOpen, onToggleForm, personFilter, onSave, sa
       </div>
       {isOpen && (
         <CantGetForm
-          card={card}
           personFilter={personFilter}
-          onSave={draft => onSave(cardKey, draft)}
+          onSave={draft => onSave(card.id, draft)}
           onCancel={() => onToggleForm(null)}
           saving={saving}
           error={error}
@@ -277,20 +251,19 @@ function Column({ title, cards, personFilter, openFormKey, onToggleForm, onSave,
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: 'calc(100vh - 320px)', overflowY: 'auto', paddingRight: 4 }}>
         {cards.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', padding: '2rem 1rem' }}>
-            No {title.replace(' Cards', '')} recommendations available for {personFilter} right now
+            No {title.replace(' Cards', '')} recommendations available for {personFilter}
           </div>
         ) : (
           cards.map(card => (
             <CardRow
-              key={card.key}
+              key={card.id}
               card={card}
-              cardKey={card.key}
-              isOpen={openFormKey === card.key}
+              isOpen={openFormKey === card.id}
               onToggleForm={onToggleForm}
               personFilter={personFilter}
               onSave={onSave}
-              saving={savingKey === card.key}
-              error={savingKey === card.key ? saveError : null}
+              saving={savingKey === card.id}
+              error={savingKey === card.id ? saveError : null}
             />
           ))
         )}
@@ -300,17 +273,17 @@ function Column({ title, cards, personFilter, openFormKey, onToggleForm, onSave,
 }
 
 export function CardRecommendationsTab() {
-  const [ineligibility, setIneligibility] = useState([]);
-  const [portfolio, setPortfolio] = useState([]);
   const [products, setProducts] = useState([]);
+  const [portfolio, setPortfolio] = useState([]);
+  const [ineligibility, setIneligibility] = useState([]);
   const [banks, setBanks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
   const [personFilter, setPersonFilter] = useState(ALL_LABEL);
-  const [fmData, setFmData] = useState(null);
-  const [scraping, setScraping] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState(null);
+  const [refreshDebug, setRefreshDebug] = useState(null);
 
   const [openFormKey, setOpenFormKey] = useState(null);
   const [savingKey, setSavingKey] = useState(null);
@@ -322,15 +295,15 @@ export function CardRecommendationsTab() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [ineligRows, portfolioRows, productRows, bankRows] = await Promise.all([
-        fetchTable(CARD_INELIGIBILITY_TABLE, INELIGIBILITY_FIELDS),
+      const [productRows, portfolioRows, ineligRows, bankRows] = await Promise.all([
+        fetchTable(CARD_PRODUCTS_TABLE, PRODUCT_FIELDS, { filterByFormula: '{FM Value Estimate} > 0' }),
         fetchTable(PORTFOLIO_TABLE, PORTFOLIO_FIELDS),
-        fetchTable(CARD_PRODUCTS_TABLE, PRODUCT_FIELDS),
+        fetchTable(CARD_INELIGIBILITY_TABLE, INELIGIBILITY_FIELDS),
         fetchTable(BANKS_TABLE, BANK_FIELDS),
       ]);
-      setIneligibility(ineligRows);
-      setPortfolio(portfolioRows);
       setProducts(productRows);
+      setPortfolio(portfolioRows);
+      setIneligibility(ineligRows);
       setBanks(bankRows);
     } catch (e) {
       setLoadError(e.message);
@@ -346,19 +319,24 @@ export function CardRecommendationsTab() {
     [banks]
   );
 
-  const productList = useMemo(
-    () => products.map(p => ({
-      id: p.id,
-      name: p.fields['Product Name'] || '',
-      annualFee: p.fields['Annual Fee'] ?? null,
-      issuerName: banksById.get(firstOf(p.fields['Issuer'])) || null,
-    })),
-    [products, banksById]
-  );
+  const enrichedProducts = useMemo(() => products.map(p => ({
+    id: p.id,
+    name: p.fields['Product Name'] || '',
+    issuer: banksById.get(firstOf(p.fields['Issuer'])) || 'Unknown',
+    personalBusiness: p.fields['Personal/Business'] || null,
+    annualFee: p.fields['Annual Fee'] ?? null,
+    fmValue: p.fields['FM Value Estimate'] ?? null,
+    fmLastUpdated: p.fields['FM Last Updated'] || null,
+  })), [products, banksById]);
 
-  const productsById = useMemo(
-    () => new Map(productList.map(p => [p.id, p])),
-    [productList]
+  const lastUpdated = useMemo(() => {
+    const dates = enrichedProducts.map(p => p.fmLastUpdated).filter(Boolean).sort();
+    return dates.length ? dates[dates.length - 1] : null;
+  }, [enrichedProducts]);
+
+  const availableIssuers = useMemo(
+    () => [...new Set(enrichedProducts.map(p => p.issuer))].sort(),
+    [enrichedProducts]
   );
 
   const activeProductIdsByPerson = useMemo(() => {
@@ -408,11 +386,10 @@ export function CardRecommendationsTab() {
   }, [ineligibility]);
 
   function hiddenForPerson(card, personId) {
-    const { key: cardKey, matchedProductId, type, issuer } = card;
-    if (localOverrides.has(`${personId}|${cardKey}`)) return true;
-    if (matchedProductId && activeProductIdsByPerson.get(personId)?.has(matchedProductId)) return true;
-    if (matchedProductId && ineligibleUntilByPersonProduct.has(`${personId}|${matchedProductId}`)) return true;
-    if (type === 'consumer' && issuer === 'Chase' && is524ByPerson.get(personId)) return true;
+    if (localOverrides.has(`${personId}|${card.id}`)) return true;
+    if (activeProductIdsByPerson.get(personId)?.has(card.id)) return true;
+    if (ineligibleUntilByPersonProduct.has(`${personId}|${card.id}`)) return true;
+    if (card.personalBusiness === 'Personal' && card.issuer === 'Chase' && is524ByPerson.get(personId)) return true;
     return false;
   }
 
@@ -424,34 +401,20 @@ export function CardRecommendationsTab() {
     return !hiddenForPerson(card, personId);
   }
 
-  function enrichCard(card) {
-    const matchedProductId = fuzzyMatchProduct(card.name, productList)?.id || null;
-    const matchedProduct = matchedProductId ? productsById.get(matchedProductId) : null;
-    return {
-      ...card,
-      key: `${card.type}|${card.name}`,
-      matchedProductId,
-      issuer: matchedProduct?.issuerName || card.issuer,
-      annual_fee: card.annual_fee ?? matchedProduct?.annualFee ?? null,
-    };
-  }
-
-  function enrichAndFilter(cards) {
+  function filterAndSort(cards) {
     return cards
-      .map(enrichCard)
       .filter(isVisible)
       .filter(card => !hiddenIssuers.has(card.issuer))
-      .sort((a, b) => (b.fm_value ?? -Infinity) - (a.fm_value ?? -Infinity));
+      .sort((a, b) => (b.fmValue ?? -Infinity) - (a.fmValue ?? -Infinity));
   }
 
-  const allEnrichedCards = useMemo(
-    () => (fmData && !fmData.error ? [...(fmData.consumer || []), ...(fmData.business || [])].map(enrichCard) : []),
-    [fmData, productList, productsById]
+  const consumerCards = useMemo(
+    () => filterAndSort(enrichedProducts.filter(c => c.personalBusiness === 'Personal')),
+    [enrichedProducts, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides, hiddenIssuers]
   );
-
-  const availableIssuers = useMemo(
-    () => [...new Set(allEnrichedCards.map(c => c.issuer))].sort(),
-    [allEnrichedCards]
+  const businessCards = useMemo(
+    () => filterAndSort(enrichedProducts.filter(c => c.personalBusiness === 'Business')),
+    [enrichedProducts, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides, hiddenIssuers]
   );
 
   function toggleIssuer(issuer) {
@@ -463,49 +426,43 @@ export function CardRecommendationsTab() {
     });
   }
 
-  const consumerCards = useMemo(
-    () => (fmData && !fmData.error ? enrichAndFilter(fmData.consumer || []) : []),
-    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides, hiddenIssuers]
-  );
-  const businessCards = useMemo(
-    () => (fmData && !fmData.error ? enrichAndFilter(fmData.business || []) : []),
-    [fmData, productList, productsById, activeProductIdsByPerson, ineligibleUntilByPersonProduct, is524ByPerson, personFilter, localOverrides, hiddenIssuers]
-  );
-
   async function handleRefresh() {
-    setScraping(true);
+    setRefreshing(true);
+    setRefreshError(null);
+    setRefreshDebug(null);
     try {
       const res = await fetch('/.netlify/functions/scrape-fm');
       const data = await res.json();
-      setFmData(data);
-      setLastUpdated(new Date());
+      if (data.error) {
+        setRefreshError('Could not reach Frequent Miler — try again later');
+        setRefreshDebug(data.debug || null);
+      } else {
+        await load();
+      }
     } catch (e) {
-      setFmData({ error: 'Failed to fetch FM data' });
+      setRefreshError('Could not reach Frequent Miler — try again later');
     } finally {
-      setScraping(false);
+      setRefreshing(false);
     }
   }
 
-  async function handleSaveIneligibility(cardKey, { personId, months, notes }) {
-    setSavingKey(cardKey);
+  async function handleSaveIneligibility(cardId, { personId, months, notes }) {
+    setSavingKey(cardId);
     setSaveError(null);
-    const card = [...(fmData?.consumer || []), ...(fmData?.business || [])].find(
-      c => `${c.type}|${c.name}` === cardKey
-    );
-    const matchedProductId = fuzzyMatchProduct(card?.name, productList)?.id || null;
+    const card = enrichedProducts.find(c => c.id === cardId);
     const personName = RELEVANT_PEOPLE.find(p => p.id === personId)?.name || personId;
     try {
       const fields = {
         'Label': `${personName} — ${card?.name || 'Card'}`,
         'Person': [personId],
+        'Card Product': [cardId],
         'Ineligible From': todayStr(),
         'Months Until Eligible': months,
       };
-      if (matchedProductId) fields['Card Product'] = [matchedProductId];
       if (notes) fields['Notes'] = notes;
       const created = await createRecord(CARD_INELIGIBILITY_TABLE, fields);
       setIneligibility(prev => [...prev, created]);
-      setLocalOverrides(prev => new Set(prev).add(`${personId}|${cardKey}`));
+      setLocalOverrides(prev => new Set(prev).add(`${personId}|${cardId}`));
       setOpenFormKey(null);
     } catch (e) {
       setSaveError(e.message);
@@ -535,6 +492,8 @@ export function CardRecommendationsTab() {
     );
   }
 
+  const hasFmData = enrichedProducts.length > 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -542,28 +501,28 @@ export function CardRecommendationsTab() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {lastUpdated && (
             <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>
-              Last Updated: {lastUpdated.toLocaleString()}
+              Last Updated: {fmtDateStr(lastUpdated)}
             </span>
           )}
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={scraping}
+            disabled={refreshing}
             style={{
               padding: '0.55rem 1.2rem', borderRadius: 8, border: 'none',
-              background: scraping ? 'rgba(0,212,255,0.4)' : ACCENT,
+              background: refreshing ? 'rgba(0,212,255,0.4)' : ACCENT,
               color: '#0B1220', fontWeight: 700, fontSize: '0.85rem',
-              cursor: scraping ? 'not-allowed' : 'pointer',
-              animation: scraping ? 'ccRecPulse 1.2s ease-in-out infinite' : 'none',
+              cursor: refreshing ? 'not-allowed' : 'pointer',
+              animation: refreshing ? 'ccRecPulse 1.2s ease-in-out infinite' : 'none',
             }}
           >
-            {scraping ? 'Fetching from Frequent Miler...' : 'Refresh Recommendations'}
+            {refreshing ? 'Updating from Frequent Miler...' : 'Refresh FM Data'}
           </button>
         </div>
         <style>{'@keyframes ccRecPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }'}</style>
       </div>
 
-      {fmData && !fmData.error && (
+      {hasFmData && (
         <IssuerPills
           issuers={availableIssuers}
           hidden={hiddenIssuers}
@@ -572,35 +531,25 @@ export function CardRecommendationsTab() {
         />
       )}
 
-      {!fmData && (
-        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', padding: '4rem 1rem' }}>
-          Hit Refresh to load current recommendations from Frequent Miler
-        </div>
-      )}
-
-      {fmData?.error && fmData.error.startsWith('Failed to fetch') && (
-        <div style={{ textAlign: 'center', color: '#FF4D4D', padding: '3rem 1rem' }}>
-          Could not fetch Frequent Miler data — check your connection and try again
-        </div>
-      )}
-
-      {fmData?.error && fmData.error.startsWith('Parse failed') && (
-        <div style={{ padding: '1.5rem 1rem' }}>
-          <div style={{ textAlign: 'center', color: '#FF4D4D', paddingBottom: '1rem' }}>
-            Frequent Miler page format may have changed — contact developer to update parser
-          </div>
-          {fmData.debug && (
+      {refreshError && (
+        <div style={{ textAlign: 'center', color: '#FF4D4D', padding: '0.75rem 1rem' }}>
+          {refreshError}
+          {refreshDebug && (
             <pre style={{
-              ...cardStyle, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', maxHeight: 400, overflowY: 'auto',
+              ...cardStyle, marginTop: '0.75rem', textAlign: 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', maxHeight: 300, overflowY: 'auto',
             }}>
-              {JSON.stringify(fmData.debug, null, 2)}
+              {JSON.stringify(refreshDebug, null, 2)}
             </pre>
           )}
         </div>
       )}
 
-      {fmData && !fmData.error && (
+      {!hasFmData ? (
+        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', padding: '4rem 1rem' }}>
+          Hit Refresh to load current FM recommendations
+        </div>
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
           <Column
             title="Consumer Cards"
