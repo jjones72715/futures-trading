@@ -5,7 +5,9 @@ import { BASE, CARD_PRODUCTS_TABLE, BANKS_TABLE } from '../../src/apps/creditcar
 // access; the dev sandbox that generated this data does not).
 
 const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0';
-const TOKEN = process.env.AIRTABLE_API_KEY;
+// Same PAT already hardcoded in airtable.cjs / cc-airtable.cjs / scrape-fm.js —
+// process.env.AIRTABLE_API_KEY returned 401s, so matching the proven pattern.
+const TOKEN = "patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60";
 
 const CARDS = [
   {
@@ -1646,14 +1648,6 @@ async function createRecord(tableId, fields) {
 }
 
 export const handler = async () => {
-  if (!TOKEN) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'AIRTABLE_API_KEY is not set in this Netlify site environment variables.' }),
-    };
-  }
-
   try {
     const bankRecords = await fetchAllRecords(BANKS_TABLE, ['Bank Name']);
     const banksByName = new Map(bankRecords.map(r => [r.fields['Bank Name'], r.id]));
