@@ -114,12 +114,14 @@ function ordinal(n) {
 }
 
 // Fee is paid when the card opens (1st Annual Fee), then again on each anniversary.
+// Compares by month only (not exact day) since "Annual Fee Post Month" is month-precision —
+// an exact-day comparison is one rounding quirk away from misclassifying a fee that lands
+// a day or two off the true anniversary.
 function annualFeeNumber(openDateStr, feeDate) {
   if (!openDateStr || !feeDate) return null;
   const open = new Date(openDateStr + 'T00:00:00');
-  let years = feeDate.getFullYear() - open.getFullYear();
-  const anniversaryThisYear = new Date(feeDate.getFullYear(), open.getMonth(), open.getDate());
-  if (feeDate < anniversaryThisYear) years -= 1;
+  const monthsElapsed = (feeDate.getFullYear() - open.getFullYear()) * 12 + (feeDate.getMonth() - open.getMonth());
+  const years = Math.round(monthsElapsed / 12);
   return years + 1;
 }
 
