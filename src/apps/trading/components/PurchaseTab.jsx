@@ -464,9 +464,7 @@ export function PurchaseTab() {
                     {label("Account Weight Override (optional)")}
                     {(() => {
                       const et = evalTypeList.find(t => t.id === evalTypeId);
-                      const dd = et?.drawdownLimit || 0;
-                      const cp = parseFloat(costPer) || 0;
-                      const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                      const suggested = totalCost > 0 ? Math.round((totalCost / 5) * 100) / 100 : null;
                       return (
                         <>
                           <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
@@ -567,9 +565,7 @@ export function PurchaseTab() {
                 {label("Account Weight Override")}
                 {(() => {
                   const et = evalTypeList.find(t => t.id === evalTypeId);
-                  const dd = et?.drawdownLimit || 0;
-                  const cp = parseFloat(costPer) || 0;
-                  const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                  const suggested = totalCost > 0 ? Math.round((totalCost / 5) * 100) / 100 : null;
                   return (
                     <>
                       <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
