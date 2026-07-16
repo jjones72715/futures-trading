@@ -619,9 +619,15 @@ function PurchaseTab() {
                 )}
 
                 {totalCost > 0 && (
-                  <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>{$$(totalCost)}</span>
+                  <div style={{ background: "#1f2937", borderRadius: 8, padding: "10px 14px", marginBottom: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>Total Cost</span>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171" }}>{$$(totalCost)}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>Recommended Weight</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24" }}>{$$(totalCost / 5)}</span>
+                    </div>
                   </div>
                 )}
 
