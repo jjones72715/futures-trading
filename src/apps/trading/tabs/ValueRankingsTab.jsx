@@ -97,7 +97,16 @@ export function ValueRankingsTab() {
   const providers = sortedProviders(byProvider);
 
   const topN = selectedTrader === null ? 20 : 5;
-  const topList = scored.slice(0, topN);
+  // Best ROI per firm only, then take top N
+  const seenFirmsTop = new Set();
+  const topList = [];
+  for (const p of scored) {
+    const key = p.firmId || p.id;
+    if (seenFirmsTop.has(key)) continue;
+    seenFirmsTop.add(key);
+    topList.push(p);
+    if (topList.length >= topN) break;
+  }
 
   const metricPillStyle = (active) => ({
     background: active ? "#ffd700" : "#e5e5e5",
