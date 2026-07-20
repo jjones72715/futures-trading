@@ -26,13 +26,38 @@ function sortedProviders(byProvider) {
   });
 }
 
+// Within a provider's sorted item list, group consecutive items by firmId
+function buildFirmGroups(items) {
+  const groups = [];
+  const seen = {};
+  items.forEach(item => {
+    const key = item.firmId || `solo:${item.id}`;
+    if (!seen[key]) {
+      seen[key] = { key, items: [] };
+      groups.push(seen[key]);
+    }
+    seen[key].items.push(item);
+  });
+  return groups;
+}
+
+function ROIBadge({ val }) {
+  const color = roiColor(val);
+  return (
+    <div style={{ fontSize: 13, fontWeight: 800, color }}>
+      {val != null ? val.toFixed(2) + "×" : "—"}
+    </div>
+  );
+}
+
 export function ValueRankingsTab() {
   const C = { card: "#1f2a37", border: "#2d3f50" };
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [metric, setMetric] = useState("roiUnlimited");
-  const [selectedTrader, setSelectedTrader] = useState(null); // null = All
+  const [selectedTrader, setSelectedTrader] = useState(null);
+  const [expandedKey, setExpandedKey] = useState(null); // "dp::firmKey" — only one at a time
 
   useEffect(() => {
     loadValueRankingsData()
@@ -41,30 +66,28 @@ export function ValueRankingsTab() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Collapse expansion when metric or trader changes
+  useEffect(() => { setExpandedKey(null); }, [metric, selectedTrader]);
+
   if (loading) return <div style={{ color: "#6b7280", fontSize: 13, padding: 16 }}>Loading ROI rankings...</div>;
   if (error) return <div style={{ background: "#450a0a", border: "1px solid #7f1d1d", color: "#fca5a5", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>⚠ {error}</div>;
   if (!data) return null;
 
   const { perfTypes, traders, traderFirmExclusions } = data;
 
-  // Filter by selected trader
   const displayItems = selectedTrader === null
     ? perfTypes
     : perfTypes.filter(p => {
-        // Check allowed traders (null = unrestricted)
         if (p.allowedTraders !== null && !p.allowedTraders.has(selectedTrader)) return false;
-        // Check firm exclusion (trader already has account there)
         const excluded = traderFirmExclusions[selectedTrader];
         if (excluded && p.firmId && excluded.has(p.firmId)) return false;
         return true;
       });
 
-  // Only include records with a value for the active metric, sorted desc
   const scored = displayItems
     .filter(p => p[metric] !== null)
     .sort((a, b) => b[metric] - a[metric]);
 
-  // Group by data provider
   const byProvider = {};
   scored.forEach(p => {
     const dp = p.dataProvider || "Other";
@@ -106,6 +129,71 @@ export function ValueRankingsTab() {
     </div>
   );
 
+  function ProviderColumn({ dp }) {
+    const firmGroups = buildFirmGroups(byProvider[dp]);
+    return (
+      <div>
+        <div style={{ fontSize: 9, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, paddingBottom: 2, borderBottom: "1px solid #1f2937" }}>
+          {dp}
+        </div>
+        {firmGroups.map(group => {
+          const best = group.items[0];
+          const hasMore = group.items.length > 1;
+          const expandKey = `${dp}::${group.key}`;
+          const isExpanded = expandedKey === expandKey;
+          const bestVal = best[metric];
+          const bestColor = roiColor(bestVal);
+
+          return (
+            <div key={group.key} style={{ marginBottom: 3 }}>
+              {/* Best card for this firm */}
+              <div style={{ background: "#111827", border: `1px solid ${bestVal != null && bestVal >= 1.0 ? bestColor + "44" : "#1f2937"}`, borderRadius: 6, padding: "6px 8px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+                  {best.name}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                  <ROIBadge val={bestVal} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {best.profitable === "Yes" && (
+                      <div style={{ fontSize: 8, fontWeight: 700, background: "#052e16", color: "#4ade80", padding: "1px 5px", borderRadius: 99, border: "1px solid #166534" }}>+EV</div>
+                    )}
+                    {hasMore && (
+                      <button
+                        onClick={() => setExpandedKey(isExpanded ? null : expandKey)}
+                        style={{ background: isExpanded ? "#374151" : "#1f2937", border: "1px solid #374151", borderRadius: 4, color: "#9ca3af", fontSize: 11, fontWeight: 700, lineHeight: 1, padding: "1px 5px", cursor: "pointer" }}
+                      >
+                        {isExpanded ? "−" : `+${group.items.length - 1}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded: remaining accounts for this firm */}
+              {isExpanded && group.items.slice(1).map(item => {
+                const val = item[metric];
+                const color = roiColor(val);
+                return (
+                  <div key={item.id} style={{ background: "#0d1117", border: `1px solid ${val != null && val >= 1.0 ? color + "33" : "#1f2937"}`, borderRadius: 6, padding: "5px 8px", marginTop: 2, marginLeft: 10, borderLeft: "2px solid #374151" }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+                      {item.name}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <ROIBadge val={val} />
+                      {item.profitable === "Yes" && (
+                        <div style={{ fontSize: 8, fontWeight: 700, background: "#052e16", color: "#4ade80", padding: "1px 5px", borderRadius: 99, border: "1px solid #166534" }}>+EV</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Row 1: Metric toggle */}
@@ -140,32 +228,7 @@ export function ValueRankingsTab() {
           <div style={{ color: "#6b7280", fontSize: 13 }}>No accounts with ROI data available.</div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(providers.length, 4)}, 1fr)`, gap: 12 }}>
-            {providers.map(dp => (
-              <div key={dp}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, paddingBottom: 2, borderBottom: "1px solid #1f2937" }}>
-                  {dp}
-                </div>
-                {byProvider[dp].map(item => {
-                  const val = item[metric];
-                  const color = roiColor(val);
-                  return (
-                    <div key={item.id} style={{ background: "#111827", border: `1px solid ${val != null && val >= 1.0 ? color + "44" : "#1f2937"}`, borderRadius: 6, padding: "6px 8px", marginBottom: 3 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#d1d5db", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
-                        {item.name}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color }}>
-                          {val != null ? val.toFixed(2) + "×" : "—"}
-                        </div>
-                        {item.profitable === "Yes" && (
-                          <div style={{ fontSize: 8, fontWeight: 700, background: "#052e16", color: "#4ade80", padding: "1px 5px", borderRadius: 99, border: "1px solid #166534" }}>+EV</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+            {providers.map(dp => <ProviderColumn key={dp} dp={dp} />)}
           </div>
         )}
       </div>
