@@ -218,8 +218,7 @@ export function BreachModal({ account, evalTypeList, traders = [], onClose, onBr
                     {(() => {
                       const et = localEvalTypeList.find(t => t.id === evalTypeId);
                       const dd = et?.drawdownLimit || 0;
-                      const cp = parseFloat(costPer) || 0;
-                      const suggested = dd > 0 && cp > 0 ? Math.round((25 * cp / dd) * 100) / 100 : null;
+                      const suggested = dd > 0 && totalCost > 0 ? Math.round((5 * totalCost / dd) * 100) / 100 : null;
                       return (
                         <>
                           <input type="number" placeholder="Optional" value={accountWeightOverride} onChange={e => setAccountWeightOverride(e.target.value)} style={inp} />
