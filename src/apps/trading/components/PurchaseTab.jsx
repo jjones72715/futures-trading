@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { $$ } from "../utils/format.js";
 import { fetchTable, createRecord, updateRecord } from "../services/airtable.js";
-import { PURCHASE_TABLE, EVAL_TABLE, EVAL_TYPE_TABLE, TRADERS_TABLE, PERF_TABLE, PERF_TYPES_TABLE } from "../config/tables.js";
+import { PURCHASE_TABLE, EVAL_TABLE, EVAL_TYPE_TABLE, TRADERS_TABLE, PERF_TABLE, PERF_TYPES_TABLE, FIRMS_TABLE } from "../config/tables.js";
 import { EvalTypePricingPanel } from "./EvalTypePricingPanel.jsx";
 
 
@@ -10,6 +10,7 @@ export function PurchaseTab() {
   const sel = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none" };
   const inp = { background: "#111827", border: "1px solid #2d3f50", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "#fff", width: "100%", outline: "none", boxSizing: "border-box" };
   const subTabStyle = (active) => ({ background: active ? "#2563eb" : "#1f2a37", color: active ? "#fff" : "#aaa", border: `1px solid ${active ? "#3b82f6" : "#2f3b4a"}`, borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" });
+  const pillStyle = (active) => ({ background: active ? "#1f3a5f" : "#18222f", color: active ? "#7dd3fc" : "#888", border: `1px solid ${active ? "#3b82f6" : "#2a3442"}`, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" });
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -41,6 +42,9 @@ export function PurchaseTab() {
   const [purchaseCountsByTrader, setPurchaseCountsByTrader] = useState({});
   const [evalPriceEdits, setEvalPriceEdits] = useState({});
   const [allowedTraderEdits, setAllowedTraderEdits] = useState([]);
+  const [firmList, setFirmList] = useState([]);
+  const [selectedDataProvider, setSelectedDataProvider] = useState("");
+  const [selectedFirmId, setSelectedFirmId] = useState("");
 
   useEffect(() => {
     loadActivePurchases();
@@ -49,6 +53,7 @@ export function PurchaseTab() {
     loadEvalTypes();
     loadTraders();
     loadStraightToFundedTypes();
+    loadFirms();
   }, []);
 
   const selectedEvalTypeForPanel = evalTypeList.find(t => t.id === evalTypeId && !evalTypeId.startsWith("perf:"));
@@ -107,7 +112,7 @@ export function PurchaseTab() {
 
   async function loadEvalTypes() {
     try {
-      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]);
+      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders", "Firm"]);
       setEvalTypeList(evalTypes.map(r => ({
         id: r.id,
         name: r.fields["Name"],
@@ -121,13 +126,14 @@ export function PurchaseTab() {
         activationCost: r.fields["Activation Cost"] ?? null,
         valueScore: r.fields["Value Score"] ?? null,
         allowedTraders: (r.fields["Allowed Traders"] ?? []).map(t => typeof t === "object" ? t.id : t),
+        firmIds: r.fields["Firm"] || [],
       })).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e) {}
   }
 
   async function loadStraightToFundedTypes() {
     try {
-      const recs = await fetchTable(PERF_TYPES_TABLE, ["Name", "Account Size", "Activation Fee"]);
+      const recs = await fetchTable(PERF_TYPES_TABLE, ["Name", "Account Size", "Activation Fee", "Firm"]);
       const filtered = recs.filter(r => {
         const name = (r.fields["Name"] || "").toLowerCase();
         return name.includes("yrm") || name.includes("savius");
@@ -136,8 +142,20 @@ export function PurchaseTab() {
         name: r.fields["Name"],
         accountSize: r.fields["Account Size"] || 0,
         cost: r.fields["Activation Fee"] || 0,
+        firmIds: r.fields["Firm"] || [],
       })).sort((a, b) => a.name.localeCompare(b.name));
       setPerfTypeListForPurchase(filtered);
+    } catch (e) {}
+  }
+
+  async function loadFirms() {
+    try {
+      const records = await fetchTable(FIRMS_TABLE, ["Name", "Data Provider"]);
+      setFirmList(records.map(r => ({
+        id: r.id,
+        name: r.fields["Name"] || "Unknown",
+        dataProvider: r.fields["Data Provider"] || "",
+      })));
     } catch (e) {}
   }
 
@@ -203,7 +221,27 @@ export function PurchaseTab() {
     setNumAccounts(1);
     setDate(today);
     setDateStarted(today);
+    setSelectedDataProvider("");
+    setSelectedFirmId("");
   }
+
+  const firmById = Object.fromEntries(firmList.map(f => [f.id, f]));
+  const purchasableTypes = [...evalTypeList, ...perfTypeListForPurchase];
+  const dataProviders = Array.from(new Set(
+    purchasableTypes.flatMap(t => (t.firmIds || []).map(fid => firmById[fid]?.dataProvider).filter(Boolean))
+  )).sort();
+  const firmsForProvider = selectedDataProvider
+    ? Array.from(new Set(
+        purchasableTypes
+          .filter(t => (t.firmIds || []).some(fid => firmById[fid]?.dataProvider === selectedDataProvider))
+          .flatMap(t => t.firmIds)
+      ))
+        .map(fid => firmById[fid])
+        .filter(f => f && f.dataProvider === selectedDataProvider)
+        .sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+  const filteredEvalTypes = selectedFirmId ? evalTypeList.filter(t => (t.firmIds || []).includes(selectedFirmId)) : [];
+  const filteredPerfTypes = selectedFirmId ? perfTypeListForPurchase.filter(t => (t.firmIds || []).includes(selectedFirmId)) : [];
 
   const selectedPurchase = activePurchases.find(r => r.id === selectedPurchaseId);
   const selectedEvalType = evalTypeList.find(t => t.id === evalTypeId);
@@ -516,18 +554,56 @@ export function PurchaseTab() {
         {mode === "new" && (
           <>
             {!traderId && <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Select a trader above to continue.</div>}
-            {traderId && <><div style={{ marginBottom: 16 }}>
+            {traderId && <>
+            <div style={{ marginBottom: 12 }}>
+              {label("Data Provider")}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {dataProviders.map(dp => {
+                  const active = selectedDataProvider === dp;
+                  return (
+                    <button key={dp}
+                      onClick={() => { setSelectedDataProvider(active ? "" : dp); setSelectedFirmId(""); setEvalTypeId(""); setCostPer(""); }}
+                      style={pillStyle(active)}>
+                      {dp}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedDataProvider && (
+              <div style={{ marginBottom: 12 }}>
+                {label("Firm")}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {firmsForProvider.length === 0 && <div style={{ color: "#6b7280", fontSize: 12 }}>No firms found for this data provider.</div>}
+                  {firmsForProvider.map(f => {
+                    const active = selectedFirmId === f.id;
+                    return (
+                      <button key={f.id}
+                        onClick={() => { setSelectedFirmId(active ? "" : f.id); setEvalTypeId(""); setCostPer(""); }}
+                        style={pillStyle(active)}>
+                        {f.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
               {label("Account Type")}
-              <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel}>
-                <option value="">Choose type...</option>
-                <optgroup label="Evaluation Accounts">
-                  {evalTypeList.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </optgroup>
-                {perfTypeListForPurchase.length > 0 && (
+              <select value={evalTypeId} onChange={e => handleEvalTypeChange(e.target.value)} style={sel} disabled={!selectedFirmId}>
+                <option value="">{selectedFirmId ? "Choose type..." : "Select a data provider and firm first"}</option>
+                {filteredEvalTypes.length > 0 && (
+                  <optgroup label="Evaluation Accounts">
+                    {filteredEvalTypes.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {filteredPerfTypes.length > 0 && (
                   <optgroup label="Straight to Funded">
-                    {perfTypeListForPurchase.map(t => (
+                    {filteredPerfTypes.map(t => (
                       <option key={t.id} value={`perf:${t.id}`}>{t.name}</option>
                     ))}
                   </optgroup>
