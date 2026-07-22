@@ -45,6 +45,8 @@ export function PurchaseTab() {
   const [firmList, setFirmList] = useState([]);
   const [selectedDataProvider, setSelectedDataProvider] = useState("");
   const [selectedFirmId, setSelectedFirmId] = useState("");
+  const [perfAccounts, setPerfAccounts] = useState([]);
+  const [perfTypeFirmMap, setPerfTypeFirmMap] = useState({});
 
   useEffect(() => {
     loadActivePurchases();
@@ -54,6 +56,8 @@ export function PurchaseTab() {
     loadTraders();
     loadStraightToFundedTypes();
     loadFirms();
+    loadPerfAccounts();
+    loadPerfTypeFirms();
   }, []);
 
   const selectedEvalTypeForPanel = evalTypeList.find(t => t.id === evalTypeId && !evalTypeId.startsWith("perf:"));
@@ -95,8 +99,24 @@ export function PurchaseTab() {
 
   async function loadEvalAccounts() {
     try {
-      const records = await fetchTable(EVAL_TABLE, ["Name", "Status", "Evaluation Account Type", "Number of Accounts", "Date Started"]);
+      const records = await fetchTable(EVAL_TABLE, ["Name", "Status", "Evaluation Account Type", "Number of Accounts", "Date Started", "Trader"]);
       setEvalAccounts(records.filter(r => r.fields["Status"] === "Active"));
+    } catch (e) {}
+  }
+
+  async function loadPerfAccounts() {
+    try {
+      const records = await fetchTable(PERF_TABLE, ["Trader", "Performance Account Type", "Status"]);
+      setPerfAccounts(records);
+    } catch (e) {}
+  }
+
+  async function loadPerfTypeFirms() {
+    try {
+      const records = await fetchTable(PERF_TYPES_TABLE, ["Firm"]);
+      const map = {};
+      records.forEach(r => { map[r.id] = r.fields["Firm"] || []; });
+      setPerfTypeFirmMap(map);
     } catch (e) {}
   }
 
@@ -227,10 +247,32 @@ export function PurchaseTab() {
 
   const firmById = Object.fromEntries(firmList.map(f => [f.id, f]));
   const purchasableTypes = [...evalTypeList, ...perfTypeListForPurchase];
+  const evalTypeFirmMap = Object.fromEntries(evalTypeList.map(t => [t.id, t.firmIds || []]));
+
+  const openFirmIdsForTrader = (() => {
+    const s = new Set();
+    if (!traderId) return s;
+    evalAccounts.forEach(r => {
+      const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+      if (tid !== traderId) return;
+      const typeArr = r.fields["Evaluation Account Type"];
+      const typeId = Array.isArray(typeArr) ? (typeof typeArr[0] === "string" ? typeArr[0] : typeArr[0]?.id) : null;
+      (evalTypeFirmMap[typeId] || []).forEach(fid => s.add(fid));
+    });
+    perfAccounts.forEach(r => {
+      const tid = Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : null;
+      if (tid !== traderId) return;
+      const typeArr = r.fields["Performance Account Type"];
+      const typeId = Array.isArray(typeArr) ? (typeof typeArr[0] === "string" ? typeArr[0] : typeArr[0]?.id) : null;
+      (perfTypeFirmMap[typeId] || []).forEach(fid => s.add(fid));
+    });
+    return s;
+  })();
+
   const dataProviders = Array.from(new Set(
     purchasableTypes.flatMap(t => (t.firmIds || []).map(fid => firmById[fid]?.dataProvider).filter(Boolean))
   )).sort();
-  const firmsForProvider = selectedDataProvider
+  const allFirmsForSelectedProvider = selectedDataProvider
     ? Array.from(new Set(
         purchasableTypes
           .filter(t => (t.firmIds || []).some(fid => firmById[fid]?.dataProvider === selectedDataProvider))
@@ -240,6 +282,7 @@ export function PurchaseTab() {
         .filter(f => f && f.dataProvider === selectedDataProvider)
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];
+  const firmsForProvider = allFirmsForSelectedProvider.filter(f => !openFirmIdsForTrader.has(f.id));
   const filteredEvalTypes = selectedFirmId ? evalTypeList.filter(t => (t.firmIds || []).includes(selectedFirmId)) : [];
   const filteredPerfTypes = selectedFirmId ? perfTypeListForPurchase.filter(t => (t.firmIds || []).includes(selectedFirmId)) : [];
 
@@ -575,7 +618,13 @@ export function PurchaseTab() {
               <div style={{ marginBottom: 12 }}>
                 {label("Firm")}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {firmsForProvider.length === 0 && <div style={{ color: "#6b7280", fontSize: 12 }}>No firms found for this data provider.</div>}
+                  {firmsForProvider.length === 0 && (
+                    <div style={{ color: "#6b7280", fontSize: 12 }}>
+                      {allFirmsForSelectedProvider.length > 0
+                        ? "This trader already has an open account at every firm on this data provider."
+                        : "No firms found for this data provider."}
+                    </div>
+                  )}
                   {firmsForProvider.map(f => {
                     const active = selectedFirmId === f.id;
                     return (
