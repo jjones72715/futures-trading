@@ -298,13 +298,10 @@ export function PurchaseTab() {
     setSubmitting(true); setErr(null);
     try {
       const evalType = evalTypeList.find(t => t.id === evalTypeId);
-      const accountSize = evalType ? evalType.accountSize : 0;
       if (mode === "reset") {
         await updateRecord(PURCHASE_TABLE, selectedPurchaseId, { "Status": "Failed" });
         if (selectedEvalId) {
           const resetFields = {
-            "Current Balance": accountSize,
-            "High Water Mark": accountSize,
             "Date Purchased": date,
             "Date Started": dateStarted,
             "Trading Days Completed": 0,
@@ -370,8 +367,6 @@ export function PurchaseTab() {
         const evalAccountFields = {
           "Name": `${traderObj?.name?.split(" ")[0]} - ${evalType?.name}`,
           "Status": "Active",
-          "Current Balance": accountSize,
-          "High Water Mark": accountSize,
           "Date Purchased": date,
           "Date Started": date,
           "Number of Accounts": parseInt(numAccounts),
@@ -571,7 +566,6 @@ export function PurchaseTab() {
                     <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>On submit:</div>
                     <div style={{ fontSize: 12, color: "#fca5a5" }}>• Old purchase → <strong>Failed</strong></div>
                     <div style={{ fontSize: 12, color: "#4ade80" }}>• New Reset purchase → <strong>Active</strong></div>
-                    <div style={{ fontSize: 12, color: "#93c5fd" }}>• Balance & HWM reset to <strong>{$$(selectedEvalType.accountSize)}</strong></div>
                     <div style={{ fontSize: 12, color: "#93c5fd" }}>• Trading days reset to <strong>0</strong></div>
                   </div>
                 )}

@@ -119,8 +119,7 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
   async function saveBalance(a, val) {
     const num = parseFloat(val);
     if (isNaN(num)) return;
-    const table = a.type === "perf" ? PERF_TABLE : EVAL_TABLE;
-    await updateRecord(table, a.id, { "Current Balance": num });
+    await updateRecord(PERF_TABLE, a.id, { "Current Balance": num });
   }
   async function submitForToday(a) {
     setSaveError(null);

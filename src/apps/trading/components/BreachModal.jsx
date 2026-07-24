@@ -93,8 +93,6 @@ export function BreachModal({ account, evalTypeList, traders = [], onClose, onBr
       const newEvalFields = {
         "Name": `${traderName.split(" ")[0]} - ${evalType.name}`,
         "Status": "Active",
-        "Current Balance": evalType.accountSize,
-        "High Water Mark": evalType.accountSize,
         "Date Purchased": date,
         "Date Started": dateStarted,
         "Trading Days Completed": 0,

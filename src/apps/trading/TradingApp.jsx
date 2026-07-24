@@ -309,21 +309,14 @@ export default function App() {
     setSaving(true); setErr(null);
     try {
       const perfUpdates = perfAccounts.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
-      const evalUpdates = evalAccounts.filter(a => inputs[a.id] !== "" && !isNaN(parseFloat(inputs[a.id])));
-      await Promise.all([
-        ...perfUpdates.map(a => {
+      await Promise.all(
+        perfUpdates.map(a => {
           const newBal = parseFloat(inputs[a.id]);
           const fields = { "Current Balance": newBal };
           if (newBal > a.bal && newBal > (a.hwm || 0)) fields["High Water Mark"] = newBal;
           return updateRecord(PERF_TABLE, a.id, fields);
-        }),
-        ...evalUpdates.map(a => {
-          const newBal = parseFloat(inputs[a.id]);
-          const fields = { "Current Balance": newBal };
-          if (newBal > a.bal && newBal > (a.hwm || 0)) fields["High Water Mark"] = newBal;
-          return updateRecord(EVAL_TABLE, a.id, fields);
-        }),
-      ]);
+        })
+      );
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
       await load();
