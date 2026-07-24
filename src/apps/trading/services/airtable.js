@@ -26,9 +26,12 @@ export async function createRecord(tableId, fields) {
 }
 
 export async function updateRecord(tableId, recordId, fields) {
-  await fetch(`/.netlify/functions/airtable/${BASE}/${tableId}/${recordId}`, {
+  const res = await fetch(`/.netlify/functions/airtable/${BASE}/${tableId}/${recordId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields }),
   });
+  const data = await res.json();
+  if (!res.ok || data?.error) throw new Error(data?.error?.message || `Airtable error ${res.status}`);
+  return data;
 }
