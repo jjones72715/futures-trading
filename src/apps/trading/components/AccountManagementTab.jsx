@@ -249,7 +249,7 @@ export function AccountManagementTab() {
   const [sepAccountNumbers, setSepAccountNumbers] = useState([]);
   const [sepSubmitting, setSepSubmitting] = useState(false);
 
-  const sepSelected = evalAccounts.find(r => r.id === sepSelectedId);
+  const sepSelected = perfAccounts.find(r => r.id === sepSelectedId);
   const sepN = sepSelected ? (sepSelected.fields["Number of Accounts"] || 1) : 0;
 
   function resetForm() {
@@ -448,35 +448,44 @@ export function AccountManagementTab() {
     setSepSubmitting(true); setErr(null);
     try {
       const f = sepSelected.fields;
+      const status = f["Status"]?.name || f["Status"] || "Active";
       const baseFields = {
-        "Status": "Active",
+        "Status": status,
         "Number of Accounts": 1,
-        "Evaluation Account Type": f["Evaluation Account Type"] || [],
+        "Performance Account Type": f["Performance Account Type"] || [],
         "Trader": f["Trader"] || [],
         "Data Provider": f["Data Provider"] || [],
+        "Data Provider Override": f["Data Provider Override"] || null,
         "Firm Name": f["Firm Name"] || [],
         "Trading Day Definition": f["Trading Day Definition"] || null,
+        "Trading Day Type": f["Trading Day Type"] || null,
         "Daily Loss Limit": f["Daily Loss Limit"] || null,
-        "Account Weight": f["Account Weight"] || null,
-        "Account Weight Override": f["Account Weight Override"] || null,
         "Max Trade Size": f["Max Trade Size"] || null,
         "Drawdown Safety": f["Drawdown Safety"] || null,
+        "Drawdown to Floor": f["Drawdown to Floor"] || null,
+        "Min Profitable Day Amount": f["Min Profitable Day Amount"] || null,
         "Current Balance": f["Current Balance"] || null,
         "High Water Mark": f["High Water Mark"] || null,
+        "Cycle Start Balance": f["Cycle Start Balance"] || null,
         "Current Drawdown Left": f["Current Drawdown Left"] || null,
-        "Profit Target": f["Profit Target"] || null,
-        "Date Started": f["Date Started"] || null,
+        "Trading Days this Cycle": f["Trading Days this Cycle"] || 0,
+        "Trading Days Left": f["Trading Days Left"] || null,
+        "Current Stage": f["Current Stage"] || [],
+        "Stage Target Override": f["Stage Target Override"] || null,
+        "Contract Multiplier": f["Contract Multiplier"] || null,
+        "Payout Account": f["Payout Account"] || false,
+        "Number of Payouts Recieved": f["Number of Payouts Recieved"] || 0,
       };
       await Promise.all(
         sepAccountNumbers.map((acctNum, i) =>
-          createRecord(EVAL_TABLE, {
+          createRecord(PERF_TABLE, {
             ...baseFields,
             "Name": `${f["Name"] || "Account"} #${i + 1}`,
             "Account Number": acctNum || null,
           })
         )
       );
-      await updateRecord(EVAL_TABLE, sepSelected.id, { "Status": "Inactive" });
+      await updateRecord(PERF_TABLE, sepSelected.id, { "Status": "Inactive" });
       setSuccess(`✓ Separated into ${sepN} individual accounts!`);
       setTimeout(() => setSuccess(""), 4000);
       resetForm(); loadData();
@@ -603,7 +612,7 @@ export function AccountManagementTab() {
             })}
           </div>
         ) : (() => {
-          const countMap = activeTab === "passed_evals" || activeTab === "separate" ? evalCountsByTrader : activeTab === "stage_mgmt" ? perfCountsByTrader : payoutCountsByTrader;
+          const countMap = activeTab === "passed_evals" ? evalCountsByTrader : activeTab === "stage_mgmt" || activeTab === "separate" ? perfCountsByTrader : payoutCountsByTrader;
           const visible = traderList.filter(t => (countMap[t.id] || 0) > 0);
           return (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
@@ -990,9 +999,9 @@ export function AccountManagementTab() {
             {label("Select Account to Separate")}
             {loading ? <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>Loading...</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                {evalAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).length === 0
-                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No multi-account eval records{traderId ? " for this trader" : ""}.</div>
-                  : evalAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).map(r => (
+                {perfAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).length === 0
+                  ? <div style={{ color: "#6b7280", fontSize: 12 }}>No multi-account performance records{traderId ? " for this trader" : ""}.</div>
+                  : perfAccounts.filter(r => (r.fields["Number of Accounts"] || 1) > 1).map(r => (
                     <div key={r.id} onClick={() => { setSepSelectedId(r.id); setSepAccountNumbers(Array(r.fields["Number of Accounts"] || 1).fill("")); }}
                       style={{ background: sepSelectedId === r.id ? "#1a2a1a" : "#111827", border: `1px solid ${sepSelectedId === r.id ? "#22c55e" : "#2d3f50"}`, borderRadius: 8, padding: "10px 14px", cursor: "pointer" }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{r.fields["Name"]}</div>
