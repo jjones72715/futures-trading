@@ -24,7 +24,7 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
   const [traders, setTraders] = React.useState([]);
   React.useEffect(() => {
     Promise.all([
-      fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]),
+      fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight (Calc)", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders"]),
       fetchTable(TRADERS_TABLE, ["Name", "Preferred Name"]),
     ]).then(([rows, traderRows]) => {
       setEvalTypeList(rows.map(r => ({
@@ -33,7 +33,7 @@ export function AllAccountsTab({ evalAccounts, perfAccounts, dones, onDone, onCl
         accountSize: r.fields["Account Size"] || 0,
         cost: r.fields["Cost Per Account"] || 0,
         drawdownLimit: r.fields["Drawdown Limit"] || 0,
-        accountWeight: r.fields["Account Weight"] || null,
+        accountWeight: r.fields["Account Weight (Calc)"] || null,
         consistencyPct: r.fields["Consistency %"] ?? null,
         newEvalCost: r.fields["New Eval Cost"] ?? null,
         resetEvalCost: r.fields["Reset Eval Cost"] ?? null,

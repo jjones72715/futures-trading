@@ -132,14 +132,14 @@ export function PurchaseTab() {
 
   async function loadEvalTypes() {
     try {
-      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders", "Firm"]);
+      const evalTypes = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Account Size", "Profit Target", "Drawdown Limit", "Daily Loss Limit", "Max Contracts", "Account Weight (Calc)", "Consistency %", "New Eval Cost", "Reset Eval Cost", "Activation Cost", "Value Score", "Allowed Traders", "Firm"]);
       setEvalTypeList(evalTypes.map(r => ({
         id: r.id,
         name: r.fields["Name"],
         accountSize: r.fields["Account Size"] || 0,
         cost: r.fields["Cost Per Account"] || 0,
         drawdownLimit: r.fields["Drawdown Limit"] || 0,
-        accountWeight: r.fields["Account Weight"] || null,
+        accountWeight: r.fields["Account Weight (Calc)"] || null,
         consistencyPct: r.fields["Consistency %"] ?? null,
         newEvalCost: r.fields["New Eval Cost"] ?? null,
         resetEvalCost: r.fields["Reset Eval Cost"] ?? null,
