@@ -101,7 +101,7 @@ export default function App() {
         console.error("PERF FETCH ERROR:", perfErr);
       }
       try {
-        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Current Balance", "High Water Mark", "Current Drawdown Left", "Drawdown Safety", "Max Trade Size", "Progress to Target", "Profit Target", "Data Provider", "Account Weight", "Account Weight Override", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
+        er = await fetchTable(EVAL_TABLE, ["Name", "Status", "Number of Accounts", "Max Trade Size", "Profit Target", "Data Provider", "Account Weight", "Account Weight Override", "Evaluation Account Type", "Trading Days Completed", "Trading Days Left", "Trader", "Score", "Firm Name", "Account Number", "Trading Day Definition", "Date Started", "Daily Loss Limit"]);
         console.log("raw eval records:", er?.length, er?.[0]);
       } catch(evalErr) {
         console.error("EVAL FETCH ERROR:", evalErr);
@@ -204,14 +204,9 @@ export default function App() {
           firmName: resolveFirm(f["Firm Name"]),
           trader: traderId,
           status: f["Status"]?.name || f["Status"] || "",
-          bal: f["Current Balance"] || 0,
-          ddLeft: f["Current Drawdown Left"] || 0,
           ddToFloor: 0,
-          prog: f["Progress to Target"] || 0,
           limit: f["Max Trade Size"] || 0,
           n: f["Number of Accounts"] || 1,
-          ddSafety: f["Drawdown Safety"] || 0,
-          hwm: f["High Water Mark"] || 0,
           tradeDown: false,
           contractMultiplier: 1,
           payoutAccount: false,
