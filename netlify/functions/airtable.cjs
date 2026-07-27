@@ -63,9 +63,9 @@ exports.handler = async (event) => {
         }
       );
       const data = await res.json();
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) };
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(data) };
     } catch (e) {
-      return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+      return { statusCode: 500, headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: e.message }) };
     }
   }
 
@@ -76,11 +76,11 @@ exports.handler = async (event) => {
       const records = await fetchAllAirtableRecords(baseId, tableId, event.rawQuery);
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
         body: JSON.stringify({ records }),
       };
     } catch (e) {
-      return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+      return { statusCode: 500, headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: e.message }) };
     }
   }
 
@@ -98,10 +98,10 @@ exports.handler = async (event) => {
     const data = await response.json();
     return {
       statusCode: response.status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       body: JSON.stringify(data),
     };
   } catch (e) {
-    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+    return { statusCode: 500, headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: e.message }) };
   }
 };
