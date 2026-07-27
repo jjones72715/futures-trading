@@ -8,6 +8,7 @@ export async function fetchTable(tableId, fields) {
     const url = `/.netlify/functions/airtable/${BASE}/${tableId}?${params}${offset ? `&offset=${offset}` : ""}`;
     const res = await fetch(url);
     const data = await res.json();
+    if (!res.ok || data?.error) throw new Error(data?.error?.message || data?.error || `Airtable error ${res.status}`);
     allRecords.push(...(data.records || []));
     offset = data.offset || null;
   } while (offset);
