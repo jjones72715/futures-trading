@@ -188,7 +188,7 @@ export function AccountManagementTab() {
     setLoading(true);
     try {
       const [evalRecords, pr, payr] = await Promise.all([
-        fetchTable(EVAL_TABLE, ["Name", "Status", "Trader", "Evaluation Account Type", "Number of Accounts", "Current Balance", "Current Drawdown Left"]),
+        fetchTable(EVAL_TABLE, ["Name", "Status", "Trader", "Evaluation Account Type", "Number of Accounts", "Starting Balance"]),
         fetch(`/.netlify/functions/airtable/${BASE}/${PERF_TABLE}?maxRecords=200`).then(r => r.json()),
         fetch(`/.netlify/functions/airtable/${BASE}/${PAYOUT_TABLE}?maxRecords=200`).then(r => r.json()),
       ]);
@@ -1019,8 +1019,7 @@ export function AccountManagementTab() {
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Eval Account</div>
                 {[
                   ["Name", selectedEval.fields["Name"]],
-                  ["Balance", $$(selectedEval.fields["Current Balance"])],
-                  ["DD Left", $$(selectedEval.fields["Current Drawdown Left"])],
+                  ["Starting Balance", $$(Array.isArray(selectedEval.fields["Starting Balance"]) ? selectedEval.fields["Starting Balance"][0] : selectedEval.fields["Starting Balance"])],
                   ["Accounts", `×${selectedEval.fields["Number of Accounts"]}`],
                   ["→ Perf Type", perfType?.name || "Unknown"],
                 ].map(([k, v]) => (
