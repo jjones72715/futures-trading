@@ -18,7 +18,7 @@ export function TraderPLTab() {
         const [traderRecs, purchaseRecs, payoutRecs] = await Promise.all([
           fetchTable(TRADERS_TABLE, ["Name", "Preferred Name", "Tax Account"]),
           fetchTable(PURCHASE_TABLE, ["Trader", "Total Cost", "Purchase Type", "Status", "Date Purchased"]),
-          fetchTable(PAYOUT_TABLE, ["Name", "Trader", "Total Amount", "Payout Tier", "Status", "Date Received"]),
+          fetchTable(PAYOUT_TABLE, ["Name", "Trader", "Total Amount", "Payout Tier", "Tax Rate", "Status", "Date Received"]),
         ]);
         setTraders(traderRecs.map(r => ({
           id: r.id,
@@ -38,12 +38,16 @@ export function TraderPLTab() {
           const tierRaw = r.fields["Payout Tier"];
           const tierNum = typeof tierRaw === "number" ? tierRaw : parseFloat(tierRaw) || 0;
           const tierPct = tierNum > 1 ? tierNum / 100 : tierNum;
+          const taxRaw = r.fields["Tax Rate"];
+          const taxNum = typeof taxRaw === "number" ? taxRaw : parseFloat(taxRaw);
+          const taxRate = Number.isFinite(taxNum) ? (taxNum > 1 ? taxNum / 100 : taxNum) : 0.10;
           return {
             id: r.id,
             name: r.fields["Name"] || "",
             trader: Array.isArray(r.fields["Trader"]) ? r.fields["Trader"][0] : (r.fields["Trader"] || ""),
             totalAmount: r.fields["Total Amount"] || 0,
             tierPct,
+            taxRate,
             status: r.fields["Status"]?.name || r.fields["Status"] || "",
             dateReceived: r.fields["Date Received"] || "",
           };
@@ -81,11 +85,12 @@ export function TraderPLTab() {
       return { ...p, gross, tierPct, tierAmt, loanFund, x80, profitPerFamily };
     }
 
+    const taxRate = p.taxRate ?? 0.10;
     const afterTier = gross * (1 - tierPct);
     const after65 = afterTier * 0.65;
-    const tax = gross * 0.10;
+    const tax = gross * taxRate;
     const profit = after65 - tax;
-    return { ...p, gross, tierPct, afterTier, after65, tax, profit };
+    return { ...p, gross, tierPct, taxRate, afterTier, after65, tax, profit };
   }).sort((a, b) => (b.dateReceived || "").localeCompare(a.dateReceived || ""));
 
   const totalPayouts = payoutRows.reduce((s, r) => s + r.gross, 0);
@@ -157,7 +162,7 @@ export function TraderPLTab() {
               <>
                 {SummaryCard({ label: "Total Spent", value: $$(totalSpent), color: "#f87171" })}
                 {SummaryCard({ label: "Total Payouts Received", value: $$(totalPayouts), color: "#60a5fa" })}
-                {SummaryCard({ label: "Taxes (10%)", value: $$(totalTaxes), color: "#fbbf24", sub: traders.find(t => t.id === traderId)?.taxAccount ? `Tax Account: ${traders.find(t => t.id === traderId).taxAccount}` : null })}
+                {SummaryCard({ label: "Taxes", value: $$(totalTaxes), color: "#fbbf24", sub: traders.find(t => t.id === traderId)?.taxAccount ? `Tax Account: ${traders.find(t => t.id === traderId).taxAccount}` : null })}
                 {SummaryCard({ label: "Net Profit", value: $$(totalProfit), color: totalProfit >= 0 ? "#4ade80" : "#f87171" })}
                 {SummaryCard({ label: "Trader Fees", value: $$(totalTraderFees), color: "#a78bfa" })}
               </>
@@ -192,7 +197,7 @@ export function TraderPLTab() {
                         ["Gross Payout", $$(r.gross), "#60a5fa"],
                         [`Tier (${Math.round(r.tierPct * 100)}%)`, `−${$$(r.gross * r.tierPct)}`, "#f87171"],
                         ["× 65%", $$(r.after65), "#a78bfa"],
-                        ["Taxes (10%)", `−${$$(r.tax)}`, "#fbbf24"],
+                        [`Taxes (${Math.round(r.taxRate * 100)}%)`, `−${$$(r.tax)}`, "#fbbf24"],
                         ["Profit", $$(r.profit), r.profit >= 0 ? "#4ade80" : "#f87171"],
                       ]).map(([lbl, val, color]) => (
                         <div key={lbl} style={{ textAlign: "center", background: "#0d1117", borderRadius: 8, padding: "10px 6px" }}>

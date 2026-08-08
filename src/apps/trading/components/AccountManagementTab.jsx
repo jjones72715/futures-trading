@@ -116,6 +116,7 @@ export function AccountManagementTab() {
   const [postPayoutStageOverride, setPostPayoutStageOverride] = useState("");
   const [postPayoutMultiplier, setPostPayoutMultiplier] = useState("");
   const [payoutTierInput, setPayoutTierInput] = useState("50");
+  const [payoutTaxInput, setPayoutTaxInput] = useState("10");
 
   // Create New Payout form state
   const [cpTrader, setCpTrader] = useState("");
@@ -260,7 +261,7 @@ export function AccountManagementTab() {
     setAdvancePayoutAmount(""); setStageTargetOverride("");
     setSelectedPayoutId(""); setPayoutAction(""); setNewPayoutStatus("");
     setReceivedAmount(""); setReceivedDate(today); setPostPayoutBalance("");
-    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPostPayoutMultiplier(""); setPayoutTierInput("50"); setPayoutDateRequested(today); setPayoutNumAccounts("");
+    setPostPayoutStageId(""); setPostPayoutStageOverride(""); setPostPayoutMultiplier(""); setPayoutTierInput("50"); setPayoutTaxInput("10"); setPayoutDateRequested(today); setPayoutNumAccounts("");
     setCpTrader(""); setCpPerfTypeId(""); setCpDateRequested(today); setCpDateReceived("");
     setCpAmountPerAccount(""); setCpNumAccounts("1"); setCpStatus("Requested"); setCpTier("50");
     setCpStageId(""); setCpNotes("");
@@ -530,11 +531,13 @@ export function AccountManagementTab() {
       const amtPerAcct = parseFloat(receivedAmount) / numAccts;
       // Update payout record
       const tierPct = parseFloat(payoutTierInput) || 50;
+      const taxPct = parseFloat(payoutTaxInput) || 0;
       await updateRecord(PAYOUT_TABLE, selectedPayoutId, {
         "Status": "Received",
         "Date Received": receivedDate,
         "Amount Per Account": amtPerAcct,
         "Payout Tier": tierPct / 100,
+        "Tax Rate": taxPct / 100,
       });
       // Update perf account: new balance, stage, back to Active
       if (payoutPerfId) {
@@ -942,6 +945,10 @@ export function AccountManagementTab() {
                       <div>
                         {label("Payout Tier %")}
                         <input type="number" min="0" max="100" placeholder="50" value={payoutTierInput} onChange={e => setPayoutTierInput(e.target.value)} style={inp} />
+                      </div>
+                      <div>
+                        {label("Tax Rate %")}
+                        <input type="number" min="0" max="100" placeholder="10" value={payoutTaxInput} onChange={e => setPayoutTaxInput(e.target.value)} style={inp} />
                       </div>
                       <div>
                         {label("Contract Multiplier")}

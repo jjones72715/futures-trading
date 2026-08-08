@@ -36,7 +36,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
     try {
       const [purchaseRecords, payoutRecords] = await Promise.all([
         fetchTable(PURCHASE_TABLE, ["Date Purchased", "Status", "Total Cost", "Purchase Type"]),
-        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts", "Payout Tier"]),
+        fetchTable(PAYOUT_TABLE, ["Name", "Total Amount", "Date Received", "Trader", "Performance Account", "Status", "Number of Accounts", "Payout Tier", "Tax Rate"]),
       ]);
       setPurchases(purchaseRecords.map(r => ({
         id: r.id,
@@ -55,6 +55,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
         status: r.fields["Status"]?.name || r.fields["Status"] || "",
         numAccounts: r.fields["Number of Accounts"] || 1,
         payoutTierPct: r.fields["Payout Tier"] != null ? r.fields["Payout Tier"] : null,
+        taxRate: r.fields["Tax Rate"] != null ? r.fields["Tax Rate"] : 0.10,
       })));
     } catch (e) {}
     setLoading(false);
@@ -84,7 +85,7 @@ export function PLTab({ evalAccounts, perfAccounts }) {
     const totalPayout  = Math.round(p.totalAmount || 0);
     const liqRepayment = Math.round(totalPayout * t);
     const afterLiq     = Math.round(totalPayout - liqRepayment);
-    const taxSet       = Math.round(totalPayout * 0.10);
+    const taxSet       = Math.round(totalPayout * (p.taxRate ?? 0.10));
     const traderProfit = Math.round(afterLiq * 0.65 - taxSet);
     return { traderName, totalPayout, liqRepayment, afterLiq, taxSet, traderProfit, tierPct: Math.round(t * 100) };
   });
