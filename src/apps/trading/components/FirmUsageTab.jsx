@@ -16,7 +16,7 @@ export function FirmUsageTab() {
       try {
         // Load firms first so fMap is available for account name resolution
         const firmRecords = await fetchTable(FIRMS_TABLE, [
-          "Name", "Data Provider", "Rank", "Max Accounts", "Reputation Score"
+          "Name", "Data Provider", "Rank", "Max Accounts", "Reputation Score", "Best Value Score"
         ]);
         const fMap = {};
         firmRecords.forEach(r => { fMap[r.id] = r; });
@@ -30,6 +30,7 @@ export function FirmUsageTab() {
             rank: r.fields["Rank"],
             maxAccounts: r.fields["Max Accounts"] || 0,
             reputationScore: r.fields["Reputation Score"],
+            bestValueScore: r.fields["Best Value Score"],
           }));
 
         // Load eval accounts with firm lookup
@@ -145,7 +146,7 @@ export function FirmUsageTab() {
   );
 
   const traderLabels = traders.map(t => t.label);
-  const gridCols = `40px 1fr 90px 90px ${traderLabels.map(() => "1fr").join(" ")}`;
+  const gridCols = `40px 1fr 90px 90px 90px ${traderLabels.map(() => "1fr").join(" ")}`;
 
   console.log("rendering providers - firms by provider:", providers.map(p => p + ": " + firms.filter(f => f.provider === p).length));
 
@@ -174,6 +175,7 @@ export function FirmUsageTab() {
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Rank</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Firm</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Reputation Score</div>
+                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Best Value Score</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Max Accounts</div>
                 {traderLabels.map(t => (
                   <div key={t} style={{ fontSize: 11, color: pc.text, fontWeight: 700, textAlign: "center" }}>{t}</div>
@@ -201,6 +203,7 @@ export function FirmUsageTab() {
                       onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                     >{f.name}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.reputationScore ?? "—"}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.bestValueScore ?? "—"}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.maxAccounts}</div>
                     {traderLabels.map(tLabel => {
                       const labels = traderUsage[tLabel] || [];
