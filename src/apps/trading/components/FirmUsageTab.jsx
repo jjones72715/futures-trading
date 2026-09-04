@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { fetchTable } from "../services/airtable.js";
 import { FIRMS_TABLE, EVAL_TABLE, PERF_TABLE, TRADERS_TABLE } from "../config/tables.js";
+import { FirmDetailPanel } from "./FirmDetailPanel.jsx";
 
 export function FirmUsageTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -8,6 +9,7 @@ export function FirmUsageTab() {
   const [accounts, setAccounts] = useState([]);
   const [restrictions, setRestrictions] = useState({}); // traderName → [firmName]
   const [loading, setLoading] = useState(true);
+  const [selectedFirm, setSelectedFirm] = useState(null); // {id, name}
 
   useEffect(() => {
     async function loadData() {
@@ -189,7 +191,13 @@ export function FirmUsageTab() {
                     alignItems: "center",
                   }}>
                     <div style={{ fontSize: 12, color: "#6b7280" }}>{f.rank}</div>
-                    <div style={{ fontSize: 13, color: hasAny ? "#fff" : "#374151", fontWeight: hasAny ? 600 : 400 }}>{f.name}</div>
+                    <div
+                      data-firm-link
+                      onClick={() => setSelectedFirm({ id: f.id, name: f.name })}
+                      style={{ fontSize: 13, color: hasAny ? "#fff" : "#374151", fontWeight: hasAny ? 600 : 400, cursor: "pointer" }}
+                      onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                      onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                    >{f.name}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.maxAccounts}</div>
                     {traderLabels.map(tLabel => {
                       const labels = traderUsage[tLabel] || [];
@@ -223,6 +231,14 @@ export function FirmUsageTab() {
           </div>
         );
       })}
+
+      {selectedFirm && (
+        <FirmDetailPanel
+          firmId={selectedFirm.id}
+          firmName={selectedFirm.name}
+          onClose={() => setSelectedFirm(null)}
+        />
+      )}
     </div>
   );
 }
