@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { getRecord, updateRecord } from "../services/airtable.js";
 import { FIRMS_TABLE, EVAL_TYPE_TABLE } from "../config/tables.js";
 import { $$ } from "../utils/format.js";
+import { bestAccountFromEvalTypes } from "../utils/bestAccount.js";
 
 const STALE_MONTHS = 4;
 
@@ -237,12 +238,7 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
   const tpReviewCount = f["TP Review Count"];
   const tpStale = isTpStale(f["TP Last Updated"]);
 
-  const bestAccount = evalTypes.reduce((best, r) => {
-    const vs = r.fields?.["Value Score"];
-    if (vs == null) return best;
-    if (!best || vs > best.valueScore) return { name: r.fields["Name"], valueScore: vs };
-    return best;
-  }, null);
+  const bestAccount = bestAccountFromEvalTypes(evalTypes);
 
   return (
     <>
@@ -292,21 +288,7 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
                 {lastUpdate && (
                   <div style={{ fontSize: 11, color: "#6b7280" }}>Last updated: {lastUpdate}</div>
                 )}
-                <TrustpilotEditForm
-                  firmId={firmId}
-                  tpScore={tpScore}
-                  tpReviewCount={tpReviewCount}
-                  onSaved={handleTpSaved}
-                />
               </div>
-
-              {hasIntel ? (
-                <div style={{ fontSize: 14, color: "#e5e7eb", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                  {summary}
-                </div>
-              ) : (
-                <div style={{ color: "#6b7280", fontSize: 13, fontStyle: "italic" }}>No intel logged for this firm yet.</div>
-              )}
 
               {bestAccount && (
                 <StatCard label="Best Account">
@@ -319,6 +301,21 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
                   <span style={{ fontSize: 15, fontWeight: 700, color: "#4ade80" }}>{$$(totalPaidOut)}</span>
                 </StatCard>
               )}
+
+              {hasIntel ? (
+                <div style={{ fontSize: 14, color: "#e5e7eb", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                  {summary}
+                </div>
+              ) : (
+                <div style={{ color: "#6b7280", fontSize: 13, fontStyle: "italic" }}>No intel logged for this firm yet.</div>
+              )}
+
+              <TrustpilotEditForm
+                firmId={firmId}
+                tpScore={tpScore}
+                tpReviewCount={tpReviewCount}
+                onSaved={handleTpSaved}
+              />
             </>
           )}
         </div>

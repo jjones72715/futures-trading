@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { fetchTable } from "../services/airtable.js";
-import { FIRMS_TABLE, EVAL_TABLE, PERF_TABLE, TRADERS_TABLE } from "../config/tables.js";
+import { FIRMS_TABLE, EVAL_TABLE, PERF_TABLE, TRADERS_TABLE, EVAL_TYPE_TABLE } from "../config/tables.js";
 import { FirmDetailPanel } from "./FirmDetailPanel.jsx";
+import { bestAccountFromEvalTypes } from "../utils/bestAccount.js";
 
 export function FirmUsageTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -16,10 +17,23 @@ export function FirmUsageTab() {
       try {
         // Load firms first so fMap is available for account name resolution
         const firmRecords = await fetchTable(FIRMS_TABLE, [
-          "Name", "Data Provider", "Rank", "Max Accounts", "Reputation Score", "Best Value Score"
+          "Name", "Data Provider", "Rank", "Max Accounts", "Reputation Score"
         ]);
         const fMap = {};
         firmRecords.forEach(r => { fMap[r.id] = r; });
+
+        // Best Value Score per firm — computed client-side from linked Evaluation
+        // Account Types (the Firms table's "Best Value Score" rollup is broken),
+        // same logic the pullout panel's Best Account section uses.
+        const evalTypeRecords = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Value Score", "Firm"]);
+        const evalTypesByFirm = {};
+        evalTypeRecords.forEach(r => {
+          (r.fields["Firm"] || []).forEach(firmId => {
+            if (!evalTypesByFirm[firmId]) evalTypesByFirm[firmId] = [];
+            evalTypesByFirm[firmId].push(r);
+          });
+        });
+
         const sortedFirms = firmRecords
           .filter(r => r.fields["Rank"])
           .sort((a, b) => a.fields["Rank"] - b.fields["Rank"])
@@ -30,7 +44,7 @@ export function FirmUsageTab() {
             rank: r.fields["Rank"],
             maxAccounts: r.fields["Max Accounts"] || 0,
             reputationScore: r.fields["Reputation Score"],
-            bestValueScore: r.fields["Best Value Score"],
+            bestValueScore: bestAccountFromEvalTypes(evalTypesByFirm[r.id])?.valueScore,
           }));
 
         // Load eval accounts with firm lookup
@@ -203,7 +217,7 @@ export function FirmUsageTab() {
                       onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                     >{f.name}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.reputationScore ?? "—"}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.bestValueScore ?? "—"}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{typeof f.bestValueScore === "number" ? f.bestValueScore.toFixed(1) : "—"}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.maxAccounts}</div>
                     {traderLabels.map(tLabel => {
                       const labels = traderUsage[tLabel] || [];
