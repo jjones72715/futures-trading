@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { getRecord, updateRecord } from "../services/airtable.js";
-import { FIRMS_TABLE, EVAL_TYPE_TABLE } from "../config/tables.js";
+import { FIRMS_TABLE, PERF_TYPES_TABLE } from "../config/tables.js";
 import { $$ } from "../utils/format.js";
-import { bestAccountFromEvalTypes } from "../utils/bestAccount.js";
+import { bestAccountByRoiRatio } from "../utils/bestAccount.js";
 
 const STALE_MONTHS = 4;
 
@@ -166,7 +166,7 @@ function fmtDate(dateStr) {
 export function FirmDetailPanel({ firmId, firmName, onClose }) {
   const [mounted, setMounted] = useState(false);
   const [record, setRecord] = useState(null);
-  const [evalTypes, setEvalTypes] = useState([]);
+  const [perfTypes, setPerfTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const panelRef = React.useRef(null);
@@ -200,12 +200,12 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
   }, [firmId]);
 
   useEffect(() => {
-    const ids = record?.fields?.["Evaluation Account Types"] || [];
-    if (ids.length === 0) { setEvalTypes([]); return; }
+    const ids = record?.fields?.["Performance Account Types"] || [];
+    if (ids.length === 0) { setPerfTypes([]); return; }
     let cancelled = false;
-    Promise.all(ids.map(id => getRecord(EVAL_TYPE_TABLE, id)))
-      .then(records => { if (!cancelled) setEvalTypes(records); })
-      .catch(() => { if (!cancelled) setEvalTypes([]); });
+    Promise.all(ids.map(id => getRecord(PERF_TYPES_TABLE, id)))
+      .then(records => { if (!cancelled) setPerfTypes(records); })
+      .catch(() => { if (!cancelled) setPerfTypes([]); });
     return () => { cancelled = true; };
   }, [record]);
 
@@ -238,7 +238,7 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
   const tpReviewCount = f["TP Review Count"];
   const tpStale = isTpStale(f["TP Last Updated"]);
 
-  const bestAccount = bestAccountFromEvalTypes(evalTypes);
+  const bestAccount = bestAccountByRoiRatio(perfTypes);
 
   return (
     <>
@@ -292,7 +292,7 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
 
               {bestAccount && (
                 <StatCard label="Best Account">
-                  {bestAccount.name} — Value Score: {typeof bestAccount.valueScore === "number" ? bestAccount.valueScore.toFixed(1) : bestAccount.valueScore}
+                  {bestAccount.name} — ROI Ratio: {typeof bestAccount.roiRatio === "number" ? bestAccount.roiRatio.toFixed(2) : bestAccount.roiRatio}
                 </StatCard>
               )}
 

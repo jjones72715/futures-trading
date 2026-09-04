@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { fetchTable } from "../services/airtable.js";
-import { FIRMS_TABLE, EVAL_TABLE, PERF_TABLE, TRADERS_TABLE, EVAL_TYPE_TABLE } from "../config/tables.js";
+import { FIRMS_TABLE, EVAL_TABLE, PERF_TABLE, TRADERS_TABLE, PERF_TYPES_TABLE } from "../config/tables.js";
 import { FirmDetailPanel } from "./FirmDetailPanel.jsx";
-import { bestAccountFromEvalTypes } from "../utils/bestAccount.js";
+import { bestAccountByRoiRatio } from "../utils/bestAccount.js";
 
 export function FirmUsageTab() {
   const C = { bg: "#030712", card: "#111827", border: "#1f2937" };
@@ -22,15 +22,15 @@ export function FirmUsageTab() {
         const fMap = {};
         firmRecords.forEach(r => { fMap[r.id] = r; });
 
-        // Best Value Score per firm — computed client-side from linked Evaluation
-        // Account Types (the Firms table's "Best Value Score" rollup is broken),
-        // same logic the pullout panel's Best Account section uses.
-        const evalTypeRecords = await fetchTable(EVAL_TYPE_TABLE, ["Name", "Value Score", "Firm"]);
-        const evalTypesByFirm = {};
-        evalTypeRecords.forEach(r => {
+        // ROI Ratio per firm — computed client-side from linked Performance
+        // Account Types (the Firms table's "Best Value Score" rollup is broken
+        // and unused here), same logic the pullout panel's Best Account section uses.
+        const perfTypeRecords = await fetchTable(PERF_TYPES_TABLE, ["Name", "ROI Ratio (Unlimited)", "Firm"]);
+        const perfTypesByFirm = {};
+        perfTypeRecords.forEach(r => {
           (r.fields["Firm"] || []).forEach(firmId => {
-            if (!evalTypesByFirm[firmId]) evalTypesByFirm[firmId] = [];
-            evalTypesByFirm[firmId].push(r);
+            if (!perfTypesByFirm[firmId]) perfTypesByFirm[firmId] = [];
+            perfTypesByFirm[firmId].push(r);
           });
         });
 
@@ -44,7 +44,7 @@ export function FirmUsageTab() {
             rank: r.fields["Rank"],
             maxAccounts: r.fields["Max Accounts"] || 0,
             reputationScore: r.fields["Reputation Score"],
-            bestValueScore: bestAccountFromEvalTypes(evalTypesByFirm[r.id])?.valueScore,
+            bestRoiRatio: bestAccountByRoiRatio(perfTypesByFirm[r.id])?.roiRatio,
           }));
 
         // Load eval accounts with firm lookup
@@ -189,7 +189,7 @@ export function FirmUsageTab() {
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Rank</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Firm</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Reputation Score</div>
-                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Best Value Score</div>
+                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>ROI Ratio</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Max Accounts</div>
                 {traderLabels.map(t => (
                   <div key={t} style={{ fontSize: 11, color: pc.text, fontWeight: 700, textAlign: "center" }}>{t}</div>
@@ -217,7 +217,7 @@ export function FirmUsageTab() {
                       onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
                     >{f.name}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.reputationScore ?? "—"}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{typeof f.bestValueScore === "number" ? f.bestValueScore.toFixed(1) : "—"}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{typeof f.bestRoiRatio === "number" ? f.bestRoiRatio.toFixed(2) : "—"}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", textAlign: "center" }}>{f.maxAccounts}</div>
                     {traderLabels.map(tLabel => {
                       const labels = traderUsage[tLabel] || [];

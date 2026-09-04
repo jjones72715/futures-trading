@@ -1,11 +1,11 @@
-// Given a firm's linked Evaluation Account Type records, find the one with
-// the highest Value Score. Shared by the Firm Usage grid (score only) and
-// the firm detail pullout (name + score).
-export function bestAccountFromEvalTypes(evalTypeRecords) {
-  return (evalTypeRecords || []).reduce((best, r) => {
-    const vs = r.fields?.["Value Score"];
-    if (vs == null) return best;
-    if (!best || vs > best.valueScore) return { name: r.fields["Name"], valueScore: vs };
+// Given a firm's linked Performance Account Type records, find the one with
+// the highest ROI Ratio (Unlimited). Shared by the Firm Usage grid (ratio only)
+// and the firm detail pullout (name + ratio).
+export function bestAccountByRoiRatio(perfTypeRecords) {
+  return (perfTypeRecords || []).reduce((best, r) => {
+    const roi = r.fields?.["ROI Ratio (Unlimited)"];
+    if (roi == null) return best;
+    if (!best || roi > best.roiRatio) return { name: r.fields["Name"], roiRatio: roi };
     return best;
   }, null);
 }
