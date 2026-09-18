@@ -8,7 +8,7 @@ export function $$(v) {
 export function $$target(v) {
   if (!v || v === 0) return "Max";
   const n = parseFloat(v);
-  if (isNaN(n) || n > 4501) return "Max";
+  if (isNaN(n) || n > 5801) return "Max";
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
