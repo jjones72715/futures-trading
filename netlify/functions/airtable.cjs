@@ -1,4 +1,4 @@
-const TOKEN = "patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60";
+const TOKEN = process.env.AIRTABLE_API_KEY;
 const BASE_URL = "https://api.airtable.com/v0";
 
 const STATUS_FILTERS = {
@@ -40,6 +40,8 @@ async function fetchAllAirtableRecords(baseId, tableId, rawQuery) {
 }
 
 exports.handler = async (event) => {
+  if (!TOKEN) return { statusCode: 500, headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: 'AIRTABLE_API_KEY is not configured' }) };
+
   const path = event.path.replace('/.netlify/functions/airtable', '');
   const method = event.httpMethod;
   const params = new URLSearchParams(event.rawQuery || '');

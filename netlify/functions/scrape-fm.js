@@ -1,6 +1,6 @@
 const FM_URL = 'https://frequentmiler.com/best-credit-card-offers/';
 
-const TOKEN = "patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60";
+const TOKEN = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0';
 const BASE = 'apph7JP85hB5dLyob';
 const CARD_PRODUCTS_TABLE = 'tbloTLQR2DwcqR2Vq';
@@ -137,6 +137,7 @@ async function patchCardProducts(updates) {
 }
 
 export const handler = async () => {
+  if (!TOKEN) return { statusCode: 500, headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: 'AIRTABLE_API_KEY is not configured' }) };
   let html;
   try {
     const controller = new AbortController();

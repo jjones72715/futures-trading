@@ -4,9 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { BASE, CARD_PRODUCTS_TABLE, BANKS_TABLE } from '../src/apps/creditcards/config/tables.js';
 
-// Same PAT already hardcoded throughout netlify/functions/*.cjs — matching
-// existing repo convention rather than introducing an env-var-only path.
-const TOKEN = "patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60";
+// Run with: AIRTABLE_API_KEY=pat... node scripts/upsert-fm-cards.js
+const TOKEN = process.env.AIRTABLE_API_KEY;
+if (!TOKEN) {
+  console.error('AIRTABLE_API_KEY is not set');
+  process.exit(1);
+}
 const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

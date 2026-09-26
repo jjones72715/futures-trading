@@ -5,9 +5,7 @@ import { BASE, CARD_PRODUCTS_TABLE, BANKS_TABLE } from '../../src/apps/creditcar
 // access; the dev sandbox that generated this data does not).
 
 const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0';
-// Same PAT already hardcoded in airtable.cjs / cc-airtable.cjs / scrape-fm.js —
-// process.env.AIRTABLE_API_KEY returned 401s, so matching the proven pattern.
-const TOKEN = "patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60";
+const TOKEN = process.env.AIRTABLE_API_KEY;
 
 const CARDS = [
   {
@@ -1674,6 +1672,7 @@ async function findExistingBySlug(slug) {
 // 250ms/card required, which is what caused runs to get killed mid-way and
 // duplicate-happy re-triggers to race each other.
 export const handler = async (event) => {
+  if (!TOKEN) return { statusCode: 500, headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: 'AIRTABLE_API_KEY is not configured' }) };
   const params = (event && event.queryStringParameters) || {};
   const start = Math.max(0, parseInt(params.start, 10) || 0);
   const count = Math.max(1, parseInt(params.count, 10) || 50);

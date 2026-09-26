@@ -6,7 +6,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const TOKEN = "patIocMMJeO1lbzlm.d9ea1e76994175893ff166925528aed82f3caea1eb9126a096b16cebade88cd5";
+const TOKEN = process.env.AIRTABLE_API_KEY;
+if (!TOKEN) {
+  console.error('AIRTABLE_API_KEY is not set');
+  process.exit(1);
+}
 const BASE_URL = "https://api.airtable.com/v0";
 
 app.get('/api/:baseId/:tableId', async (req, res) => {

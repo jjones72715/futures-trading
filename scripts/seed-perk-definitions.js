@@ -1,11 +1,15 @@
 // Seed script for Perk Definitions table in Airtable.
 // Checks for existing records by Perk Name + Credit Amount before creating.
 // Run via: node scripts/seed-perk-definitions.js
-// Note: Requires AIRTABLE_TOKEN env var or edit the token below.
+// Requires the AIRTABLE_API_KEY env var (AIRTABLE_TOKEN also accepted).
 
 const BASE = 'apph7JP85hB5dLyob';
 const PERK_DEFINITIONS_TABLE = 'tblA2XdVpJoLGDNMd';
-const TOKEN = process.env.AIRTABLE_TOKEN || 'patIocMMJeO1lbzlm.c34342b06deba92090aacdb92686c8bc1479be242f03adf24cc9d0c32f1dfb60';
+const TOKEN = process.env.AIRTABLE_API_KEY || process.env.AIRTABLE_TOKEN;
+if (!TOKEN) {
+  console.error('AIRTABLE_API_KEY is not set');
+  process.exit(1);
+}
 
 const PERKS = [
   { name: 'Admiral Club',    credit: 4,      cycle: 'Annual',      priority: 3 },
