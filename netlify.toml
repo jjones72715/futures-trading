@@ -8,6 +8,11 @@
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https://api.airtable.com; style-src 'self' 'unsafe-inline';"
 
 [[redirects]]
+  from = "/api/financial"
+  to = "/.netlify/functions/financial"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
