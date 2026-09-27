@@ -20,6 +20,20 @@ const TABLES = {
 
 const RECORD_ID = /^rec[A-Za-z0-9]{14}$/;
 
+// Tolerate common paste mistakes: whitespace, wrapping quotes, a "Bearer " prefix.
+function readToken() {
+  const raw = process.env.AIRTABLE_API_KEY;
+  if (!raw) return null;
+  return raw.trim().replace(/^["']|["']$/g, '').replace(/^Bearer\s+/i, '').trim();
+}
+
+// Describes an obviously malformed token without revealing it; null when it looks plausible.
+function describeBadToken(token) {
+  if (!token.startsWith('pat')) return 'does not start with "pat"';
+  if (!token.includes('.')) return 'is only the token ID — the secret part after the "." is missing (Airtable shows the full token only once, at creation)';
+  return null;
+}
+
 function respond(statusCode, body) {
   return {
     statusCode,
@@ -57,8 +71,10 @@ async function fetchAllAirtableRecords(token, tableId) {
 }
 
 exports.handler = async (event) => {
-  const TOKEN = process.env.AIRTABLE_API_KEY;
+  const TOKEN = readToken();
   if (!TOKEN) return respond(500, { error: 'AIRTABLE_API_KEY is not configured' });
+  const badToken = describeBadToken(TOKEN);
+  if (badToken) return respond(500, { error: `AIRTABLE_API_KEY doesn't look like a full Airtable token: it ${badToken}` });
 
   const method = event.httpMethod;
   const params = new URLSearchParams(event.rawQuery || '');
