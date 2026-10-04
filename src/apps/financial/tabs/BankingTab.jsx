@@ -55,8 +55,13 @@ function AccountsView() {
     .sort((a, b) => (isActive(b) - isActive(a)) || num(b.fields['Current Balance']) - num(a.fields['Current Balance']));
 
   const activeFiltered = byOwner.filter(isActive);
-  const totalCash = sumField(activeFiltered, 'Current Balance');
-  const prevCash = sumField(activeFiltered, 'Previous Balance');
+  // Cash excludes tax-holdback accounts ("Exclude from Net Worth"); those get their own card.
+  const cashAccounts = activeFiltered.filter(countsTowardNetWorth);
+  const holdbackAccounts = activeFiltered.filter(r => !countsTowardNetWorth(r));
+  const totalCash = sumField(cashAccounts, 'Current Balance');
+  const prevCash = sumField(cashAccounts, 'Previous Balance');
+  const holdbackCash = sumField(holdbackAccounts, 'Current Balance');
+  const prevHoldback = sumField(holdbackAccounts, 'Previous Balance');
   const owedTotal = sumField(owed, 'Current Amount');
 
   return (
@@ -66,10 +71,12 @@ function AccountsView() {
         <PillFilter options={owners} value={owner} onChange={setOwner} />
       </div>
 
-      {loading ? <SkeletonStats count={3} /> : (
+      {loading ? <SkeletonStats count={4} /> : (
         <div className="fin-stats">
           <StatCard label={`Cash${owner !== ALL ? ` — ${owner}` : ''}`} value={formatCurrency(totalCash)} accent="var(--positive)"
             sub={<Delta current={totalCash} previous={prevCash} />} />
+          <StatCard label={`Tax Holdback Cash${owner !== ALL ? ` — ${owner}` : ''}`} value={formatCurrency(holdbackCash)} accent="var(--warning)"
+            sub={<Delta current={holdbackCash} previous={prevHoldback} />} />
           <StatCard label="Active Accounts" value={activeFiltered.length} accent="var(--text)" />
           <StatCard label="Owed to Me" value={formatCurrency(owedTotal)} accent="var(--warning)" />
         </div>
