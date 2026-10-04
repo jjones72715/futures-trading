@@ -6,7 +6,7 @@ import AlertBadge, { daysText } from '../components/AlertBadge.jsx';
 import LineChart from '../components/LineChart.jsx';
 import { ErrorBanner, Skel, SkeletonStats } from '../components/ui.jsx';
 import {
-  formatCurrency, formatDate, daysUntil, sumField, isActive, num,
+  formatCurrency, formatDate, daysUntil, sumField, isActive, countsTowardNetWorth, num,
   sortSnapshots, snapshotLabel, formatPercent,
 } from '../utils/formatters.js';
 
@@ -42,7 +42,7 @@ function AlertPanel({ title, items, level, emptyText, onItemClick }) {
 export default function HomeTab({ onNavigate }) {
   const { data, loading, error } = useTables(KEYS);
 
-  const totalCash = sumField(data[T.BANKING_ACCOUNTS].filter(isActive), 'Current Balance');
+  const totalCash = sumField(data[T.BANKING_ACCOUNTS].filter(r => isActive(r) && countsTowardNetWorth(r)), 'Current Balance');
   const totalOwed = sumField(data[T.CREDIT_CARD_LOGINS], 'Current Balance');
   const totalInvest = sumField(data[T.INVESTMENTS].filter(isActive), 'Current Balance');
   const snapshots = sortSnapshots(data[T.MONTHLY_NET_WORTH]);

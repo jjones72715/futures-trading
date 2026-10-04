@@ -14,6 +14,7 @@ export const FORMS = {
     { name: 'Target Type', type: 'select', options: CHOICES.TARGET_TYPE },
     { name: 'Notes', type: 'textarea', full: true },
     { name: 'Active', type: 'checkbox', default: true },
+    { name: 'Exclude from Net Worth', type: 'checkbox' },
   ],
   OWED_TO_ME: [
     { name: 'Person or Entity', type: 'text', required: true },

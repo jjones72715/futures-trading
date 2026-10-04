@@ -11,7 +11,7 @@ import {
   Chip, Delta, EmptyState, ErrorBanner, SkeletonGrid, SkeletonStats, SkeletonTable, ShowInactiveToggle, Subtabs,
 } from '../components/ui.jsx';
 import {
-  formatCurrency, formatShortDate, daysUntil, distinct, isActive, sumField, num,
+  formatCurrency, formatShortDate, daysUntil, distinct, isActive, countsTowardNetWorth, sumField, num,
 } from '../utils/formatters.js';
 
 const SUBTABS = [{ id: 'accounts', label: 'Accounts' }, { id: 'bonuses', label: 'Bonuses' }];
@@ -101,6 +101,7 @@ function AccountsView() {
                   chips={<>
                     {f.Type && <Chip color="#00D4FF">{f.Type}</Chip>}
                     {f.Owner && <Chip>{f.Owner}</Chip>}
+                    {!countsTowardNetWorth(r) && <Chip color="#FFD60A">Tax Holdback</Chip>}
                   </>}
                   current={f['Current Balance']}
                   previous={f['Previous Balance']}

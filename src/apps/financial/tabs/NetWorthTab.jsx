@@ -6,7 +6,7 @@ import LineChart from '../components/LineChart.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
 import { Delta, EmptyState, ErrorBanner, Skel, SkeletonStats, SkeletonTable } from '../components/ui.jsx';
 import {
-  formatCurrency, formatPercent, isActive, num, sortSnapshots, snapshotLabel, sumField,
+  formatCurrency, formatPercent, isActive, countsTowardNetWorth, num, sortSnapshots, snapshotLabel, sumField,
 } from '../utils/formatters.js';
 
 const KEYS = [T.MONTHLY_NET_WORTH, T.BANKING_ACCOUNTS, T.CREDIT_CARD_LOGINS, T.OWED_TO_ME];
@@ -56,7 +56,7 @@ export default function NetWorthTab() {
     editor.open(null, {
       Month: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       Date: localIsoDate(now),
-      'Total Banking': Math.round(sumField(data[T.BANKING_ACCOUNTS].filter(isActive), 'Current Balance') * 100) / 100,
+      'Total Banking': Math.round(sumField(data[T.BANKING_ACCOUNTS].filter(r => isActive(r) && countsTowardNetWorth(r)), 'Current Balance') * 100) / 100,
       'Total Credit Card Debt': Math.round(sumField(data[T.CREDIT_CARD_LOGINS], 'Current Balance') * 100) / 100,
       'Total Owed to Me': Math.round(sumField(data[T.OWED_TO_ME], 'Current Amount') * 100) / 100,
       'Home Value': latest?.fields['Home Value'],

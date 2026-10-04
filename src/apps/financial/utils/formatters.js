@@ -76,6 +76,10 @@ export const sumField = (records, field) => records.reduce((s, r) => s + num(r.f
 // Checkbox fields are omitted by Airtable when unchecked.
 export const isActive = (r) => r.fields?.Active === true;
 
+// Banking accounts flagged "Exclude from Net Worth" (e.g. tax holdbacks) stay out of cash / net worth totals.
+export const EXCLUDE_FROM_NET_WORTH = 'Exclude from Net Worth';
+export const countsTowardNetWorth = (r) => r.fields?.[EXCLUDE_FROM_NET_WORTH] !== true;
+
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 
 // Sort key for Monthly Net Worth rows: Date field, else parsed "Month YYYY", else createdTime.
