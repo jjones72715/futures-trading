@@ -523,7 +523,7 @@ export function AccountManagementTab() {
   }
 
   async function handleReceivePayout() {
-    if (!selectedPayoutId || !receivedAmount || !postPayoutBalance || !postPayoutStageId) return;
+    if (!selectedPayoutId || !receivedAmount || !postPayoutBalance || !(postPayoutStageId || postPayoutStageOverride)) return;
     setSubmitting(true); setErr(null);
     try {
       const payout = payouts.find(r => r.id === selectedPayoutId);
@@ -546,10 +546,10 @@ export function AccountManagementTab() {
           "Current Balance": parseFloat(postPayoutBalance),
           "High Water Mark": parseFloat(postPayoutBalance),
           "Cycle Start Balance": parseFloat(postPayoutBalance),
-          "Current Stage": [postPayoutStageId],
           "Trading Days this Cycle": 0,
           "Number of Payouts Recieved": (payoutPerf?.fields["Number of Payouts Recieved"] || 0) + 1,
         };
+        if (postPayoutStageId) perfUpdate["Current Stage"] = [postPayoutStageId];
         if (postPayoutStageOverride) perfUpdate["Stage Target Override"] = parseFloat(postPayoutStageOverride);
         if (postPayoutMultiplier) perfUpdate["Contract Multiplier"] = parseFloat(postPayoutMultiplier);
         await updateRecord(PERF_TABLE, payoutPerfId, perfUpdate);
@@ -960,27 +960,30 @@ export function AccountManagementTab() {
                         <input type="number" placeholder="e.g. 101200" value={postPayoutBalance} onChange={e => setPostPayoutBalance(e.target.value)} style={inp} />
                       </div>
                       <div style={{ gridColumn: "1/-1" }}>
-                        {label("Advance to Stage")}
+                        {label("Advance to Stage (optional)")}
                         <select value={postPayoutStageId} onChange={e => { setPostPayoutStageId(e.target.value); setPostPayoutStageOverride(""); }} style={sel}>
-                          <option value="">Select next stage...</option>
+                          <option value="">No stage / manual target...</option>
                           {payoutAvailableStages.map(s => (
                             <option key={s.id} value={s.id}>Stage {s.stage} (Target: {$$(s.target)})</option>
                           ))}
                         </select>
+                        {payoutAvailableStages.length === 0 && (
+                          <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 4 }}>No payout strategy found for this account type — enter a target manually below.</div>
+                        )}
                       </div>
-                      {postPayoutStageId && (() => {
-                        const sel2 = payoutAvailableStages.find(s => s.id === postPayoutStageId);
-                        return sel2 ? (
+                      {(() => {
+                        const sel2 = postPayoutStageId ? payoutAvailableStages.find(s => s.id === postPayoutStageId) : null;
+                        return (
                           <div style={{ gridColumn: "1/-1" }}>
-                            {label("Stage Target Override (optional)")}
-                            <input type="number" placeholder={`Default: ${$$(sel2.target)}`} value={postPayoutStageOverride} onChange={e => setPostPayoutStageOverride(e.target.value)} style={inp} />
-                            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Default target: <strong style={{ color: "#e5e7eb" }}>{$$(sel2.target)}</strong></div>
+                            {label(sel2 ? "Stage Target Override (optional)" : "Manual Stage Target")}
+                            <input type="number" placeholder={sel2 ? `Default: ${$$(sel2.target)}` : "e.g. 4100"} value={postPayoutStageOverride} onChange={e => setPostPayoutStageOverride(e.target.value)} style={inp} />
+                            {sel2 && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Default target: <strong style={{ color: "#e5e7eb" }}>{$$(sel2.target)}</strong></div>}
                           </div>
-                        ) : null;
+                        );
                       })()}
                     </div>
-                    <button onClick={handleReceivePayout} disabled={!receivedAmount || !postPayoutBalance || !postPayoutStageId || submitting}
-                      style={{ width: "100%", background: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#16a34a" : "#111827", color: (receivedAmount && postPayoutBalance && postPayoutStageId) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    <button onClick={handleReceivePayout} disabled={!receivedAmount || !postPayoutBalance || !(postPayoutStageId || postPayoutStageOverride) || submitting}
+                      style={{ width: "100%", background: (receivedAmount && postPayoutBalance && (postPayoutStageId || postPayoutStageOverride)) ? "#16a34a" : "#111827", color: (receivedAmount && postPayoutBalance && (postPayoutStageId || postPayoutStageOverride)) ? "#fff" : "#4b5563", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                       {submitting ? "Saving..." : "✓ Mark Received & Advance Stage"}
                     </button>
                   </>
