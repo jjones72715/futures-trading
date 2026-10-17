@@ -16,6 +16,8 @@ const TABLES = {
   SPORTSBOOKS:         'tblP4LwZvvD1UaGOr',
   SUBSCRIPTIONS:       'tblJH6wcALfOIXicg',
   MONTHLY_NET_WORTH:   'tblcoEHMi7RhWkwsz',
+  ASSETS:              'tblzFno17OgJyw9Xd',
+  LIABILITIES:         'tblr8uB2jwwVRUnWz',
 };
 
 const RECORD_ID = /^rec[A-Za-z0-9]{14}$/;

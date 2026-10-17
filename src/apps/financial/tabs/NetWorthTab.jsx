@@ -9,7 +9,7 @@ import {
   formatCurrency, formatPercent, isActive, countsTowardNetWorth, num, sortSnapshots, snapshotLabel, sumField,
 } from '../utils/formatters.js';
 
-const KEYS = [T.MONTHLY_NET_WORTH, T.BANKING_ACCOUNTS, T.CREDIT_CARD_LOGINS, T.OWED_TO_ME];
+const KEYS = [T.MONTHLY_NET_WORTH, T.BANKING_ACCOUNTS, T.CREDIT_CARD_LOGINS, T.OWED_TO_ME, T.ASSETS, T.LIABILITIES];
 
 const computeNetWorth = (f) => Math.round((
   num(f['Total Banking']) - num(f['Total Credit Card Debt']) + num(f['Total Owed to Me'])
@@ -35,10 +35,24 @@ export default function NetWorthTab() {
     return prev && p !== 0 ? (num(r.fields['Net Worth']) - p) / Math.abs(p) : null;
   };
 
+  // Home Value / Mortgage Balance from the Assets & Liabilities tab (active records only).
+  const realProperty = data[T.ASSETS].filter(r => isActive(r) && r.fields.Category === 'Real Property');
+  const mortgages = data[T.LIABILITIES].filter(r => isActive(r) && r.fields.Category === 'Mortgage');
+  const pullFromAssets = {
+    label: '↓ Pull from Assets & Liabilities',
+    hint: 'Fills Home Value from active Real Property assets and Mortgage Balance from active Mortgage liabilities.',
+    getValues: () => ({
+      'Home Value': Math.round(sumField(realProperty, 'Current Value') * 100) / 100,
+      'Mortgage Balance': Math.round(sumField(mortgages, 'Current Balance') * 100) / 100,
+    }),
+    note: (v) => `Pulled ${formatCurrency(v['Home Value'])} from ${realProperty.length} propert${realProperty.length === 1 ? 'y' : 'ies'} and ${formatCurrency(v['Mortgage Balance'])} from ${mortgages.length} mortgage${mortgages.length === 1 ? '' : 's'}.`,
+  };
+
   const editor = useRecordEditor({
     table: T.MONTHLY_NET_WORTH,
     noun: 'Monthly Snapshot',
     reload,
+    fieldActions: { 'Home Value': pullFromAssets },
     transform: (fields, { isNew }) => {
       const out = { ...fields };
       if (out['Net Worth'] == null) out['Net Worth'] = computeNetWorth(out);

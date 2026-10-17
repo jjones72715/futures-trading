@@ -15,6 +15,8 @@ export const TABLES = {
   SPORTSBOOKS:         'tblP4LwZvvD1UaGOr',
   SUBSCRIPTIONS:       'tblJH6wcALfOIXicg',
   MONTHLY_NET_WORTH:   'tblcoEHMi7RhWkwsz',
+  ASSETS:              'tblzFno17OgJyw9Xd',
+  LIABILITIES:         'tblr8uB2jwwVRUnWz',
 };
 
 // Table keys — components reference these, never raw table IDs.
@@ -33,4 +35,6 @@ export const CHOICES = {
   PROJECT_STATUS: ['Active', 'Closed'],
   FREQUENCY: ['Monthly', 'Quarterly', 'Annual'],
   SUB_CATEGORY: ['Insurance', 'Subscription', 'Utilities', 'Loan', 'Software', 'Other'],
+  ASSET_CATEGORY: ['Real Property', 'Vehicle', 'Other'],
+  LIABILITY_CATEGORY: ['Mortgage', 'Auto Loan', 'Personal Loan', 'Other'],
 };

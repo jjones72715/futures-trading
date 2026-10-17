@@ -5,6 +5,7 @@ import BankingTab from './tabs/BankingTab.jsx';
 import CreditCardsTab from './tabs/CreditCardsTab.jsx';
 import TradingTab from './tabs/TradingTab.jsx';
 import InvestmentsTab from './tabs/InvestmentsTab.jsx';
+import AssetsLiabilitiesTab from './tabs/AssetsLiabilitiesTab.jsx';
 import SportsbooksTab from './tabs/SportsbooksTab.jsx';
 import SubscriptionsTab from './tabs/SubscriptionsTab.jsx';
 import NetWorthTab from './tabs/NetWorthTab.jsx';
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'creditcards', label: 'Credit Cards' },
   { id: 'trading', label: 'Trading' },
   { id: 'investments', label: 'Investments' },
+  { id: 'assets', label: 'Assets & Liabilities' },
   { id: 'sportsbooks', label: 'Sportsbooks' },
   { id: 'subscriptions', label: 'Subscriptions' },
   { id: 'networth', label: 'Net Worth' },
@@ -57,6 +59,7 @@ export default function FinancialApp() {
         {tab === 'creditcards' && <CreditCardsTab subtab={subtab.creditcards} onSubtab={setSub('creditcards')} />}
         {tab === 'trading' && <TradingTab />}
         {tab === 'investments' && <InvestmentsTab />}
+        {tab === 'assets' && <AssetsLiabilitiesTab />}
         {tab === 'sportsbooks' && <SportsbooksTab />}
         {tab === 'subscriptions' && <SubscriptionsTab />}
         {tab === 'networth' && <NetWorthTab />}

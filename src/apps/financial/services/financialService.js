@@ -94,3 +94,13 @@ export const fetchMonthlyNetWorth = () => fetchRecords('MONTHLY_NET_WORTH');
 export const createMonthlyNetWorth = (data) => createRecord('MONTHLY_NET_WORTH', data);
 export const updateMonthlyNetWorth = (id, data) => updateRecord('MONTHLY_NET_WORTH', id, data);
 export const deleteMonthlyNetWorth = (id) => deleteRecord('MONTHLY_NET_WORTH', id);
+
+export const fetchAssets = () => fetchRecords('ASSETS');
+export const createAsset = (data) => createRecord('ASSETS', data);
+export const updateAsset = (id, data) => updateRecord('ASSETS', id, data);
+export const deleteAsset = (id) => deleteRecord('ASSETS', id);
+
+export const fetchLiabilities = () => fetchRecords('LIABILITIES');
+export const createLiability = (data) => createRecord('LIABILITIES', data);
+export const updateLiability = (id, data) => updateRecord('LIABILITIES', id, data);
+export const deleteLiability = (id) => deleteRecord('LIABILITIES', id);

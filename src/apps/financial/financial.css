@@ -154,9 +154,15 @@
 .fin-input-prefix > input { padding-left: 1.45rem; }
 .fin-input-suffix > span { left: auto; right: 0.7rem; }
 .fin-input-suffix > input { padding-left: 0.7rem; padding-right: 1.6rem; }
+.fin-field-action { flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
 .fin-check { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer; padding-top: 4px; }
 .fin-check input { width: 16px; height: 16px; accent-color: var(--accent); }
 .fin-inline-check { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+/* ---- Category group header (collapsible, inside a section) ---- */
+.fin-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; margin: 0.4rem 0 0.75rem; color: var(--text); cursor: pointer; font-size: 0.85rem; font-weight: 700; }
+.fin-group-head:hover { border-color: rgba(0,212,255,0.3); }
+.fin-group { margin-bottom: 1rem; }
 
 /* ---- Toggle switch ---- */
 .fin-switch { position: relative; width: 34px; height: 19px; border-radius: 20px; border: none; cursor: pointer; background: rgba(255,255,255,0.15); transition: background 0.15s; flex-shrink: 0; padding: 0; }
