@@ -154,7 +154,6 @@
 .fin-input-prefix > input { padding-left: 1.45rem; }
 .fin-input-suffix > span { left: auto; right: 0.7rem; }
 .fin-input-suffix > input { padding-left: 0.7rem; padding-right: 1.6rem; }
-.fin-field-action { flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
 .fin-check { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer; padding-top: 4px; }
 .fin-check input { width: 16px; height: 16px; accent-color: var(--accent); }
 .fin-inline-check { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }

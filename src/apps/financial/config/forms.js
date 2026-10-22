@@ -128,16 +128,17 @@ export const FORMS = {
   MONTHLY_NET_WORTH: [
     { name: 'Month', type: 'text', required: true, placeholder: 'e.g. October 2026' },
     { name: 'Date', type: 'date' },
-    // "Total Banking", "Home Value" and "Mortgage Balance" keep their Airtable names; only the labels changed.
-    { name: 'Total Banking', label: 'Total Cash', type: 'currency', hint: 'Banking (excl. tax holdback) + sportsbooks' },
+    // "Total Banking", "Home Value", "Mortgage Balance" and "Total Credit Card Debt" keep their
+    // Airtable names; only the labels differ.
+    { name: 'Total Banking', label: 'Total Cash', type: 'currency', hint: 'Banking (excl. tax holdback) + sportsbooks + trading platforms' },
+    { name: 'Trading Liquidation Invested', type: 'currency' },
     { name: 'Total Investments', type: 'currency' },
-    { name: 'Total Trading', type: 'currency', hint: 'Platforms + liquidation invested' },
-    { name: 'Total Credit Card Debt', type: 'currency' },
-    { name: 'Total Owed to Me', type: 'currency' },
     { name: 'Home Value', label: 'Total Assets', type: 'currency' },
+    { name: 'Total Owed to Me', type: 'currency' },
+    { name: 'Total Credit Card Debt', label: 'Total CC Debt', type: 'currency' },
     { name: 'Mortgage Balance', label: 'Total Liabilities', type: 'currency' },
     { name: 'Net Worth', type: 'currency', hint: 'Leave blank to auto-calculate' },
-    { name: 'Change Percent', type: 'percent', hint: 'Leave blank to auto-calculate' },
+    { name: 'Change Percent', label: 'Change %', type: 'percent', hint: 'Leave blank to compare with the previous snapshot' },
     { name: 'Notes', type: 'textarea', full: true },
   ],
 };

@@ -21,6 +21,7 @@ export function useTables(keys) {
     setData(next);
     setError(errors.length ? errors.join(' · ') : null);
     setLoading(false);
+    return next;
   }, [keyStr]);
 
   useEffect(() => { reload(); }, [reload]);

@@ -114,10 +114,9 @@ function Field({ spec, value, onChange, listId }) {
 /**
  * Add/Edit form for one Airtable table, driven by the specs in config/forms.js.
  * `transform(fields, { isNew })` may adjust the payload before it is saved.
- * `fieldActions` adds a full-width button row before a field:
- *   { [fieldName]: { label, hint, getValues: () => ({ [field]: value, ... }) } }
+ * `note` is a muted line shown under the form.
  */
-export function RecordModal({ table, record, defaults, title, suggestions = {}, transform, fieldActions = {}, onClose, onSaved, allowDelete = true }) {
+export function RecordModal({ table, record, defaults, title, suggestions = {}, transform, note, onClose, onSaved, allowDelete = true }) {
   const specs = FORMS[table];
   const isNew = !record;
   const [values, setValues] = useState(() => Object.fromEntries(specs.map(s => {
@@ -126,20 +125,6 @@ export function RecordModal({ table, record, defaults, title, suggestions = {}, 
   })));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [actionNote, setActionNote] = useState({});
-
-  function runAction(fieldName, action) {
-    const filled = action.getValues();
-    setValues(prev => {
-      const next = { ...prev };
-      for (const [name, raw] of Object.entries(filled)) {
-        const spec = specs.find(sp => sp.name === name);
-        if (spec) next[name] = toFormValue(spec, raw);
-      }
-      return next;
-    });
-    if (action.note) setActionNote(prev => ({ ...prev, [fieldName]: action.note(filled) }));
-  }
 
   async function handleSubmit(e) {
     e?.preventDefault();
@@ -200,14 +185,7 @@ export function RecordModal({ table, record, defaults, title, suggestions = {}, 
       <form className="fin-form" onSubmit={handleSubmit}>
         {specs.map(s => {
           const listId = s.suggest && suggestions[s.name]?.length ? `fin-dl-${table}-${s.name}` : undefined;
-          const action = fieldActions[s.name];
-          return [
-            action && (
-              <div key={`action-${s.name}`} className="fin-field full fin-field-action">
-                <button type="button" className="fin-btn sm" onClick={() => runAction(s.name, action)}>{action.label}</button>
-                <span className="fin-hint">{actionNote[s.name] || action.hint}</span>
-              </div>
-            ),
+          return (
             <div key={s.name} className={`fin-field${s.full || s.type === 'textarea' ? ' full' : ''}`}>
               <Field spec={s} value={values[s.name]} listId={listId}
                 onChange={v => setValues(prev => ({ ...prev, [s.name]: v }))} />
@@ -216,19 +194,21 @@ export function RecordModal({ table, record, defaults, title, suggestions = {}, 
                   {suggestions[s.name].map(o => <option key={o} value={o} />)}
                 </datalist>
               )}
-            </div>,
-          ];
+            </div>
+          );
         })}
         <button type="submit" style={{ display: 'none' }} />
       </form>
+      {note && <div className="fin-hint" style={{ marginTop: '0.9rem' }}>{note}</div>}
     </Modal>
   );
 }
 
 // Convenience hook: const editor = useRecordEditor({...}); editor.open(record?, defaults?); render {editor.modal}
-export function useRecordEditor({ table, noun, reload, suggestions, transform, fieldActions, allowDelete }) {
+export function useRecordEditor({ table, noun, reload, suggestions, transform, allowDelete }) {
   const [state, setState] = useState(null);
-  const open = useCallback((record = null, defaults = null) => setState({ record, defaults }), []);
+  // options.note: a muted line shown under the form (e.g. where pre-filled values came from).
+  const open = useCallback((record = null, defaults = null, options = {}) => setState({ record, defaults, note: options.note }), []);
   const close = useCallback(() => setState(null), []);
   const modal = state && (
     <RecordModal
@@ -238,7 +218,7 @@ export function useRecordEditor({ table, noun, reload, suggestions, transform, f
       title={`${state.record ? 'Edit' : 'Add'} ${noun}`}
       suggestions={suggestions}
       transform={transform}
-      fieldActions={fieldActions}
+      note={state.note}
       allowDelete={allowDelete}
       onClose={close}
       onSaved={reload}
