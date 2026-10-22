@@ -110,3 +110,17 @@ export function ErrorBanner({ error }) {
   if (!error) return null;
   return <div className="fin-error">Couldn’t load some data — {error}</div>;
 }
+
+// Inline delta for table rows: renders nothing when the balance didn't change.
+export function MiniDelta({ current, previous, invert = false }) {
+  const { diff } = delta(current, previous);
+  const rounded = Math.round(diff * 100) / 100;
+  if (rounded === 0) return null;
+  const up = rounded > 0;
+  const good = invert ? !up : up;
+  return (
+    <span className={`fin-mini-delta ${good ? 'up' : 'down'}`} title={`Previous ${formatCurrency(previous)}`}>
+      {up ? '↑' : '↓'} {formatCurrency(Math.abs(rounded))}
+    </span>
+  );
+}

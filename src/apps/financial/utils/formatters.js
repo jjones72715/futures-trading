@@ -59,7 +59,7 @@ export function delta(current, previous) {
 }
 
 // Household members lead the pill order; everything else (businesses, other users) follows alphabetically.
-const PRIORITY = ['Jonathan', 'Cherelyn'];
+const PRIORITY = ['Jonathan', 'Sherry', 'Cherelyn'];
 const rank = (v) => { const i = PRIORITY.indexOf(v); return i < 0 ? PRIORITY.length : i; };
 
 export function distinct(records, field) {
