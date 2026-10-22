@@ -6,7 +6,7 @@ export function Chip({ children, color }) {
 }
 
 // Current-vs-previous delta. `invert` flips the colors for debts (a rising balance is bad).
-export function Delta({ current, previous, invert = false }) {
+export function Delta({ current, previous, invert = false, pctDigits = 1 }) {
   const { diff, pct } = delta(current, previous);
   const rounded = Math.round(diff * 100) / 100;
   if (rounded === 0) return <span className="fin-delta flat">— {formatCurrency(0)}</span>;
@@ -15,7 +15,7 @@ export function Delta({ current, previous, invert = false }) {
   return (
     <span className={`fin-delta ${good ? 'up' : 'down'}`}>
       {up ? '↑' : '↓'} {formatCurrency(Math.abs(rounded))}
-      {pct != null && ` (${formatPercent(pct, { signed: true })})`}
+      {pct != null && ` (${formatPercent(pct, { signed: true, digits: pctDigits })})`}
     </span>
   );
 }

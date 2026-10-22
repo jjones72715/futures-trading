@@ -113,7 +113,7 @@ function Field({ spec, value, onChange, listId }) {
 
 /**
  * Add/Edit form for one Airtable table, driven by the specs in config/forms.js.
- * `transform(fields, { isNew })` may adjust the payload before it is saved.
+ * `transform(fields, { isNew, record })` may adjust the payload before it is saved (may be async).
  * `note` is a muted line shown under the form.
  */
 export function RecordModal({ table, record, defaults, title, suggestions = {}, transform, note, onClose, onSaved, allowDelete = true }) {
@@ -137,9 +137,9 @@ export function RecordModal({ table, record, defaults, title, suggestions = {}, 
       if (isNew && v == null) continue; // don't send empties on create
       fields[s.name] = v;
     }
-    if (transform) fields = transform(fields, { isNew });
     setSaving(true);
     try {
+      if (transform) fields = await transform(fields, { isNew, record });
       if (isNew) await createRecord(table, fields);
       else await updateRecord(table, record.id, fields);
       await onSaved?.();

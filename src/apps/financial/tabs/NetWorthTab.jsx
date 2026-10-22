@@ -7,8 +7,9 @@ import LineChart from '../components/LineChart.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
 import { Delta, EmptyState, ErrorBanner, Skel, SkeletonStats, SkeletonTable } from '../components/ui.jsx';
 import {
-  formatCurrency, formatPercent, num, sortSnapshots, snapshotLabel,
+  formatCurrency, formatPercent, num, sortSnapshots, snapshotLabel, snapshotTime,
 } from '../utils/formatters.js';
+import { fetchRecords } from '../services/financialService.js';
 import { totals } from '../utils/totals.js';
 
 const KEYS = [
@@ -16,26 +17,39 @@ const KEYS = [
   T.CREDIT_CARD_LOGINS, T.OWED_TO_ME, T.ASSETS, T.LIABILITIES,
 ];
 
-// Airtable field names. Display labels differ for a few legacy fields:
-// "Total Banking" shows as Total Cash, "Home Value" as Total Assets, "Mortgage Balance" as Total Liabilities.
+// Monthly Net Worth field names in Airtable.
 const F = {
-  cash: 'Total Banking',
+  cash: 'Cash Available',
   liquidation: 'Trading Liquidation Invested',
   investments: 'Total Investments',
-  assets: 'Home Value',
+  assets: 'Total Assets',
   owed: 'Total Owed to Me',
-  ccDebt: 'Total Credit Card Debt',
-  liabilities: 'Mortgage Balance',
+  ccDebt: 'Short Term Debt',
+  liabilities: 'Total Liabilities',
+  change: 'Change Percent',
 };
 
-// Net Worth = Total Cash + Trading Liquidation Invested + Total Investments + Total Assets + Total Owed to Me
-//             − Total CC Debt − Total Liabilities
+// Net Worth = Cash Available + Trading Liquidation Invested + Total Investments + Total Assets + Total Owed to Me
+//             − Short Term Debt − Total Liabilities
 const computeNetWorth = (f) => Math.round((
   num(f[F.cash]) + num(f[F.liquidation]) + num(f[F.investments]) + num(f[F.assets]) + num(f[F.owed])
   - num(f[F.ccDebt]) - num(f[F.liabilities])
 ) * 100) / 100;
 
 const orDash = (v) => (v == null ? '—' : formatCurrency(v));
+const formatChange = (v) => formatPercent(v, { signed: true, digits: 2 });
+
+// Change Percent is an Airtable percent field, so it stores a fraction (0.0648 displays as 6.48%).
+// Rounded to 2 decimal places of a percent.
+const changeFraction = (netWorth, prevNetWorth) =>
+  Math.round(((netWorth - prevNetWorth) / Math.abs(prevNetWorth)) * 10000) / 10000;
+
+// The snapshot dated immediately before `fields`, read fresh from Airtable.
+async function fetchPreviousSnapshot(fields, excludeId) {
+  const all = await fetchRecords(T.MONTHLY_NET_WORTH);
+  const time = snapshotTime({ fields, createdTime: new Date().toISOString() });
+  return sortSnapshots(all.filter(r => r.id !== excludeId && snapshotTime(r) < time)).pop() || null;
+}
 
 function localIsoDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -51,7 +65,7 @@ export default function NetWorthTab() {
 
   // Change % falls back to a computed value when the field is blank.
   const changeFor = (r) => {
-    if (r.fields['Change Percent'] != null) return r.fields['Change Percent'];
+    if (r.fields[F.change] != null) return r.fields[F.change];
     const prev = previousOf(r);
     const p = num(prev?.fields['Net Worth']);
     return prev && p !== 0 ? (num(r.fields['Net Worth']) - p) / Math.abs(p) : null;
@@ -61,13 +75,14 @@ export default function NetWorthTab() {
     table: T.MONTHLY_NET_WORTH,
     noun: 'Monthly Snapshot',
     reload,
-    transform: (fields, { isNew }) => {
+    // Net Worth auto-calculates when blank; Change % is always recalculated against the
+    // previous snapshot by date (cleared when there isn't one to compare with).
+    transform: async (fields, { record }) => {
       const out = { ...fields };
       if (out['Net Worth'] == null) out['Net Worth'] = computeNetWorth(out);
-      if (out['Change Percent'] == null && isNew && latest) {
-        const p = num(latest.fields['Net Worth']);
-        if (p !== 0) out['Change Percent'] = (out['Net Worth'] - p) / Math.abs(p);
-      }
+      const prev = await fetchPreviousSnapshot(out, record?.id);
+      const p = num(prev?.fields['Net Worth']);
+      out[F.change] = prev && p !== 0 ? changeFraction(out['Net Worth'], p) : null;
       return out;
     },
   });
@@ -111,9 +126,9 @@ export default function NetWorthTab() {
       {loading ? <SkeletonStats count={4} /> : latest && (
         <div className="fin-stats">
           <StatCard label="Net Worth" value={formatCurrency(lf['Net Worth'])} accent="var(--positive)" size="2rem"
-            sub={prevSnap && <Delta current={lf['Net Worth']} previous={prevSnap.fields['Net Worth']} />} />
-          <StatCard label="Total Cash" value={formatCurrency(lf[F.cash])} accent="var(--text)" />
-          <StatCard label="Total CC Debt" value={formatCurrency(lf[F.ccDebt])} accent="var(--negative)" />
+            sub={prevSnap && <Delta current={lf['Net Worth']} previous={prevSnap.fields['Net Worth']} pctDigits={2} />} />
+          <StatCard label="Cash Available" value={formatCurrency(lf[F.cash])} accent="var(--text)" />
+          <StatCard label="Short Term Debt" value={formatCurrency(lf[F.ccDebt])} accent="var(--negative)" />
           <StatCard label="Assets − Liabilities" value={formatCurrency(netAssets)} accent="var(--accent)"
             sub={`${formatCurrency(lf[F.assets])} assets − ${formatCurrency(lf[F.liabilities])} liabilities`} />
         </div>
@@ -136,9 +151,9 @@ export default function NetWorthTab() {
                 <table className="fin-table">
                   <thead>
                     <tr>
-                      <th>Month</th><th className="num">Total Cash</th><th className="num">Trading Liquidation Invested</th>
+                      <th>Month</th><th className="num">Cash Available</th><th className="num">Trading Liquidation Invested</th>
                       <th className="num">Total Investments</th><th className="num">Total Assets</th><th className="num">Owed to Me</th>
-                      <th className="num">CC Debt</th><th className="num">Total Liabilities</th>
+                      <th className="num">Short Term Debt</th><th className="num">Total Liabilities</th>
                       <th className="num">Net Worth</th><th className="num">Change %</th>
                     </tr>
                   </thead>
@@ -158,7 +173,7 @@ export default function NetWorthTab() {
                           <td className="num" style={{ color: 'var(--negative)' }}>{orDash(f[F.liabilities])}</td>
                           <td className="num" style={{ fontWeight: 800 }}>{formatCurrency(f['Net Worth'])}</td>
                           <td className="num" style={{ fontWeight: 600, color: change == null || change === 0 ? 'var(--text-muted)' : change > 0 ? 'var(--positive)' : 'var(--negative)' }}>
-                            {change == null ? '—' : `${change > 0 ? '↑' : change < 0 ? '↓' : ''} ${formatPercent(change, { signed: true })}`}
+                            {change == null ? '—' : `${change > 0 ? '↑' : change < 0 ? '↓' : ''} ${formatChange(change)}`}
                           </td>
                         </tr>
                       );
@@ -167,7 +182,7 @@ export default function NetWorthTab() {
                 </table>
               </div>
             )}
-            <div className="fin-faint" style={{ fontSize: '0.72rem', marginTop: 8 }}>Click a row to edit. Net Worth and Change % auto-calculate when left blank.</div>
+            <div className="fin-faint" style={{ fontSize: '0.72rem', marginTop: 8 }}>Click a row to edit. Net Worth auto-calculates when left blank; Change % is calculated on save from the previous snapshot.</div>
           </div>
         </>
       )}

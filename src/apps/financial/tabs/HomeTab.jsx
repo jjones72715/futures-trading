@@ -95,7 +95,7 @@ export default function HomeTab({ onNavigate }) {
       <ErrorBanner error={error} />
       {loading ? <SkeletonStats count={4} /> : (
         <div className="fin-stats">
-          <StatCard label="Total Cash" value={formatCurrency(totalCash)} accent="var(--positive)" />
+          <StatCard label="Cash Available" value={formatCurrency(totalCash)} accent="var(--positive)" />
           <StatCard label="Total Owed (Credit Cards)" value={formatCurrency(totalOwed)} accent={totalOwed > 0 ? 'var(--negative)' : 'var(--text)'} />
           <StatCard
             label="Net Worth"
@@ -142,7 +142,7 @@ export default function HomeTab({ onNavigate }) {
                 <span>{sparkPoints[0].label}</span>
                 {latest?.fields['Change Percent'] != null && (
                   <span style={{ color: latest.fields['Change Percent'] >= 0 ? 'var(--positive)' : 'var(--negative)', fontWeight: 600 }}>
-                    {formatPercent(latest.fields['Change Percent'], { signed: true })} last month
+                    {formatPercent(latest.fields['Change Percent'], { signed: true, digits: 2 })} last month
                   </span>
                 )}
                 <span>{sparkPoints[sparkPoints.length - 1].label}</span>
