@@ -79,12 +79,6 @@ export const FORMS = {
     { name: 'Available Balance', type: 'currency' },
     { name: 'Notes', type: 'textarea', full: true },
   ],
-  PENDING_PAYOUTS: [
-    { name: 'Source', type: 'text', required: true },
-    { name: 'Amount', type: 'currency' },
-    { name: 'Expected Date', type: 'date' },
-    { name: 'Notes', type: 'textarea', full: true },
-  ],
   INVESTMENTS: [
     { name: 'Account Name', type: 'text', required: true },
     { name: 'Owner', type: 'text', suggest: true },
@@ -134,11 +128,14 @@ export const FORMS = {
   MONTHLY_NET_WORTH: [
     { name: 'Month', type: 'text', required: true, placeholder: 'e.g. October 2026' },
     { name: 'Date', type: 'date' },
-    { name: 'Total Banking', type: 'currency' },
+    // "Total Banking", "Home Value" and "Mortgage Balance" keep their Airtable names; only the labels changed.
+    { name: 'Total Banking', label: 'Total Cash', type: 'currency', hint: 'Banking (excl. tax holdback) + sportsbooks' },
+    { name: 'Total Investments', type: 'currency' },
+    { name: 'Total Trading', type: 'currency', hint: 'Platforms + liquidation invested' },
     { name: 'Total Credit Card Debt', type: 'currency' },
     { name: 'Total Owed to Me', type: 'currency' },
-    { name: 'Home Value', type: 'currency' },
-    { name: 'Mortgage Balance', type: 'currency' },
+    { name: 'Home Value', label: 'Total Assets', type: 'currency' },
+    { name: 'Mortgage Balance', label: 'Total Liabilities', type: 'currency' },
     { name: 'Net Worth', type: 'currency', hint: 'Leave blank to auto-calculate' },
     { name: 'Change Percent', type: 'percent', hint: 'Leave blank to auto-calculate' },
     { name: 'Notes', type: 'textarea', full: true },

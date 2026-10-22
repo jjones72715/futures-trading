@@ -3,15 +3,13 @@ import { useTables } from '../hooks/useTables.js';
 import { T } from '../config/airtable.js';
 import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
-import AlertBadge, { daysText } from '../components/AlertBadge.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
-import { deleteRecord } from '../services/financialService.js';
 import {
   Chip, Delta, EmptyState, ErrorBanner, Skel, SkeletonGrid, SkeletonStats, SkeletonTable,
 } from '../components/ui.jsx';
-import { formatCurrency, formatDate, daysUntil, distinct, sumField, num } from '../utils/formatters.js';
+import { formatCurrency, distinct, sumField, num } from '../utils/formatters.js';
 
-const KEYS = [T.TRADING_PLATFORMS, T.TRADING_LIQUIDATION, T.SPECIAL_PROJECTS, T.PENDING_PAYOUTS];
+const KEYS = [T.TRADING_PLATFORMS, T.TRADING_LIQUIDATION, T.SPECIAL_PROJECTS];
 
 const PROJECT_FIELDS = [
   ['This Month Earned', 'var(--positive)'],
@@ -23,49 +21,33 @@ const PROJECT_FIELDS = [
 export default function TradingTab() {
   const { data, loading, error, reload } = useTables(KEYS);
   const [showClosed, setShowClosed] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
 
   const platforms = data[T.TRADING_PLATFORMS];
   const liquidation = data[T.TRADING_LIQUIDATION][0];
   const projects = data[T.SPECIAL_PROJECTS];
-  const payouts = data[T.PENDING_PAYOUTS];
 
   const platformEditor = useRecordEditor({ table: T.TRADING_PLATFORMS, noun: 'Platform', reload, suggestions: { Owner: distinct(platforms, 'Owner') } });
   const liquidationEditor = useRecordEditor({ table: T.TRADING_LIQUIDATION, noun: 'Liquidation Invested', reload, allowDelete: false });
   const projectEditor = useRecordEditor({ table: T.SPECIAL_PROJECTS, noun: 'Special Project', reload });
-  const payoutEditor = useRecordEditor({ table: T.PENDING_PAYOUTS, noun: 'Pending Payout', reload });
 
   const platformTotal = sumField(platforms, 'Current Balance');
   const platformPrev = sumField(platforms, 'Previous Balance');
   const liqCurrent = num(liquidation?.fields['Current Balance']);
-  const payoutTotal = sumField(payouts, 'Amount');
 
   const closedCount = projects.filter(p => p.fields.Status === 'Closed').length;
   const visibleProjects = projects
     .filter(p => showClosed || p.fields.Status !== 'Closed')
     .sort((a, b) => (a.fields.Status === 'Closed') - (b.fields.Status === 'Closed'));
 
-  async function removePayout(r) {
-    if (!window.confirm(`Delete pending payout from ${r.fields.Source || 'this source'}?`)) return;
-    setDeleteError(null);
-    try {
-      await deleteRecord(T.PENDING_PAYOUTS, r.id);
-      await reload();
-    } catch (e) {
-      setDeleteError(e.message);
-    }
-  }
-
   return (
     <div>
-      <ErrorBanner error={error || deleteError} />
+      <ErrorBanner error={error} />
 
-      {loading ? <SkeletonStats count={4} /> : (
+      {loading ? <SkeletonStats count={3} /> : (
         <div className="fin-stats">
           <StatCard label="Platform Balances" value={formatCurrency(platformTotal)} accent="var(--text)" />
           <StatCard label="Liquidation Invested" value={formatCurrency(liqCurrent)} accent="var(--text)" />
-          <StatCard label="Pending Payouts" value={formatCurrency(payoutTotal)} accent="var(--warning)" />
-          <StatCard label="Trading Total" value={formatCurrency(platformTotal + liqCurrent + payoutTotal)} accent="var(--accent)" />
+          <StatCard label="Trading Total" value={formatCurrency(platformTotal + liqCurrent)} accent="var(--accent)" />
         </div>
       )}
 
@@ -182,46 +164,9 @@ export default function TradingTab() {
         )}
       </div>
 
-      {/* ---- Pending Payouts ---- */}
-      <div className="fin-section">
-        <SectionHeader title="Pending Payouts" count={loading ? null : payouts.length} onAdd={() => payoutEditor.open()}
-          right={!loading && payouts.length > 0 && <span style={{ fontWeight: 700 }}>{formatCurrency(payoutTotal)}</span>} />
-        {loading ? <SkeletonTable rows={2} /> : payouts.length === 0 ? (
-          <EmptyState icon="✓" message="All clear — no pending payouts." actionLabel="Add payout" onAction={() => payoutEditor.open()} />
-        ) : (
-          <div className="fin-table-wrap">
-            <table className="fin-table">
-              <thead><tr><th>Source</th><th className="num">Amount</th><th>Expected Date</th><th>Notes</th><th /></tr></thead>
-              <tbody>
-                {[...payouts].sort((a, b) => String(a.fields['Expected Date'] || '9999').localeCompare(String(b.fields['Expected Date'] || '9999'))).map(r => {
-                  const days = daysUntil(r.fields['Expected Date']);
-                  const late = days != null && days < 0;
-                  return (
-                    <tr key={r.id} className={late ? 'row-yellow' : ''}>
-                      <td style={{ fontWeight: 600 }}>{r.fields.Source}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>{formatCurrency(r.fields.Amount)}</td>
-                      <td>
-                        {formatDate(r.fields['Expected Date'])}
-                        {late && <span style={{ marginLeft: 6 }}><AlertBadge level="warning">{daysText(days)}</AlertBadge></span>}
-                      </td>
-                      <td className="wrap">{r.fields.Notes}</td>
-                      <td style={{ display: 'flex', gap: 6 }}>
-                        <button className="fin-btn sm" onClick={() => payoutEditor.open(r)}>Edit</button>
-                        <button className="fin-btn sm danger" onClick={() => removePayout(r)}>Delete</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
       {platformEditor.modal}
       {liquidationEditor.modal}
       {projectEditor.modal}
-      {payoutEditor.modal}
     </div>
   );
 }

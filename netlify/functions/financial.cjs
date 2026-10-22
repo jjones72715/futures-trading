@@ -11,7 +11,6 @@ const TABLES = {
   TRADING_PLATFORMS:   'tbltwSwawAa8sZRfa',
   TRADING_LIQUIDATION: 'tbl6B2CVnNScr7WuQ',
   SPECIAL_PROJECTS:    'tblXYstGQiLwsgivm',
-  PENDING_PAYOUTS:     'tblPemNYCNDkqo27w',
   INVESTMENTS:         'tbloQcjOOz4taiXjV',
   SPORTSBOOKS:         'tblP4LwZvvD1UaGOr',
   SUBSCRIPTIONS:       'tblJH6wcALfOIXicg',

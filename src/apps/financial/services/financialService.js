@@ -70,11 +70,6 @@ export const createSpecialProject = (data) => createRecord('SPECIAL_PROJECTS', d
 export const updateSpecialProject = (id, data) => updateRecord('SPECIAL_PROJECTS', id, data);
 export const deleteSpecialProject = (id) => deleteRecord('SPECIAL_PROJECTS', id);
 
-export const fetchPendingPayouts = () => fetchRecords('PENDING_PAYOUTS');
-export const createPendingPayout = (data) => createRecord('PENDING_PAYOUTS', data);
-export const updatePendingPayout = (id, data) => updateRecord('PENDING_PAYOUTS', id, data);
-export const deletePendingPayout = (id) => deleteRecord('PENDING_PAYOUTS', id);
-
 export const fetchInvestments = () => fetchRecords('INVESTMENTS');
 export const createInvestment = (data) => createRecord('INVESTMENTS', data);
 export const updateInvestment = (id, data) => updateRecord('INVESTMENTS', id, data);

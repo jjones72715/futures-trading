@@ -6,15 +6,35 @@ import LineChart from '../components/LineChart.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
 import { Delta, EmptyState, ErrorBanner, Skel, SkeletonStats, SkeletonTable } from '../components/ui.jsx';
 import {
-  formatCurrency, formatPercent, isActive, countsTowardNetWorth, num, sortSnapshots, snapshotLabel, sumField,
+  formatCurrency, formatPercent, isActive, num, sortSnapshots, snapshotLabel,
 } from '../utils/formatters.js';
+import { totals } from '../utils/totals.js';
 
-const KEYS = [T.MONTHLY_NET_WORTH, T.BANKING_ACCOUNTS, T.CREDIT_CARD_LOGINS, T.OWED_TO_ME, T.ASSETS, T.LIABILITIES];
+const KEYS = [
+  T.MONTHLY_NET_WORTH, T.BANKING_ACCOUNTS, T.SPORTSBOOKS, T.INVESTMENTS, T.TRADING_PLATFORMS, T.TRADING_LIQUIDATION,
+  T.CREDIT_CARD_LOGINS, T.OWED_TO_ME, T.ASSETS, T.LIABILITIES,
+];
 
+// Airtable field names. Display labels differ for a few legacy fields:
+// "Total Banking" shows as Total Cash, "Home Value" as Total Assets, "Mortgage Balance" as Total Liabilities.
+const F = {
+  cash: 'Total Banking',
+  investments: 'Total Investments',
+  trading: 'Total Trading',
+  ccDebt: 'Total Credit Card Debt',
+  owed: 'Total Owed to Me',
+  assets: 'Home Value',
+  liabilities: 'Mortgage Balance',
+};
+
+// Net Worth = Total Cash + Total Investments + Total Trading + Total Assets − Total CC Debt − Total Liabilities
 const computeNetWorth = (f) => Math.round((
-  num(f['Total Banking']) - num(f['Total Credit Card Debt']) + num(f['Total Owed to Me'])
-  + num(f['Home Value']) - num(f['Mortgage Balance'])
+  num(f[F.cash]) + num(f[F.investments]) + num(f[F.trading]) + num(f[F.assets])
+  - num(f[F.ccDebt]) - num(f[F.liabilities])
 ) * 100) / 100;
+
+const orDash = (v) => (v == null ? '—' : formatCurrency(v));
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 function localIsoDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -35,24 +55,21 @@ export default function NetWorthTab() {
     return prev && p !== 0 ? (num(r.fields['Net Worth']) - p) / Math.abs(p) : null;
   };
 
-  // Home Value / Mortgage Balance from the Assets & Liabilities tab (active records only).
-  const realProperty = data[T.ASSETS].filter(r => isActive(r) && r.fields.Category === 'Real Property');
-  const mortgages = data[T.LIABILITIES].filter(r => isActive(r) && r.fields.Category === 'Mortgage');
+  // Total Assets / Total Liabilities from the Assets & Liabilities tab (all active records).
+  const activeAssets = data[T.ASSETS].filter(isActive);
+  const activeLiabilities = data[T.LIABILITIES].filter(isActive);
   const pullFromAssets = {
     label: '↓ Pull from Assets & Liabilities',
-    hint: 'Fills Home Value from active Real Property assets and Mortgage Balance from active Mortgage liabilities.',
-    getValues: () => ({
-      'Home Value': Math.round(sumField(realProperty, 'Current Value') * 100) / 100,
-      'Mortgage Balance': Math.round(sumField(mortgages, 'Current Balance') * 100) / 100,
-    }),
-    note: (v) => `Pulled ${formatCurrency(v['Home Value'])} from ${realProperty.length} propert${realProperty.length === 1 ? 'y' : 'ies'} and ${formatCurrency(v['Mortgage Balance'])} from ${mortgages.length} mortgage${mortgages.length === 1 ? '' : 's'}.`,
+    hint: 'Fills Total Assets from all active assets and Total Liabilities from all active liabilities.',
+    getValues: () => ({ [F.assets]: totals.assets(data), [F.liabilities]: totals.liabilities(data) }),
+    note: (v) => `Pulled ${formatCurrency(v[F.assets])} from ${plural(activeAssets.length, 'asset', 'assets')} and ${formatCurrency(v[F.liabilities])} from ${plural(activeLiabilities.length, 'liability', 'liabilities')}.`,
   };
 
   const editor = useRecordEditor({
     table: T.MONTHLY_NET_WORTH,
     noun: 'Monthly Snapshot',
     reload,
-    fieldActions: { 'Home Value': pullFromAssets },
+    fieldActions: { [F.assets]: pullFromAssets },
     transform: (fields, { isNew }) => {
       const out = { ...fields };
       if (out['Net Worth'] == null) out['Net Worth'] = computeNetWorth(out);
@@ -64,23 +81,26 @@ export default function NetWorthTab() {
     },
   });
 
-  // Pre-fill a new snapshot from live balances + last snapshot's home figures.
+  // Pre-fill a new snapshot from live balances. Assets / liabilities fall back to the
+  // last snapshot's figures until the Assets & Liabilities tab has records.
   function openNew() {
     const now = new Date();
     editor.open(null, {
       Month: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       Date: localIsoDate(now),
-      'Total Banking': Math.round(sumField(data[T.BANKING_ACCOUNTS].filter(r => isActive(r) && countsTowardNetWorth(r)), 'Current Balance') * 100) / 100,
-      'Total Credit Card Debt': Math.round(sumField(data[T.CREDIT_CARD_LOGINS], 'Current Balance') * 100) / 100,
-      'Total Owed to Me': Math.round(sumField(data[T.OWED_TO_ME], 'Current Amount') * 100) / 100,
-      'Home Value': latest?.fields['Home Value'],
-      'Mortgage Balance': latest?.fields['Mortgage Balance'],
+      [F.cash]: totals.cash(data),
+      [F.investments]: totals.investments(data),
+      [F.trading]: totals.trading(data),
+      [F.ccDebt]: totals.ccDebt(data),
+      [F.owed]: totals.owedToMe(data),
+      [F.assets]: activeAssets.length ? totals.assets(data) : latest?.fields[F.assets],
+      [F.liabilities]: activeLiabilities.length ? totals.liabilities(data) : latest?.fields[F.liabilities],
     });
   }
 
   const lf = latest?.fields || {};
   const prevSnap = latest && previousOf(latest);
-  const homeEquity = num(lf['Home Value']) - num(lf['Mortgage Balance']);
+  const netAssets = num(lf[F.assets]) - num(lf[F.liabilities]);
   const points = snapshots.map(r => ({ label: snapshotLabel(r, true), value: num(r.fields['Net Worth']) }));
 
   return (
@@ -97,10 +117,10 @@ export default function NetWorthTab() {
         <div className="fin-stats">
           <StatCard label="Net Worth" value={formatCurrency(lf['Net Worth'])} accent="var(--positive)" size="2rem"
             sub={prevSnap && <Delta current={lf['Net Worth']} previous={prevSnap.fields['Net Worth']} />} />
-          <StatCard label="Total Banking" value={formatCurrency(lf['Total Banking'])} accent="var(--text)" />
-          <StatCard label="Total CC Debt" value={formatCurrency(lf['Total Credit Card Debt'])} accent="var(--negative)" />
-          <StatCard label="Home Equity" value={formatCurrency(homeEquity)} accent="var(--accent)"
-            sub={`${formatCurrency(lf['Home Value'])} value − ${formatCurrency(lf['Mortgage Balance'])} mortgage`} />
+          <StatCard label="Total Cash" value={formatCurrency(lf[F.cash])} accent="var(--text)" />
+          <StatCard label="Total CC Debt" value={formatCurrency(lf[F.ccDebt])} accent="var(--negative)" />
+          <StatCard label="Assets − Liabilities" value={formatCurrency(netAssets)} accent="var(--accent)"
+            sub={`${formatCurrency(lf[F.assets])} assets − ${formatCurrency(lf[F.liabilities])} liabilities`} />
         </div>
       )}
 
@@ -121,8 +141,9 @@ export default function NetWorthTab() {
                 <table className="fin-table">
                   <thead>
                     <tr>
-                      <th>Month</th><th className="num">Total Banking</th><th className="num">Total CC Debt</th>
-                      <th className="num">Owed to Me</th><th className="num">Home Value</th><th className="num">Mortgage Balance</th>
+                      <th>Month</th><th className="num">Total Cash</th><th className="num">Total Investments</th>
+                      <th className="num">Total Trading</th><th className="num">Total Assets</th><th className="num">Total CC Debt</th>
+                      <th className="num">Total Liabilities</th><th className="num">Owed to Me</th>
                       <th className="num">Net Worth</th><th className="num">Change %</th>
                     </tr>
                   </thead>
@@ -133,11 +154,13 @@ export default function NetWorthTab() {
                       return (
                         <tr key={r.id} className="clickable" onClick={() => editor.open(r)} title={f.Notes || 'Click to edit'}>
                           <td style={{ fontWeight: 600 }}>{snapshotLabel(r)}</td>
-                          <td className="num">{formatCurrency(f['Total Banking'])}</td>
-                          <td className="num" style={{ color: 'var(--negative)' }}>{formatCurrency(f['Total Credit Card Debt'])}</td>
-                          <td className="num">{formatCurrency(f['Total Owed to Me'])}</td>
-                          <td className="num">{formatCurrency(f['Home Value'])}</td>
-                          <td className="num">{formatCurrency(f['Mortgage Balance'])}</td>
+                          <td className="num">{formatCurrency(f[F.cash])}</td>
+                          <td className="num">{orDash(f[F.investments])}</td>
+                          <td className="num">{orDash(f[F.trading])}</td>
+                          <td className="num">{formatCurrency(f[F.assets])}</td>
+                          <td className="num" style={{ color: 'var(--negative)' }}>{formatCurrency(f[F.ccDebt])}</td>
+                          <td className="num" style={{ color: 'var(--negative)' }}>{formatCurrency(f[F.liabilities])}</td>
+                          <td className="num">{formatCurrency(f[F.owed])}</td>
                           <td className="num" style={{ fontWeight: 800 }}>{formatCurrency(f['Net Worth'])}</td>
                           <td className="num" style={{ fontWeight: 600, color: change == null || change === 0 ? 'var(--text-muted)' : change > 0 ? 'var(--positive)' : 'var(--negative)' }}>
                             {change == null ? '—' : `${change > 0 ? '↑' : change < 0 ? '↓' : ''} ${formatPercent(change, { signed: true })}`}

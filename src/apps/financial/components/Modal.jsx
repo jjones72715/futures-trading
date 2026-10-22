@@ -59,7 +59,7 @@ function Field({ spec, value, onChange, listId }) {
     return (
       <label className="fin-check">
         <input type="checkbox" checked={!!value} onChange={set} />
-        {spec.name}
+        {spec.label || spec.name}
       </label>
     );
   }
@@ -104,7 +104,7 @@ function Field({ spec, value, onChange, listId }) {
   }
   return (
     <>
-      <span className="fin-label">{spec.name}{spec.required && <span style={{ color: 'var(--negative)' }}> *</span>}</span>
+      <span className="fin-label">{spec.label || spec.name}{spec.required && <span style={{ color: 'var(--negative)' }}> *</span>}</span>
       {input}
       {spec.hint && <span className="fin-hint">{spec.hint}</span>}
     </>
@@ -147,8 +147,8 @@ export function RecordModal({ table, record, defaults, title, suggestions = {}, 
     let fields = {};
     for (const s of specs) {
       const v = toAirtableValue(s, values[s.name]);
-      if (Number.isNaN(v)) { setError(`${s.name} must be a number.`); return; }
-      if (s.required && (v == null || v === '')) { setError(`${s.name} is required.`); return; }
+      if (Number.isNaN(v)) { setError(`${s.label || s.name} must be a number.`); return; }
+      if (s.required && (v == null || v === '')) { setError(`${s.label || s.name} is required.`); return; }
       if (isNew && v == null) continue; // don't send empties on create
       fields[s.name] = v;
     }

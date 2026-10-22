@@ -6,13 +6,13 @@ import AlertBadge, { daysText } from '../components/AlertBadge.jsx';
 import LineChart from '../components/LineChart.jsx';
 import { ErrorBanner, Skel, SkeletonStats } from '../components/ui.jsx';
 import {
-  formatCurrency, formatDate, daysUntil, sumField, isActive, countsTowardNetWorth, num,
-  sortSnapshots, snapshotLabel, formatPercent,
+  formatCurrency, formatDate, daysUntil, sumField, num, sortSnapshots, snapshotLabel, formatPercent,
 } from '../utils/formatters.js';
+import { totals } from '../utils/totals.js';
 
 const KEYS = [
-  T.BANKING_ACCOUNTS, T.CREDIT_CARD_LOGINS, T.MONTHLY_NET_WORTH, T.INVESTMENTS,
-  T.BALANCE_TRANSFERS, T.BANK_BONUSES, T.PENDING_PAYOUTS, T.TRADING_PLATFORMS, T.TRADING_LIQUIDATION,
+  T.BANKING_ACCOUNTS, T.SPORTSBOOKS, T.CREDIT_CARD_LOGINS, T.MONTHLY_NET_WORTH, T.INVESTMENTS,
+  T.BALANCE_TRANSFERS, T.BANK_BONUSES, T.TRADING_PLATFORMS, T.TRADING_LIQUIDATION,
 ];
 
 function AlertPanel({ title, items, level, emptyText, onItemClick }) {
@@ -42,9 +42,9 @@ function AlertPanel({ title, items, level, emptyText, onItemClick }) {
 export default function HomeTab({ onNavigate }) {
   const { data, loading, error } = useTables(KEYS);
 
-  const totalCash = sumField(data[T.BANKING_ACCOUNTS].filter(r => isActive(r) && countsTowardNetWorth(r)), 'Current Balance');
-  const totalOwed = sumField(data[T.CREDIT_CARD_LOGINS], 'Current Balance');
-  const totalInvest = sumField(data[T.INVESTMENTS].filter(isActive), 'Current Balance');
+  const totalCash = totals.cash(data);
+  const totalOwed = totals.ccDebt(data);
+  const totalInvest = totals.investments(data);
   const snapshots = sortSnapshots(data[T.MONTHLY_NET_WORTH]);
   const latest = snapshots[snapshots.length - 1];
 
@@ -83,21 +83,10 @@ export default function HomeTab({ onNavigate }) {
       detail: formatDate(r.fields['Can Close Date']),
       badge: <AlertBadge level={days <= 0 ? 'ok' : 'info'}>{days <= 0 ? 'can close now' : `${days}d`}</AlertBadge>,
     }));
-  const payoutAlerts = data[T.PENDING_PAYOUTS]
-    .map(r => ({ r, days: daysUntil(r.fields['Expected Date']) }))
-    .filter(({ days }) => days != null && days < 0)
-    .sort((a, b) => a.days - b.days)
-    .map(({ r, days }) => ({
-      id: r.id,
-      label: r.fields.Source || 'Untitled',
-      detail: formatCurrency(r.fields.Amount),
-      badge: <AlertBadge level="warning">{daysText(days)}</AlertBadge>,
-    }));
 
   // ---- Trading quick view ----
   const platformTotal = sumField(data[T.TRADING_PLATFORMS], 'Current Balance');
   const liquidation = sumField(data[T.TRADING_LIQUIDATION], 'Current Balance');
-  const pendingTotal = sumField(data[T.PENDING_PAYOUTS], 'Amount');
 
   const sparkPoints = snapshots.slice(-6).map(r => ({ label: snapshotLabel(r, true), value: num(r.fields['Net Worth']) }));
 
@@ -119,10 +108,10 @@ export default function HomeTab({ onNavigate }) {
       )}
 
       <div className="fin-section">
-        <SectionHeader title="Action Items" count={loading ? null : transferAlerts.length + completeAlerts.length + closeAlerts.length + payoutAlerts.length} />
+        <SectionHeader title="Action Items" count={loading ? null : transferAlerts.length + completeAlerts.length + closeAlerts.length} />
         {loading ? (
           <div className="fin-alert-grid">
-            {[0, 1, 2, 3].map(i => <div key={i} className="fin-alert-card"><Skel w="60%" /><Skel h={30} /><Skel h={30} w="85%" /></div>)}
+            {[0, 1, 2].map(i => <div key={i} className="fin-alert-card"><Skel w="60%" /><Skel h={30} /><Skel h={30} w="85%" /></div>)}
           </div>
         ) : (
           <div className="fin-alert-grid">
@@ -132,8 +121,6 @@ export default function HomeTab({ onNavigate }) {
               emptyText="No bonus deadlines coming up" onItemClick={() => onNavigate('banking', 'bonuses')} />
             <AlertPanel title="Bonus accounts closable ≤ 30 days" items={closeAlerts} level="info"
               emptyText="Nothing to close soon" onItemClick={() => onNavigate('banking', 'bonuses')} />
-            <AlertPanel title="Overdue pending payouts" items={payoutAlerts} level="warning"
-              emptyText="No overdue payouts" onItemClick={() => onNavigate('trading')} />
           </div>
         )}
       </div>
@@ -173,11 +160,10 @@ export default function HomeTab({ onNavigate }) {
               <div className="fin-mini-grid">
                 <div className="fin-mini"><div className="fin-mini-label">Platforms</div><div className="fin-mini-value">{formatCurrency(platformTotal)}</div></div>
                 <div className="fin-mini"><div className="fin-mini-label">Liquidation</div><div className="fin-mini-value">{formatCurrency(liquidation)}</div></div>
-                <div className="fin-mini"><div className="fin-mini-label">Pending Payouts</div><div className="fin-mini-value">{formatCurrency(pendingTotal)}</div></div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
                 <span className="fin-muted" style={{ fontSize: '0.8rem' }}>Total</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>{formatCurrency(platformTotal + liquidation + pendingTotal)}</span>
+                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>{formatCurrency(platformTotal + liquidation)}</span>
               </div>
             </>
           )}
