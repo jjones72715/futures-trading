@@ -106,3 +106,16 @@ export function snapshotLabel(r, short = false) {
   }
   return formatShortDate(r.fields?.Date);
 }
+
+// Today (or `d`) as a local "YYYY-MM-DD" string, the format Airtable date fields use.
+export function localIsoDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Parses a typed amount: accepts "$1,234.56", "1234", "-50". Empty → null, garbage → NaN.
+export function parseAmount(str) {
+  const cleaned = String(str ?? '').replace(/[$,\s]/g, '');
+  if (cleaned === '') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : NaN;
+}

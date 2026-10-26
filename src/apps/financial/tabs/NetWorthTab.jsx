@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTables } from '../hooks/useTables.js';
+import { useCycle } from '../hooks/useCycle.jsx';
 import { T } from '../config/airtable.js';
 import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
@@ -58,6 +59,7 @@ function localIsoDate(d) {
 export default function NetWorthTab() {
   const { data, loading, error, reload } = useTables(KEYS);
   const [pulling, setPulling] = useState(false);
+  const cycle = useCycle();
 
   const snapshots = sortSnapshots(data[T.MONTHLY_NET_WORTH]);
   const latest = snapshots[snapshots.length - 1];
@@ -74,7 +76,8 @@ export default function NetWorthTab() {
   const editor = useRecordEditor({
     table: T.MONTHLY_NET_WORTH,
     noun: 'Monthly Snapshot',
-    reload,
+    // A new or re-dated snapshot moves the reconciliation cutoff, so refresh it too.
+    reload: async () => { await reload(); await cycle.refresh(); },
     // Net Worth auto-calculates when blank; Change % is always recalculated against the
     // previous snapshot by date (cleared when there isn't one to compare with).
     transform: async (fields, { record }) => {

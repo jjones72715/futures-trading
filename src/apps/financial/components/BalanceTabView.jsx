@@ -4,6 +4,8 @@ import PillFilter, { ALL } from './PillFilter.jsx';
 import BalanceCard from './BalanceCard.jsx';
 import StatCard from './StatCard.jsx';
 import { useRecordEditor } from './Modal.jsx';
+import BalanceUpdatePanel, { PanelNotes, PanelActive } from './BalanceUpdatePanel.jsx';
+import { useRecordStatus, staleFirst } from '../hooks/useCycle.jsx';
 import { Chip, Delta, EmptyState, ErrorBanner, SkeletonGrid, SkeletonStats, ShowInactiveToggle } from './ui.jsx';
 import { formatCurrency, distinct, isActive, sumField, num } from '../utils/formatters.js';
 
@@ -18,6 +20,8 @@ export default function BalanceTabView({
   const { data, loading, error, reload } = useTables([table]);
   const [filter, setFilter] = useState(ALL);
   const [showInactive, setShowInactive] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const statusOf = useRecordStatus();
 
   const records = data[table];
   const owners = distinct(records, ownerField);
@@ -27,14 +31,18 @@ export default function BalanceTabView({
   const byOwner = records.filter(r => filter === ALL || r.fields[ownerField] === filter);
   const active = byOwner.filter(isActive);
   const inactiveCount = byOwner.length - active.length;
-  const visible = (showInactive ? byOwner : active)
-    .sort((a, b) => (isActive(b) - isActive(a)) || num(b.fields['Current Balance']) - num(a.fields['Current Balance']));
+  const visible = staleFirst(
+    (showInactive ? byOwner : active)
+      .sort((a, b) => (isActive(b) - isActive(a)) || num(b.fields['Current Balance']) - num(a.fields['Current Balance'])),
+    statusOf,
+  );
+  const selected = records.find(r => r.id === selectedId) || null;
 
   const total = sumField(active, 'Current Balance');
   const prev = sumField(active, 'Previous Balance');
 
   return (
-    <div>
+    <div className={selected ? 'fin-has-panel' : undefined}>
       <ErrorBanner error={error || toggleError} />
       <div className="fin-toolbar">
         <PillFilter options={owners} value={filter} onChange={setFilter} />
@@ -74,10 +82,31 @@ export default function BalanceTabView({
                 toggling={pending === r.id}
                 onToggleActive={v => toggle(r, 'Active', v)}
                 onEdit={() => editor.open(r)}
+                status={statusOf(r)}
+                selected={r.id === selectedId}
+                onClick={() => setSelectedId(r.id)}
               />
             );
           })}
         </div>
+      )}
+      {selected && (
+        <BalanceUpdatePanel
+          table={table}
+          record={selected}
+          reload={reload}
+          onClose={() => setSelectedId(null)}
+          onEdit={() => editor.open(selected)}
+          title={selected.fields[titleField] || 'Untitled'}
+          subtitle={selected.fields[ownerField] || null}
+          chips={<>
+            {chipField && selected.fields[chipField] && <Chip color="#00D4FF">{selected.fields[chipField]}</Chip>}
+            {selected.fields[ownerField] && <Chip>{selected.fields[ownerField]}</Chip>}
+          </>}
+        >
+          <PanelNotes notes={selected.fields.Notes} />
+          <PanelActive active={isActive(selected)} onToggle={v => toggle(selected, 'Active', v)} toggling={pending === selected.id} />
+        </BalanceUpdatePanel>
       )}
       {editor.modal}
     </div>

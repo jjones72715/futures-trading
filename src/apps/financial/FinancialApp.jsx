@@ -9,6 +9,7 @@ import AssetsLiabilitiesTab from './tabs/AssetsLiabilitiesTab.jsx';
 import SportsbooksTab from './tabs/SportsbooksTab.jsx';
 import SubscriptionsTab from './tabs/SubscriptionsTab.jsx';
 import NetWorthTab from './tabs/NetWorthTab.jsx';
+import { CycleProvider } from './hooks/useCycle.jsx';
 import './financial.css';
 
 const TABS = [
@@ -38,6 +39,7 @@ export default function FinancialApp() {
   const setSub = (key) => (value) => setSubtab(prev => ({ ...prev, [key]: value }));
 
   return (
+    <CycleProvider>
     <div className="fin-app">
       <div className="fin-header">
         <div className="fin-title-row">
@@ -65,5 +67,6 @@ export default function FinancialApp() {
         {tab === 'networth' && <NetWorthTab />}
       </div>
     </div>
+    </CycleProvider>
   );
 }

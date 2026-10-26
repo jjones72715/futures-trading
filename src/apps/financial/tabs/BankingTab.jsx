@@ -5,16 +5,17 @@ import PillFilter, { ALL } from '../components/PillFilter.jsx';
 import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
 import SummaryStrip from '../components/SummaryStrip.jsx';
-import SidePanel, { PanelSection, PanelRow } from '../components/SidePanel.jsx';
+import { PanelRow } from '../components/SidePanel.jsx';
+import BalanceUpdatePanel, { PanelNotes, PanelActive } from '../components/BalanceUpdatePanel.jsx';
+import { StatusDot } from '../components/Status.jsx';
+import { useRecordStatus, staleFirst } from '../hooks/useCycle.jsx';
 import { useSort, sortRows, SortTh, SearchInput, matchesQuery } from '../components/SortableTable.jsx';
 import AlertBadge, { daysText } from '../components/AlertBadge.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
 import {
-  Chip, Delta, MiniDelta, EmptyState, ErrorBanner, SkeletonStats, SkeletonTable, ShowInactiveToggle, Subtabs, Switch,
-} from '../components/ui.jsx';
+  Chip, Delta, MiniDelta, EmptyState, ErrorBanner, SkeletonStats, SkeletonTable, ShowInactiveToggle, Subtabs, } from '../components/ui.jsx';
 import {
-  formatCurrency, formatShortDate, daysUntil, distinct, isActive, countsTowardNetWorth, sumField, num, delta,
-} from '../utils/formatters.js';
+  formatCurrency, formatShortDate, daysUntil, distinct, isActive, countsTowardNetWorth, sumField, num, } from '../utils/formatters.js';
 
 const SUBTABS = [{ id: 'accounts', label: 'Accounts' }, { id: 'bonuses', label: 'Bonuses' }];
 
@@ -68,16 +69,18 @@ function AccountsView() {
   const accountEditor = useRecordEditor({ table: T.BANKING_ACCOUNTS, noun: 'Bank Account', reload, suggestions: { Owner: owners } });
   const owedEditor = useRecordEditor({ table: T.OWED_TO_ME, noun: 'Owed to Me', reload });
   const { toggle, pending, error: toggleError } = useFieldToggle(T.BANKING_ACCOUNTS, reload);
+  const statusOf = useRecordStatus();
 
   const byOwner = accounts.filter(r => owner === ALL || r.fields.Owner === owner);
   const inactiveCount = byOwner.filter(r => !isActive(r)).length;
-  const rows = sortRows(
+  // Needs Update rows first; the chosen column sort applies within each status group.
+  const rows = staleFirst(sortRows(
     byOwner
       .filter(r => showInactive || isActive(r))
       .filter(r => matchesQuery(query, [r.fields['Account Name'], r.fields.Institution, r.fields.Owner, r.fields.Type, r.fields.Notes,
         countsTowardNetWorth(r) ? null : 'tax holdback'])),
     ACCOUNT_SORT, sort,
-  );
+  ), statusOf);
 
   // Summary strip: Cash excludes tax-holdback accounts; those get their own figure. Both follow the owner filter.
   const activeFiltered = byOwner.filter(isActive);
@@ -102,6 +105,7 @@ function AccountsView() {
     return (
       <tr key={r.id} className={`row${r.id === selectedId ? ' selected' : ''}${isActive(r) ? '' : ' inactive'}`}
         onClick={() => setSelectedId(r.id)}>
+        <td className="status-col"><StatusDot status={statusOf(r)} /></td>
         <td className="cell-name" title={f.Institution ? `${f['Account Name']} — ${f.Institution}` : f['Account Name']}>
           {f['Account Name'] || 'Untitled'}
         </td>
@@ -161,6 +165,7 @@ function AccountsView() {
             <table className="fin-table compact">
               <thead>
                 <tr>
+                  <th className="status-col">Up to Date</th>
                   <SortTh label="Account Name" k="name" sort={sort} onSort={onSort} />
                   <SortTh label="Owner" k="owner" sort={sort} onSort={onSort} />
                   <SortTh label="Type / Purpose" k="type" sort={sort} onSort={onSort} />
@@ -173,7 +178,7 @@ function AccountsView() {
                   const isCollapsed = !query && !!collapsed[g.name];
                   return [
                     <tr key={`g-${g.name}`} className="group-row" onClick={() => setCollapsed(c => ({ ...c, [g.name]: !c[g.name] }))}>
-                      <td colSpan={3}>
+                      <td colSpan={4}>
                         <span className={`fin-sh-caret${isCollapsed ? ' closed' : ''}`} style={{ marginRight: 8 }}>▼</span>
                         {g.name} <span className="fin-faint" style={{ fontWeight: 400 }}>({g.items.length})</span>
                       </td>
@@ -231,6 +236,7 @@ function AccountsView() {
       {selected && (
         <AccountPanel
           record={selected}
+          reload={reload}
           onClose={() => setSelectedId(null)}
           onEdit={() => accountEditor.open(selected)}
           onToggleActive={v => toggle(selected, 'Active', v)}
@@ -243,57 +249,38 @@ function AccountsView() {
   );
 }
 
-function AccountPanel({ record, onClose, onEdit, onToggleActive, toggling }) {
+function AccountPanel({ record, reload, onClose, onEdit, onToggleActive, toggling }) {
   const f = record.fields;
   const target = targetOf(f);
   const low = isBelowMin(f);
   const holdback = !countsTowardNetWorth(record);
-  const { diff } = delta(f['Current Balance'], f['Previous Balance']);
   return (
-    <SidePanel
+    <BalanceUpdatePanel
+      table={T.BANKING_ACCOUNTS}
+      record={record}
+      reload={reload}
+      onClose={onClose}
+      onEdit={onEdit}
       title={f['Account Name'] || 'Untitled'}
       subtitle={[f.Institution, f.Owner].filter(Boolean).join(' · ') || null}
-      onClose={onClose}
-      footer={<button className="fin-btn primary" onClick={onEdit}>Edit</button>}
-    >
-      <PanelSection>
-        <div className="fin-card-chips">
-          {f.Type && <Chip color="#00D4FF">{f.Type}</Chip>}
-          {f.Owner && <Chip>{f.Owner}</Chip>}
-          {holdback && <Chip color="#FFD60A">Tax Holdback</Chip>}
-        </div>
-      </PanelSection>
-      <PanelSection label="Current Balance">
-        <div className="fin-balance" style={low ? { color: 'var(--orange)' } : undefined}>{formatCurrency(f['Current Balance'])}</div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
-          <span className="fin-prev">Prev {formatCurrency(f['Previous Balance'])}</span>
-          <Delta current={f['Current Balance']} previous={f['Previous Balance']} />
-        </div>
+      chips={<>
+        {f.Type && <Chip color="#00D4FF">{f.Type}</Chip>}
+        {f.Owner && <Chip>{f.Owner}</Chip>}
+        {holdback && <Chip color="#FFD60A">Tax Holdback</Chip>}
+      </>}
+      historyRows={<>
+        <PanelRow label="Target Amount">
+          {f['Target Amount'] != null ? formatCurrency(f['Target Amount']) : '—'}
+          {f['Target Type'] && f['Target Type'] !== 'None' && <span className="fin-tag-muted">{f['Target Type']}</span>}
+        </PanelRow>
         {low && <AlertBadge level="orange">Below minimum by {formatCurrency(target.amount - num(f['Current Balance']))}</AlertBadge>}
-      </PanelSection>
-      <PanelSection label="Balance History">
-        <PanelRow label="Previous">{formatCurrency(f['Previous Balance'])}</PanelRow>
-        <PanelRow label="Current">{formatCurrency(f['Current Balance'])}</PanelRow>
-        <PanelRow label="Change"><span style={{ color: diff > 0 ? 'var(--positive)' : diff < 0 ? 'var(--negative)' : undefined }}>{diff > 0 ? '+' : diff < 0 ? '−' : ''}{formatCurrency(Math.abs(diff))}</span></PanelRow>
-        <span className="fin-hint">Only the previous balance is stored for each account.</span>
-      </PanelSection>
-      <PanelSection label="Target">
-        <PanelRow label="Amount">{target ? formatCurrency(target.amount) : '—'}</PanelRow>
-        <PanelRow label="Type">{f['Target Type'] || '—'}</PanelRow>
-      </PanelSection>
-      {f.Notes && (
-        <PanelSection label="Notes">
-          <div className="fin-notes">{f.Notes}</div>
-        </PanelSection>
-      )}
-      <PanelSection>
-        <div className="fin-panel-row" style={{ alignItems: 'center' }}>
-          <span>{isActive(record) ? 'Active' : 'Inactive'}</span>
-          <Switch on={isActive(record)} onChange={onToggleActive} disabled={toggling} />
-        </div>
-        {holdback && <span className="fin-hint">Excluded from Cash and Net Worth (tax holdback).</span>}
-      </PanelSection>
-    </SidePanel>
+      </>}
+      extraInputs={[{ field: 'Target Amount', label: 'Target Amount' }]}
+    >
+      <PanelNotes notes={f.Notes} />
+      <PanelActive active={isActive(record)} onToggle={onToggleActive} toggling={toggling}
+        hint={holdback ? 'Excluded from Cash and Net Worth (tax holdback).' : null} />
+    </BalanceUpdatePanel>
   );
 }
 

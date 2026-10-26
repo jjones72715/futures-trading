@@ -76,7 +76,9 @@ export const FORMS = {
     { name: 'Last Month Earned', type: 'currency' },
     { name: 'This Month Spent', type: 'currency' },
     { name: 'Last Month Spent', type: 'currency' },
-    { name: 'Available Balance', type: 'currency' },
+    { name: 'Total Earned', type: 'currency', hint: 'Running total; the monthly update adds to it' },
+    { name: 'Total Spent', type: 'currency', hint: 'Running total; the monthly update adds to it' },
+    { name: 'Available Balance', type: 'currency', hint: 'Shown as Total Earned − Total Spent once totals are set' },
     { name: 'Notes', type: 'textarea', full: true },
   ],
   INVESTMENTS: [
