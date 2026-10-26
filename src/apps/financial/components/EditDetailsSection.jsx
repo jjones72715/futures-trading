@@ -8,10 +8,11 @@ import { updateRecord, deleteRecord } from '../services/financialService.js';
  * In-panel editor for a record's non-balance fields, driven by the specs in config/forms.js.
  * `fields` lists which form fields to show, in order. Save PATCHes them; Delete removes the record.
  * This replaces the center Edit modal — the modal is only used for adding records.
+ * `transform(fields, { record })` may adjust the payload before it is saved (may be async).
  */
 export default function EditDetailsSection({
   table, record, fields, reload, onDeleted, suggestions = {},
-  collapsible = true, defaultOpen = false, title = 'Edit Details', allowDelete = true,
+  collapsible = true, defaultOpen = false, title = 'Edit Details', allowDelete = true, transform,
 }) {
   const specs = fields.map(name => FORMS[table].find(s => s.name === name)).filter(Boolean);
   const init = () => Object.fromEntries(specs.map(s => [s.name, toFormValue(s, record.fields[s.name])]));
@@ -29,7 +30,7 @@ export default function EditDetailsSection({
 
   async function save(e) {
     e.preventDefault();
-    const out = {};
+    let out = {};
     for (const s of specs) {
       const v = toAirtableValue(s, values[s.name]);
       if (Number.isNaN(v)) { setError(`${s.label || s.name} must be a number.`); return; }
@@ -39,6 +40,7 @@ export default function EditDetailsSection({
     setSaving(true);
     setError(null);
     try {
+      if (transform) out = await transform(out, { record });
       await updateRecord(table, record.id, out);
       await reload();
       setSaved(true);
@@ -97,13 +99,13 @@ export default function EditDetailsSection({
 }
 
 // Side panel that is only a details editor (records with no balance to reconcile).
-export function RecordDetailsPanel({ table, record, title, subtitle, chips, fields, reload, onClose, suggestions, children }) {
+export function RecordDetailsPanel({ table, record, title, subtitle, chips, fields, reload, onClose, suggestions, transform, children }) {
   return (
     <SidePanel title={title} subtitle={subtitle} onClose={onClose}>
       {chips && <PanelSection><div className="fin-card-chips">{chips}</div></PanelSection>}
       {children}
       <EditDetailsSection table={table} record={record} fields={fields} reload={reload}
-        onDeleted={onClose} suggestions={suggestions} collapsible={false} title="Details" />
+        onDeleted={onClose} suggestions={suggestions} transform={transform} collapsible={false} title="Details" />
     </SidePanel>
   );
 }

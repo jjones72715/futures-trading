@@ -6,9 +6,12 @@ import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
 import LineChart from '../components/LineChart.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
+import { RecordDetailsPanel } from '../components/EditDetailsSection.jsx';
+import { PanelSection, PanelRow } from '../components/SidePanel.jsx';
+import { FORMS } from '../config/forms.js';
 import { Delta, EmptyState, ErrorBanner, Skel, SkeletonStats, SkeletonTable } from '../components/ui.jsx';
 import {
-  formatCurrency, formatPercent, num, sortSnapshots, snapshotLabel, snapshotTime,
+  formatCurrency, formatDate, formatPercent, num, sortSnapshots, snapshotLabel, snapshotTime,
 } from '../utils/formatters.js';
 import { fetchRecords } from '../services/financialService.js';
 import { totals } from '../utils/totals.js';
@@ -59,6 +62,7 @@ function localIsoDate(d) {
 export default function NetWorthTab() {
   const { data, loading, error, reload } = useTables(KEYS);
   const [pulling, setPulling] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
   const cycle = useCycle();
 
   const snapshots = sortSnapshots(data[T.MONTHLY_NET_WORTH]);
@@ -73,22 +77,22 @@ export default function NetWorthTab() {
     return prev && p !== 0 ? (num(r.fields['Net Worth']) - p) / Math.abs(p) : null;
   };
 
-  const editor = useRecordEditor({
-    table: T.MONTHLY_NET_WORTH,
-    noun: 'Monthly Snapshot',
-    // A new or re-dated snapshot moves the reconciliation cutoff, so refresh it too.
-    reload: async () => { await reload(); await cycle.refresh(); },
-    // Net Worth auto-calculates when blank; Change % is always recalculated against the
-    // previous snapshot by date (cleared when there isn't one to compare with).
-    transform: async (fields, { record }) => {
-      const out = { ...fields };
-      if (out['Net Worth'] == null) out['Net Worth'] = computeNetWorth(out);
-      const prev = await fetchPreviousSnapshot(out, record?.id);
-      const p = num(prev?.fields['Net Worth']);
-      out[F.change] = prev && p !== 0 ? changeFraction(out['Net Worth'], p) : null;
-      return out;
-    },
-  });
+  // A new or re-dated snapshot moves the reconciliation cutoff, so refresh it too.
+  const reloadAll = async () => { await reload(); await cycle.refresh(); };
+  // Net Worth auto-calculates when blank; Change % is always recalculated against the
+  // previous snapshot by date (cleared when there isn't one to compare with).
+  // Used by both the Add modal and the edit side panel.
+  const transform = async (fields, { record }) => {
+    const out = { ...fields };
+    if (out['Net Worth'] == null) out['Net Worth'] = computeNetWorth(out);
+    const prev = await fetchPreviousSnapshot(out, record?.id);
+    const p = num(prev?.fields['Net Worth']);
+    out[F.change] = prev && p !== 0 ? changeFraction(out['Net Worth'], p) : null;
+    return out;
+  };
+
+  const editor = useRecordEditor({ table: T.MONTHLY_NET_WORTH, noun: 'Monthly Snapshot', reload: reloadAll, transform });
+  const selected = snapshots.find(r => r.id === selectedId) || null;
 
   // New snapshots are pre-filled from freshly re-fetched live balances (all still editable).
   async function openNew() {
@@ -117,7 +121,7 @@ export default function NetWorthTab() {
   const points = snapshots.map(r => ({ label: snapshotLabel(r, true), value: num(r.fields['Net Worth']) }));
 
   return (
-    <div>
+    <div className={selected ? 'fin-has-panel' : undefined}>
       <ErrorBanner error={error} />
       <div className="fin-toolbar">
         <div className="fin-muted" style={{ fontSize: '0.85rem' }}>
@@ -165,7 +169,7 @@ export default function NetWorthTab() {
                       const f = r.fields;
                       const change = changeFor(r);
                       return (
-                        <tr key={r.id} className="clickable" onClick={() => editor.open(r)} title={f.Notes || 'Click to edit'}>
+                        <tr key={r.id} className={`clickable${r.id === selectedId ? ' row-selected' : ''}`} onClick={() => setSelectedId(r.id)} title={f.Notes || 'Click to edit'}>
                           <td style={{ fontWeight: 600 }}>{snapshotLabel(r)}</td>
                           <td className="num">{orDash(f[F.cash])}</td>
                           <td className="num">{orDash(f[F.liquidation])}</td>
@@ -188,6 +192,30 @@ export default function NetWorthTab() {
             <div className="fin-faint" style={{ fontSize: '0.72rem', marginTop: 8 }}>Click a row to edit. Net Worth auto-calculates when left blank; Change % is calculated on save from the previous snapshot.</div>
           </div>
         </>
+      )}
+      {selected && (
+        <RecordDetailsPanel
+          table={T.MONTHLY_NET_WORTH}
+          record={selected}
+          reload={reloadAll}
+          transform={transform}
+          onClose={() => setSelectedId(null)}
+          title={snapshotLabel(selected)}
+          subtitle={selected.fields.Date ? formatDate(selected.fields.Date) : null}
+          fields={FORMS[T.MONTHLY_NET_WORTH].map(s => s.name)}
+        >
+          <PanelSection label="Summary">
+            <PanelRow label="Net Worth"><strong>{formatCurrency(selected.fields['Net Worth'])}</strong></PanelRow>
+            <PanelRow label="Change %">
+              {changeFor(selected) == null ? '—' : (
+                <span style={{ color: changeFor(selected) > 0 ? 'var(--positive)' : changeFor(selected) < 0 ? 'var(--negative)' : undefined }}>
+                  {formatChange(changeFor(selected))}
+                </span>
+              )}
+            </PanelRow>
+            <span className="fin-hint">Net Worth recalculates when cleared; Change % is recalculated against the previous snapshot on save.</span>
+          </PanelSection>
+        </RecordDetailsPanel>
       )}
       {editor.modal}
     </div>
