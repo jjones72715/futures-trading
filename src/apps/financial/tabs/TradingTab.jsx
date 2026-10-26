@@ -55,10 +55,11 @@ export default function TradingTab() {
 
   const selectedPlatform = selected?.kind === 'platform' ? platforms.find(r => r.id === selected.id) : null;
   const selectedProject = selected?.kind === 'project' ? projects.find(r => r.id === selected.id) : null;
+  const selectedLiquidation = selected?.kind === 'liquidation' ? liquidation : null;
   const isSel = (kind, id) => selected?.kind === kind && selected.id === id;
 
   return (
-    <div className={selectedPlatform || selectedProject ? 'fin-has-panel' : undefined}>
+    <div className={selectedPlatform || selectedProject || selectedLiquidation ? 'fin-has-panel' : undefined}>
       <ErrorBanner error={error || projectError} />
 
       {loading ? <SkeletonStats count={3} /> : (
@@ -113,23 +114,24 @@ export default function TradingTab() {
           <EmptyState icon="💧" message="Liquidation balance hasn’t been set up yet."
             actionLabel="Set balance" onAction={() => liquidationEditor.open()} />
         ) : (
-          <div className="fin-card" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <div className="fin-mini-label">{liquidation.fields.Label || 'Liquidation Invested'}</div>
-              <div style={{ fontSize: '2.6rem', fontWeight: 800, lineHeight: 1.1, marginTop: 4 }}>{formatCurrency(liquidation.fields['Current Balance'])}</div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
-                <span className="fin-prev">Prev {formatCurrency(liquidation.fields['Previous Balance'])}</span>
-                <Delta current={liquidation.fields['Current Balance']} previous={liquidation.fields['Previous Balance']} />
-              </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-                <span className="fin-muted" style={{ fontSize: '0.8rem' }}>
-                  Last Updated: {liquidation.fields[LAST_UPDATED] ? formatDate(liquidation.fields[LAST_UPDATED]) : 'Never'}
-                </span>
-                <StatusPill status={statusOf(liquidation)} />
-              </div>
-              {liquidation.fields.Notes && <div className="fin-notes" style={{ marginTop: 8 }}>{liquidation.fields.Notes}</div>}
-            </div>
-            <LiquidationUpdate record={liquidation} reload={reload} />
+          <div className="fin-table-wrap">
+            <table className="fin-table compact">
+              <thead>
+                <tr><th className="status-col">Up to Date</th><th>Label</th><th className="num">Current Balance</th><th className="num">Previous Balance</th><th>Delta</th><th>Last Updated</th></tr>
+              </thead>
+              <tbody>
+                <tr className={`row${selected?.kind === 'liquidation' ? ' selected' : ''}`} onClick={() => setSelected({ kind: 'liquidation', id: liquidation.id })}>
+                  <td className="status-col"><StatusDot status={statusOf(liquidation)} /></td>
+                  <td style={{ fontWeight: 600 }}>{liquidation.fields.Label || 'Liquidation Invested'}</td>
+                  <td className="num" style={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatCurrency(liquidation.fields['Current Balance'])}</td>
+                  <td className="num fin-muted">{formatCurrency(liquidation.fields['Previous Balance'])}</td>
+                  <td><Delta current={liquidation.fields['Current Balance']} previous={liquidation.fields['Previous Balance']} /></td>
+                  <td className={liquidation.fields[LAST_UPDATED] ? undefined : 'fin-faint'}>
+                    {liquidation.fields[LAST_UPDATED] ? formatDate(liquidation.fields[LAST_UPDATED]) : 'Never'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -205,6 +207,18 @@ export default function TradingTab() {
           <PanelNotes notes={selectedPlatform.fields.Notes} />
         </BalanceUpdatePanel>
       )}
+      {selectedLiquidation && (
+        <BalanceUpdatePanel
+          table={T.TRADING_LIQUIDATION}
+          record={selectedLiquidation}
+          reload={reload}
+          onClose={() => setSelected(null)}
+          title="Liquidation Invested"
+          updateTitle="Update Value"
+          previousLabel="Previous"
+          currentLabel="New Value"
+        />
+      )}
       {selectedProject && isProjectActive(selectedProject) && (
         <ProjectPanel record={selectedProject} reload={reload} onClose={() => setSelected(null)} />
       )}
@@ -230,47 +244,6 @@ export default function TradingTab() {
       {liquidationEditor.modal}
       {projectEditor.modal}
     </div>
-  );
-}
-
-/* ---- Trading Liquidation: one number, so an inline update form instead of a side panel ---- */
-
-function LiquidationUpdate({ record, reload }) {
-  const current = record.fields['Current Balance'];
-  const [prev, setPrev] = useState(toInput(current));
-  const [next, setNext] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => { setPrev(toInput(current)); setNext(''); }, [record.id, current, record.fields[LAST_UPDATED]]);
-
-  async function save(e) {
-    e.preventDefault();
-    const p = parseAmount(prev);
-    const n = parseAmount(next);
-    if (n == null) { setError('Enter the new value.'); return; }
-    if (Number.isNaN(n) || Number.isNaN(p)) { setError('Amounts must be numbers, e.g. 1,234.56'); return; }
-    setSaving(true);
-    setError(null);
-    try {
-      await updateRecord(T.TRADING_LIQUIDATION, record.id, {
-        'Previous Balance': p, 'Current Balance': n, [LAST_UPDATED]: localIsoDate(),
-      });
-      await reload();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form className="fin-inline-update" onSubmit={save}>
-      <CurrencyInput label="Previous" value={prev} onChange={setPrev} />
-      <CurrencyInput label="New Value" value={next} onChange={setNext} placeholder="New amount" />
-      <button type="submit" className="fin-btn primary" disabled={saving} style={{ marginBottom: 2 }}>{saving ? 'Saving…' : 'Save'}</button>
-      {error && <div className="fin-error" style={{ margin: 0, width: '100%' }}>{error}</div>}
-    </form>
   );
 }
 

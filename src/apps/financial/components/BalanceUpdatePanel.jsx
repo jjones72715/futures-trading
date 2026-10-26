@@ -24,7 +24,7 @@ export default function BalanceUpdatePanel({
   title, subtitle, chips,
   currentField = 'Current Balance', previousField = 'Previous Balance',
   currentLabel = 'Current Balance', previousLabel = 'Previous Balance',
-  invert = false, historyRows = null, extraInputs = [], children,
+  updateTitle, invert = false, historyRows = null, extraInputs = [], children,
 }) {
   const cycle = useCycle();
   const f = record.fields;
@@ -55,7 +55,7 @@ export default function BalanceUpdatePanel({
     e.preventDefault();
     const prev = parseAmount(prevInput);
     const cur = parseAmount(curInput);
-    if (cur == null) { setError(`Enter the new ${currentLabel.toLowerCase()}.`); return; }
+    if (cur == null) { setError(`Enter the ${currentLabel.replace(/^(current|new) /i, 'new ').toLowerCase()}.`); return; }
     if (Number.isNaN(cur) || Number.isNaN(prev)) { setError('Amounts must be numbers, e.g. 1,234.56'); return; }
     const fields = { [previousField]: prev, [currentField]: cur, [LAST_UPDATED]: localIsoDate() };
     for (const x of extraInputs) {
@@ -94,7 +94,7 @@ export default function BalanceUpdatePanel({
         </div>
       </PanelSection>
 
-      <PanelSection label={`Update ${currentLabel}`}>
+      <PanelSection label={updateTitle || `Update ${currentLabel}`}>
         <form className="fin-panel-form" onSubmit={save}>
           <CurrencyInput label={previousLabel} value={prevInput} onChange={setPrevInput} />
           <CurrencyInput label={currentLabel} value={curInput} onChange={setCurInput} placeholder="New amount" />
