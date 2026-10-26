@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useTables, useFieldToggle } from '../hooks/useTables.js';
+import { useTables } from '../hooks/useTables.js';
 import { T } from '../config/airtable.js';
 import PillFilter, { ALL } from '../components/PillFilter.jsx';
 import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
 import SummaryStrip from '../components/SummaryStrip.jsx';
 import { PanelRow } from '../components/SidePanel.jsx';
-import BalanceUpdatePanel, { PanelNotes, PanelActive } from '../components/BalanceUpdatePanel.jsx';
+import BalanceUpdatePanel, { PanelNotes } from '../components/BalanceUpdatePanel.jsx';
+import { RecordDetailsPanel } from '../components/EditDetailsSection.jsx';
+import { FORMS } from '../config/forms.js';
 import { StatusDot } from '../components/Status.jsx';
 import { useRecordStatus, staleFirst } from '../hooks/useCycle.jsx';
 import { useSort, sortRows, SortTh, SearchInput, matchesQuery } from '../components/SortableTable.jsx';
@@ -59,16 +61,20 @@ function AccountsView() {
   const [collapsed, setCollapsed] = useState({});
   const [openOwed, setOpenOwed] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedOwedId, setSelectedOwedId] = useState(null);
   const { sort, onSort } = useSort('name');
 
   const accounts = data[T.BANKING_ACCOUNTS];
   const owed = data[T.OWED_TO_ME];
   const owners = distinct(accounts, 'Owner');
   const selected = accounts.find(r => r.id === selectedId) || null;
+  const selectedOwed = owed.find(r => r.id === selectedOwedId) || null;
+  // One side panel at a time.
+  const showAccount = (id) => { setSelectedOwedId(null); setSelectedId(id); };
+  const showOwed = (id) => { setSelectedId(null); setSelectedOwedId(id); };
 
   const accountEditor = useRecordEditor({ table: T.BANKING_ACCOUNTS, noun: 'Bank Account', reload, suggestions: { Owner: owners } });
   const owedEditor = useRecordEditor({ table: T.OWED_TO_ME, noun: 'Owed to Me', reload });
-  const { toggle, pending, error: toggleError } = useFieldToggle(T.BANKING_ACCOUNTS, reload);
   const statusOf = useRecordStatus();
 
   const byOwner = accounts.filter(r => owner === ALL || r.fields.Owner === owner);
@@ -104,7 +110,7 @@ function AccountsView() {
     const low = isBelowMin(f);
     return (
       <tr key={r.id} className={`row${r.id === selectedId ? ' selected' : ''}${isActive(r) ? '' : ' inactive'}`}
-        onClick={() => setSelectedId(r.id)}>
+        onClick={() => showAccount(r.id)}>
         <td className="status-col"><StatusDot status={statusOf(r)} /></td>
         <td className="cell-name" title={f.Institution ? `${f['Account Name']} — ${f.Institution}` : f['Account Name']}>
           {f['Account Name'] || 'Untitled'}
@@ -134,8 +140,8 @@ function AccountsView() {
   }
 
   return (
-    <div className={selected ? 'fin-has-panel' : undefined}>
-      <ErrorBanner error={error || toggleError} />
+    <div className={selected || selectedOwed ? 'fin-has-panel' : undefined}>
+      <ErrorBanner error={error} />
       <SummaryStrip loading={loading} items={[
         { label: `Cash${suffix}`, value: formatCurrency(totalCash), color: 'var(--positive)', sub: <Delta current={totalCash} previous={prevCash} /> },
         { label: `Tax Holdback Cash${suffix}`, value: formatCurrency(holdbackCash), color: 'var(--warning)' },
@@ -213,18 +219,17 @@ function AccountsView() {
           <div className="fin-table-wrap">
             <table className="fin-table compact">
               <thead>
-                <tr><th>Person / Entity</th><th>Type</th><th className="num">Current</th><th className="num">Previous</th><th>Change</th><th>Notes</th><th /></tr>
+                <tr><th>Person / Entity</th><th>Type</th><th className="num">Current</th><th className="num">Previous</th><th>Change</th><th>Notes</th></tr>
               </thead>
               <tbody>
                 {[...owed].sort((a, b) => num(b.fields['Current Amount']) - num(a.fields['Current Amount'])).map(r => (
-                  <tr key={r.id}>
+                  <tr key={r.id} className={`row${r.id === selectedOwedId ? ' selected' : ''}`} onClick={() => showOwed(r.id)}>
                     <td style={{ fontWeight: 600 }}>{r.fields['Person or Entity']}</td>
                     <td>{r.fields.Type && <Chip>{r.fields.Type}</Chip>}</td>
                     <td className="num" style={{ fontWeight: 700 }}>{formatCurrency(r.fields['Current Amount'])}</td>
                     <td className="num fin-muted">{formatCurrency(r.fields['Previous Amount'])}</td>
                     <td><Delta current={r.fields['Current Amount']} previous={r.fields['Previous Amount']} /></td>
                     <td className="wrap">{r.fields.Notes}</td>
-                    <td><button className="fin-btn sm" onClick={() => owedEditor.open(r)}>Edit</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -238,9 +243,18 @@ function AccountsView() {
           record={selected}
           reload={reload}
           onClose={() => setSelectedId(null)}
-          onEdit={() => accountEditor.open(selected)}
-          onToggleActive={v => toggle(selected, 'Active', v)}
-          toggling={pending === selected.id}
+          suggestions={{ Owner: owners }}
+        />
+      )}
+      {selectedOwed && (
+        <RecordDetailsPanel
+          table={T.OWED_TO_ME}
+          record={selectedOwed}
+          reload={reload}
+          onClose={() => setSelectedOwedId(null)}
+          title={selectedOwed.fields['Person or Entity'] || 'Untitled'}
+          chips={selectedOwed.fields.Type && <Chip>{selectedOwed.fields.Type}</Chip>}
+          fields={FORMS[T.OWED_TO_ME].map(s => s.name)}
         />
       )}
       {accountEditor.modal}
@@ -249,7 +263,7 @@ function AccountsView() {
   );
 }
 
-function AccountPanel({ record, reload, onClose, onEdit, onToggleActive, toggling }) {
+function AccountPanel({ record, reload, onClose, suggestions }) {
   const f = record.fields;
   const target = targetOf(f);
   const low = isBelowMin(f);
@@ -260,7 +274,6 @@ function AccountPanel({ record, reload, onClose, onEdit, onToggleActive, togglin
       record={record}
       reload={reload}
       onClose={onClose}
-      onEdit={onEdit}
       title={f['Account Name'] || 'Untitled'}
       subtitle={[f.Institution, f.Owner].filter(Boolean).join(' · ') || null}
       chips={<>
@@ -276,10 +289,10 @@ function AccountPanel({ record, reload, onClose, onEdit, onToggleActive, togglin
         {low && <AlertBadge level="orange">Below minimum by {formatCurrency(target.amount - num(f['Current Balance']))}</AlertBadge>}
       </>}
       extraInputs={[{ field: 'Target Amount', label: 'Target Amount' }]}
+      detailFields={['Account Name', 'Institution', 'Type', 'Owner', 'Target Type', 'Notes', 'Active', 'Exclude from Net Worth']}
+      suggestions={suggestions}
     >
       <PanelNotes notes={f.Notes} />
-      <PanelActive active={isActive(record)} onToggle={onToggleActive} toggling={toggling}
-        hint={holdback ? 'Excluded from Cash and Net Worth (tax holdback).' : null} />
     </BalanceUpdatePanel>
   );
 }
@@ -303,6 +316,7 @@ const STATE_ORDER = { overdue: 0, 'due-soon': 1, active: 2, completed: 3, closed
 function BonusesView() {
   const { data, loading, error, reload } = useTables([T.BANK_BONUSES]);
   const [filter, setFilter] = useState(ALL);
+  const [selectedId, setSelectedId] = useState(null);
   const bonuses = data[T.BANK_BONUSES];
 
   const owners = distinct(bonuses, 'Owner');
@@ -326,8 +340,10 @@ function BonusesView() {
   const earned = rows.filter(x => x.r.fields['Date Completed']).reduce((s, x) => s + num(x.r.fields['Bonus Amount']), 0);
   const closable = rows.filter(x => x.state !== 'closed' && daysUntil(x.r.fields['Can Close Date']) != null && daysUntil(x.r.fields['Can Close Date']) <= 0).length;
 
+  const selected = bonuses.find(r => r.id === selectedId) || null;
+
   return (
-    <div>
+    <div className={selected ? 'fin-has-panel' : undefined}>
       <ErrorBanner error={error} />
       <div className="fin-toolbar">
         <PillFilter options={pillOptions} value={filter} onChange={setFilter} />
@@ -361,7 +377,7 @@ function BonusesView() {
                 const dueDays = daysUntil(f['Date to Complete']);
                 const closeDays = daysUntil(f['Can Close Date']);
                 return (
-                  <tr key={r.id} className={`clickable ${ROW_CLASS[state]}`} onClick={() => editor.open(r)} title="Click to edit">
+                  <tr key={r.id} className={`clickable ${ROW_CLASS[state]}${r.id === selectedId ? ' row-selected' : ''}`} onClick={() => setSelectedId(r.id)} title="Click to edit">
                     <td style={{ fontWeight: 600 }}>{f['Bank Name']}{f['Account Type'] && <span className="fin-faint"> · {f['Account Type']}</span>}</td>
                     <td>{f.Owner || '—'}</td>
                     <td>{f['Business or Personal'] ? <Chip color={f['Business or Personal'] === BUSINESS ? '#8B5CF6' : undefined}>{f['Business or Personal'][0]}</Chip> : '—'}</td>
@@ -395,6 +411,18 @@ function BonusesView() {
       <div className="fin-faint" style={{ fontSize: '0.72rem', marginTop: 8 }}>
         Rows: <span style={{ color: 'var(--negative)' }}>red</span> overdue · <span style={{ color: 'var(--warning)' }}>yellow</span> due within 30 days · <span style={{ color: 'var(--positive)' }}>green</span> completed · gray closed. Click a row to edit.
       </div>
+      {selected && (
+        <RecordDetailsPanel
+          table={T.BANK_BONUSES}
+          record={selected}
+          reload={reload}
+          onClose={() => setSelectedId(null)}
+          title={selected.fields['Bank Name'] || 'Untitled'}
+          subtitle={[selected.fields.Owner, selected.fields['Business or Personal']].filter(Boolean).join(' · ') || null}
+          fields={FORMS[T.BANK_BONUSES].map(s => s.name)}
+          suggestions={{ Owner: owners }}
+        />
+      )}
       {editor.modal}
     </div>
   );

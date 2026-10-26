@@ -13,6 +13,7 @@ export default function InvestmentsTab() {
       emptyMessage="No investment accounts yet."
       addLabel="+ Add Account"
       accent="var(--warning)"
+      showActiveColumn
     />
   );
 }

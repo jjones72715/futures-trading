@@ -5,13 +5,14 @@ import PillFilter, { ALL } from '../components/PillFilter.jsx';
 import SummaryStrip from '../components/SummaryStrip.jsx';
 import { PanelSection, PanelRow } from '../components/SidePanel.jsx';
 import BalanceUpdatePanel, { PanelNotes } from '../components/BalanceUpdatePanel.jsx';
+import RecordTable, { ChangeCell } from '../components/RecordTable.jsx';
 import { StatusDot } from '../components/Status.jsx';
 import { useRecordStatus, staleFirst } from '../hooks/useCycle.jsx';
 import { useSort, sortRows, SortTh, SearchInput, matchesQuery } from '../components/SortableTable.jsx';
 import AlertBadge, { levelColor } from '../components/AlertBadge.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
 import {
-  Chip, Delta, MiniDelta, EmptyState, ErrorBanner, SkeletonGrid, SkeletonTable, Subtabs,
+  Chip, Delta, MiniDelta, EmptyState, ErrorBanner, SkeletonTable, Subtabs,
 } from '../components/ui.jsx';
 import {
   formatCurrency, formatDate, formatShortDate, daysUntil, distinct, sumField, num, } from '../utils/formatters.js';
@@ -174,13 +175,13 @@ function BalancesView() {
         </div>
       )}
 
-      {selected && <LoginPanel record={selected} reload={reload} onClose={() => setSelectedId(null)} onEdit={() => editor.open(selected)} />}
+      {selected && <LoginPanel record={selected} reload={reload} onClose={() => setSelectedId(null)} suggestions={{ Owner: owners }} />}
       {editor.modal}
     </div>
   );
 }
 
-function LoginPanel({ record, reload, onClose, onEdit }) {
+function LoginPanel({ record, reload, onClose, suggestions }) {
   const f = record.fields;
   const autopay = autopayOf(f);
   return (
@@ -189,8 +190,9 @@ function LoginPanel({ record, reload, onClose, onEdit }) {
       record={record}
       reload={reload}
       onClose={onClose}
-      onEdit={onEdit}
       invert
+      detailFields={['Login Label', 'Issuer', 'Owner', 'Relationship', 'Notes']}
+      suggestions={suggestions}
       title={f['Login Label'] || 'Untitled'}
       subtitle={[f.Issuer, f.Owner].filter(Boolean).join(' · ') || null}
       chips={<>
@@ -212,14 +214,6 @@ function LoginPanel({ record, reload, onClose, onEdit }) {
 
 /* ================= Transfers ================= */
 
-function transferLevel(days) {
-  if (days == null) return 'muted';
-  if (days < 0) return 'danger';
-  if (days < 60) return 'orange';
-  if (days <= 90) return 'warning';
-  return 'ok';
-}
-
 function statusColor(s) {
   return s === 'Paid Off' ? '#00E676' : s === 'Expired' ? '#FF4D4D' : '#00D4FF';
 }
@@ -233,20 +227,49 @@ function TransfersView() {
   const selected = transfers.find(r => r.id === selectedId) || null;
   const editor = useRecordEditor({ table: T.BALANCE_TRANSFERS, noun: 'Balance Transfer', reload });
 
-  const withDays = transfers.map(r => ({ r, days: daysUntil(r.fields['End Date']) }));
-  const paidCount = withDays.filter(x => x.r.fields.Status === 'Paid Off').length;
-  // Needs Update cards first; soonest end date first within each status group.
-  const visible = staleFirst(withDays
-    .filter(x => showPaid || x.r.fields.Status !== 'Paid Off')
-    .sort((a, b) => (a.days ?? 99999) - (b.days ?? 99999)), x => statusOf(x.r));
+  const daysOf = (r) => daysUntil(r.fields['End Date']);
+  const paidCount = transfers.filter(r => r.fields.Status === 'Paid Off').length;
+  // Soonest end date first (the table puts Needs Update rows on top of that).
+  const visible = transfers
+    .filter(r => showPaid || r.fields.Status !== 'Paid Off')
+    .sort((a, b) => (daysOf(a) ?? 99999) - (daysOf(b) ?? 99999));
 
-  const alerts = withDays.filter(x => x.r.fields.Status !== 'Paid Off' && x.days != null && x.days <= 60)
+  const alerts = transfers
+    .map(r => ({ r, days: daysOf(r) }))
+    .filter(x => x.r.fields.Status !== 'Paid Off' && x.days != null && x.days <= 60)
     .sort((a, b) => a.days - b.days);
   const anyExpired = alerts.some(x => x.days < 0);
   const bannerColor = anyExpired ? levelColor('danger') : levelColor('warning');
 
-  const open = withDays.filter(x => x.r.fields.Status !== 'Paid Off');
-  const totalOpen = sumField(open.map(x => x.r), 'Current Balance');
+  const open = transfers.filter(r => r.fields.Status !== 'Paid Off');
+  const totalOpen = sumField(open, 'Current Balance');
+
+  const dash = <span className="fin-faint">—</span>;
+  const columns = [
+    { key: 'name', label: 'Transfer Name', sort: r => r.fields['Card Name'] || '', className: 'cell-name',
+      render: r => {
+        const days = daysOf(r);
+        const paid = r.fields.Status === 'Paid Off';
+        return (
+          <>
+            {r.fields['Card Name'] || 'Untitled'}
+            {!paid && days != null && days < 0 && <span style={{ marginLeft: 8 }}><AlertBadge level="danger">EXPIRED</AlertBadge></span>}
+            {!paid && days != null && days >= 0 && days <= 60 && <span style={{ marginLeft: 8 }}><AlertBadge level="orange">{days}d left</AlertBadge></span>}
+            {paid && <span style={{ marginLeft: 8 }}><Chip color={statusColor('Paid Off')}>Paid Off</Chip></span>}
+          </>
+        );
+      } },
+    { key: 'from', label: 'From Card', sort: r => r.fields['From Card'] || '', render: r => r.fields['From Card'] || dash },
+    { key: 'to', label: 'To Card', sort: r => r.fields['To Card'] || '', render: r => r.fields['To Card'] || dash },
+    { key: 'balance', label: 'Balance', numeric: true, sort: r => num(r.fields['Current Balance']),
+      render: r => <strong style={{ color: num(r.fields['Current Balance']) > 0 ? 'var(--negative)' : undefined }}>{formatCurrency(r.fields['Current Balance'])}</strong> },
+    { key: 'previous', label: 'Previous Balance', numeric: true, sort: r => num(r.fields['Previous Balance']),
+      render: r => <span className="fin-muted">{formatCurrency(r.fields['Previous Balance'])}</span> },
+    { key: 'change', label: 'Change', numeric: true, sort: r => num(r.fields['Current Balance']) - num(r.fields['Previous Balance']),
+      render: r => <ChangeCell current={r.fields['Current Balance']} previous={r.fields['Previous Balance']} invert /> },
+  ];
+
+  const selDays = selected ? daysOf(selected) : null;
 
   return (
     <div className={selected ? 'fin-has-panel' : undefined}>
@@ -281,73 +304,41 @@ function TransfersView() {
         <button className="fin-btn primary" onClick={() => editor.open()}>+ Add Transfer</button>
       </div>
 
-      {loading ? <SkeletonGrid count={4} /> : visible.length === 0 ? (
+      {loading ? <SkeletonTable rows={5} /> : visible.length === 0 ? (
         <EmptyState icon="🔁" message={transfers.length ? 'All balance transfers are paid off.' : 'No balance transfers tracked yet.'}
           actionLabel="Add transfer" onAction={() => editor.open()} />
       ) : (
-        <div className="fin-grid">
-          {visible.map(({ r, days }) => {
-            const f = r.fields;
-            const paid = f.Status === 'Paid Off';
-            const level = paid ? 'muted' : transferLevel(days);
-            const color = levelColor(level);
-            const expired = !paid && days != null && days < 0;
-            return (
-              <div key={r.id} className={`fin-card clickable${paid ? ' inactive' : ''}${r.id === selectedId ? ' selected' : ''}`}
-                style={expired && r.id !== selectedId ? { borderColor: `${color}66` } : undefined}
-                onClick={() => setSelectedId(r.id)}>
-                <div className="fin-card-top">
-                  <div className="fin-card-title-row">
-                    <StatusDot status={statusOf(r)} />
-                    <div className="fin-card-title">{f['Card Name'] || 'Untitled'}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {expired && <AlertBadge level="danger">EXPIRED</AlertBadge>}
-                    {f.Status && !(expired && f.Status === 'Active') && <Chip color={statusColor(f.Status)}>{f.Status}</Chip>}
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <div className="fin-mini-label">Current Balance</div>
-                    <div className="fin-balance" style={{ fontSize: '1.4rem' }}>{formatCurrency(f['Current Balance'])}</div>
-                    <Delta current={f['Current Balance']} previous={f['Amount Transferred']} invert />
-                  </div>
-                  <div>
-                    <div className="fin-mini-label">Transferred</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 600, marginTop: 4 }} className="fin-muted">{formatCurrency(f['Amount Transferred'])}</div>
-                  </div>
-                </div>
-                <div style={{ background: `${color}14`, border: `1px solid ${color}44`, borderRadius: 10, padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                  <div>
-                    <div className="fin-mini-label">End Date</div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{formatDate(f['End Date'])}</div>
-                  </div>
-                  <div style={{ color, fontWeight: 800, fontSize: days != null && days >= 0 ? '1.3rem' : '0.9rem', textAlign: 'right' }}>
-                    {days == null ? '—' : paid ? 'Paid' : days < 0 ? `${Math.abs(days)}d ago` : `${days}d`}
-                    {days != null && days >= 0 && !paid && <div style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.8 }}>remaining</div>}
-                  </div>
-                </div>
-                {f.Notes && <div className="fin-notes">{f.Notes}</div>}
-                <div className="fin-card-actions" onClick={e => e.stopPropagation()}>
-                  <button className="fin-btn sm" onClick={() => editor.open(r)}>Edit</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <RecordTable
+          columns={columns}
+          rows={visible}
+          statusOf={statusOf}
+          selectedId={selectedId}
+          onRowClick={r => setSelectedId(r.id)}
+          rowClassName={r => (r.fields.Status === 'Paid Off' ? 'inactive' : '')}
+        />
       )}
+
       {selected && (
         <BalanceUpdatePanel
           table={T.BALANCE_TRANSFERS}
           record={selected}
           reload={reload}
           onClose={() => setSelectedId(null)}
-          onEdit={() => editor.open(selected)}
           invert
+          currentLabel="Balance"
           title={selected.fields['Card Name'] || 'Untitled'}
-          subtitle={selected.fields['End Date'] ? `Ends ${formatDate(selected.fields['End Date'])}` : null}
+          subtitle={[selected.fields['From Card'], selected.fields['To Card']].filter(Boolean).join(' → ') || null}
           chips={selected.fields.Status && <Chip color={statusColor(selected.fields.Status)}>{selected.fields.Status}</Chip>}
-          historyRows={<PanelRow label="Amount Transferred">{formatCurrency(selected.fields['Amount Transferred'])}</PanelRow>}
+          historyRows={<>
+            <PanelRow label="Amount Transferred">{formatCurrency(selected.fields['Amount Transferred'])}</PanelRow>
+            <PanelRow label="End Date">
+              {selected.fields['End Date'] ? formatDate(selected.fields['End Date']) : '—'}
+              {selDays != null && selected.fields.Status !== 'Paid Off' && (
+                <span className="fin-tag-muted">{selDays < 0 ? `expired ${Math.abs(selDays)}d ago` : `${selDays}d left`}</span>
+              )}
+            </PanelRow>
+          </>}
+          detailFields={['Card Name', 'From Card', 'To Card', 'Status', 'Amount Transferred', 'End Date', 'Notes']}
         >
           <PanelNotes notes={selected.fields.Notes} />
         </BalanceUpdatePanel>

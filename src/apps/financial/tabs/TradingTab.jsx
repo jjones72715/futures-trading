@@ -5,13 +5,17 @@ import SectionHeader from '../components/SectionHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
 import BalanceUpdatePanel, { PanelNotes } from '../components/BalanceUpdatePanel.jsx';
+import EditDetailsSection, { RecordDetailsPanel } from '../components/EditDetailsSection.jsx';
+import RecordTable from '../components/RecordTable.jsx';
+import { useFieldToggle } from '../hooks/useTables.js';
 import SidePanel, { PanelSection, PanelRow } from '../components/SidePanel.jsx';
 import CurrencyInput from '../components/CurrencyInput.jsx';
 import { StatusDot, StatusPill } from '../components/Status.jsx';
 import { updateRecord } from '../services/financialService.js';
 import { useCycle, cycleStatus, useRecordStatus, staleFirst, LAST_UPDATED } from '../hooks/useCycle.jsx';
+import { Switch } from '../components/ui.jsx';
 import {
-  Chip, Delta, EmptyState, ErrorBanner, Skel, SkeletonGrid, SkeletonStats, SkeletonTable,
+  Chip, Delta, EmptyState, ErrorBanner, Skel, SkeletonStats, SkeletonTable,
 } from '../components/ui.jsx';
 import { formatCurrency, formatDate, distinct, sumField, num, localIsoDate, parseAmount } from '../utils/formatters.js';
 
@@ -25,16 +29,8 @@ const toInput = (v) => (v == null ? '' : String(v));
 const hasTotals = (f) => f['Total Earned'] != null || f['Total Spent'] != null;
 const projectAvailable = (f) => (hasTotals(f) ? num(f['Total Earned']) - num(f['Total Spent']) : f['Available Balance']);
 
-const PROJECT_FIELDS = [
-  ['This Month Earned', 'var(--positive)'],
-  ['Last Month Earned', null],
-  ['This Month Spent', 'var(--negative)'],
-  ['Last Month Spent', null],
-];
-
 export default function TradingTab() {
   const { data, loading, error, reload } = useTables(KEYS);
-  const [showClosed, setShowClosed] = useState(false);
   const [selected, setSelected] = useState(null); // { kind: 'platform' | 'project', id }
   const statusOf = useRecordStatus();
 
@@ -45,15 +41,15 @@ export default function TradingTab() {
   const platformEditor = useRecordEditor({ table: T.TRADING_PLATFORMS, noun: 'Platform', reload, suggestions: { Owner: distinct(platforms, 'Owner') } });
   const liquidationEditor = useRecordEditor({ table: T.TRADING_LIQUIDATION, noun: 'Liquidation Invested', reload, allowDelete: false });
   const projectEditor = useRecordEditor({ table: T.SPECIAL_PROJECTS, noun: 'Special Project', reload });
+  const { toggle: toggleProject, pending: projectPending, error: projectError } = useFieldToggle(T.SPECIAL_PROJECTS, reload);
 
   const platformTotal = sumField(platforms, 'Current Balance');
   const platformPrev = sumField(platforms, 'Previous Balance');
   const liqCurrent = num(liquidation?.fields['Current Balance']);
 
-  const closedCount = projects.filter(p => p.fields.Status === 'Closed').length;
-  const visibleProjects = staleFirst(projects
-    .filter(p => showClosed || p.fields.Status !== 'Closed')
-    .sort((a, b) => (a.fields.Status === 'Closed') - (b.fields.Status === 'Closed')), statusOf);
+  const isProjectActive = (r) => r.fields.Status !== 'Closed';
+  const activeProjects = projects.filter(isProjectActive);
+  const inactiveProjects = projects.filter(r => !isProjectActive(r));
   const sortedPlatforms = staleFirst(
     [...platforms].sort((a, b) => num(b.fields['Current Balance']) - num(a.fields['Current Balance'])), statusOf);
 
@@ -63,7 +59,7 @@ export default function TradingTab() {
 
   return (
     <div className={selectedPlatform || selectedProject ? 'fin-has-panel' : undefined}>
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error || projectError} />
 
       {loading ? <SkeletonStats count={3} /> : (
         <div className="fin-stats">
@@ -82,7 +78,7 @@ export default function TradingTab() {
           <div className="fin-table-wrap">
             <table className="fin-table compact">
               <thead>
-                <tr><th className="status-col">Up to Date</th><th>Platform</th><th>Owner</th><th className="num">Current Balance</th><th className="num">Previous Balance</th><th>Delta</th><th /></tr>
+                <tr><th className="status-col">Up to Date</th><th>Platform</th><th>Owner</th><th className="num">Current Balance</th><th className="num">Previous Balance</th><th>Delta</th></tr>
               </thead>
               <tbody>
                 {sortedPlatforms.map(r => (
@@ -96,14 +92,13 @@ export default function TradingTab() {
                     <td className="num" style={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatCurrency(r.fields['Current Balance'])}</td>
                     <td className="num fin-muted">{formatCurrency(r.fields['Previous Balance'])}</td>
                     <td><Delta current={r.fields['Current Balance']} previous={r.fields['Previous Balance']} /></td>
-                    <td onClick={e => e.stopPropagation()}><button className="fin-btn sm" onClick={() => platformEditor.open(r)}>Edit</button></td>
                   </tr>
                 ))}
                 <tr>
                   <td /><td style={{ fontWeight: 700 }}>Total</td><td />
                   <td className="num" style={{ fontWeight: 800, color: 'var(--accent)' }}>{formatCurrency(platformTotal)}</td>
                   <td className="num fin-muted">{formatCurrency(platformPrev)}</td>
-                  <td><Delta current={platformTotal} previous={platformPrev} /></td><td />
+                  <td><Delta current={platformTotal} previous={platformPrev} /></td>
                 </tr>
               </tbody>
             </table>
@@ -134,69 +129,64 @@ export default function TradingTab() {
               </div>
               {liquidation.fields.Notes && <div className="fin-notes" style={{ marginTop: 8 }}>{liquidation.fields.Notes}</div>}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
-              <LiquidationUpdate record={liquidation} reload={reload} />
-              <button className="fin-btn sm" onClick={() => liquidationEditor.open(liquidation)}>Edit all fields</button>
-            </div>
+            <LiquidationUpdate record={liquidation} reload={reload} />
           </div>
         )}
       </div>
 
       {/* ---- Special Projects ---- */}
       <div className="fin-section">
-        <SectionHeader
-          title="Special Projects"
-          count={loading ? null : visibleProjects.length}
-          onAdd={() => projectEditor.open()}
-          right={closedCount > 0 && (
-            <label className="fin-link" style={{ cursor: 'pointer' }}>
-              <input type="checkbox" className="fin-inline-check" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} />
-              Show closed ({closedCount})
-            </label>
-          )}
-        />
-        {loading ? <SkeletonGrid count={2} /> : visibleProjects.length === 0 ? (
-          <EmptyState icon="🧪" message={projects.length ? 'All projects are closed.' : 'No special projects yet.'}
-            actionLabel="Add project" onAction={() => projectEditor.open()} />
+        <SectionHeader title="Special Projects" count={loading ? null : projects.length} onAdd={() => projectEditor.open()} />
+        {loading ? <SkeletonTable rows={3} /> : projects.length === 0 ? (
+          <EmptyState icon="🧪" message="No special projects yet." actionLabel="Add project" onAction={() => projectEditor.open()} />
         ) : (
-          <div className="fin-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
-            {visibleProjects.map(r => {
-              const f = r.fields;
-              const net = num(f['This Month Earned']) - num(f['This Month Spent']);
-              return (
-                <div key={r.id} className={`fin-card clickable${f.Status === 'Closed' ? ' inactive' : ''}${isSel('project', r.id) ? ' selected' : ''}`}
-                  onClick={() => setSelected({ kind: 'project', id: r.id })}>
-                  <div className="fin-card-top">
-                    <div className="fin-card-title-row">
-                      <StatusDot status={statusOf(r)} />
-                      <div className="fin-card-title">{f['Project Name'] || 'Untitled'}</div>
-                    </div>
-                    {f.Status && <Chip color={f.Status === 'Active' ? '#00E676' : undefined}>{f.Status}</Chip>}
-                  </div>
-                  <div className="fin-mini-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                    {PROJECT_FIELDS.map(([name, color]) => (
-                      <div key={name} className="fin-mini">
-                        <div className="fin-mini-label">{name}</div>
-                        <div className="fin-mini-value" style={color ? { color } : { color: 'var(--text-muted)' }}>{formatCurrency(f[name])}</div>
-                      </div>
-                    ))}
-                    <div className="fin-mini" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div className="fin-mini-label">Available Balance</div>
-                        <div className="fin-mini-value" style={{ fontSize: '1.3rem', color: 'var(--accent)' }}>{formatCurrency(projectAvailable(f))}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className="fin-mini-label">Net this month</div>
-                        <div style={{ fontWeight: 700, color: net >= 0 ? 'var(--positive)' : 'var(--negative)' }}>{formatCurrency(net)}</div>
-                      </div>
-                    </div>
-                  </div>
-                  {f.Notes && <div className="fin-notes">{f.Notes}</div>}
-                  <div className="fin-card-actions" onClick={e => e.stopPropagation()}><button className="fin-btn sm" onClick={() => projectEditor.open(r)}>Edit</button></div>
-                </div>
-              );
-            })}
-          </div>
+          <>
+            {activeProjects.length > 0 && (
+              <RecordTable
+                rows={activeProjects}
+                statusOf={statusOf}
+                selectedId={selected?.kind === 'project' ? selected.id : null}
+                onRowClick={r => setSelected({ kind: 'project', id: r.id })}
+                columns={[
+                  { key: 'status', label: 'Status', interactive: true, render: r => (
+                    <Switch on title="Active — click to close" disabled={projectPending === r.id}
+                      onChange={() => toggleProject(r, 'Status', 'Closed')} />) },
+                  { key: 'name', label: 'Project Name', className: 'cell-name', sort: r => r.fields['Project Name'] || '',
+                    render: r => r.fields['Project Name'] || 'Untitled' },
+                  { key: 'earned', label: 'This Month Earned', numeric: true, sort: r => num(r.fields['This Month Earned']),
+                    render: r => <span style={{ color: 'var(--positive)' }}>{formatCurrency(r.fields['This Month Earned'])}</span> },
+                  { key: 'spent', label: 'This Month Spent', numeric: true, sort: r => num(r.fields['This Month Spent']),
+                    render: r => <span style={{ color: 'var(--negative)' }}>{formatCurrency(r.fields['This Month Spent'])}</span> },
+                  { key: 'available', label: 'Available Balance', numeric: true, sort: r => num(projectAvailable(r.fields)),
+                    render: r => <strong style={{ color: 'var(--accent)' }}>{formatCurrency(projectAvailable(r.fields))}</strong> },
+                ]}
+              />
+            )}
+            {inactiveProjects.length > 0 && (
+              <>
+                <div className="fin-panel-label" style={{ margin: '1rem 0 0.5rem', color: 'var(--text-muted)' }}>Inactive</div>
+                <RecordTable
+                  rows={inactiveProjects}
+                  selectedId={selected?.kind === 'project' ? selected.id : null}
+                  onRowClick={r => setSelected({ kind: 'project', id: r.id })}
+                  rowClassName={() => 'inactive'}
+                  columns={[
+                    { key: 'status', label: 'Status', interactive: true, render: r => (
+                      <Switch on={false} title="Closed — click to reactivate" disabled={projectPending === r.id}
+                        onChange={() => toggleProject(r, 'Status', 'Active')} />) },
+                    { key: 'name', label: 'Project Name', className: 'cell-name', sort: r => r.fields['Project Name'] || '',
+                      render: r => r.fields['Project Name'] || 'Untitled' },
+                    { key: 'totalEarned', label: 'Total Earned', numeric: true, sort: r => num(r.fields['Total Earned']),
+                      render: r => formatCurrency(r.fields['Total Earned']) },
+                    { key: 'totalSpent', label: 'Total Spent', numeric: true, sort: r => num(r.fields['Total Spent']),
+                      render: r => formatCurrency(r.fields['Total Spent']) },
+                    { key: 'available', label: 'Available Balance', numeric: true, sort: r => num(projectAvailable(r.fields)),
+                      render: r => (Math.round(num(projectAvailable(r.fields)) * 100) === 0 ? '' : formatCurrency(projectAvailable(r.fields))) },
+                  ]}
+                />
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -206,17 +196,35 @@ export default function TradingTab() {
           record={selectedPlatform}
           reload={reload}
           onClose={() => setSelected(null)}
-          onEdit={() => platformEditor.open(selectedPlatform)}
           title={selectedPlatform.fields['Platform Name'] || 'Untitled'}
+          detailFields={['Platform Name', 'Owner', 'Notes']}
+          suggestions={{ Owner: distinct(platforms, 'Owner') }}
           subtitle={selectedPlatform.fields.Owner || null}
           chips={selectedPlatform.fields.Owner && <Chip>{selectedPlatform.fields.Owner}</Chip>}
         >
           <PanelNotes notes={selectedPlatform.fields.Notes} />
         </BalanceUpdatePanel>
       )}
-      {selectedProject && (
-        <ProjectPanel record={selectedProject} reload={reload} onClose={() => setSelected(null)}
-          onEdit={() => projectEditor.open(selectedProject)} />
+      {selectedProject && isProjectActive(selectedProject) && (
+        <ProjectPanel record={selectedProject} reload={reload} onClose={() => setSelected(null)} />
+      )}
+      {selectedProject && !isProjectActive(selectedProject) && (
+        <RecordDetailsPanel
+          table={T.SPECIAL_PROJECTS}
+          record={selectedProject}
+          reload={reload}
+          onClose={() => setSelected(null)}
+          title={selectedProject.fields['Project Name'] || 'Untitled'}
+          chips={<Chip>{selectedProject.fields.Status || 'Closed'}</Chip>}
+          fields={['Project Name', 'Status', 'Notes']}
+        >
+          <PanelSection label="Summary">
+            <PanelRow label="Total Earned">{formatCurrency(selectedProject.fields['Total Earned'])}</PanelRow>
+            <PanelRow label="Total Spent">{formatCurrency(selectedProject.fields['Total Spent'])}</PanelRow>
+            <PanelRow label="Available Balance"><strong style={{ color: 'var(--accent)' }}>{formatCurrency(projectAvailable(selectedProject.fields))}</strong></PanelRow>
+            <PanelRow label="Last Updated">{selectedProject.fields[LAST_UPDATED] ? formatDate(selectedProject.fields[LAST_UPDATED]) : 'Never'}</PanelRow>
+          </PanelSection>
+        </RecordDetailsPanel>
       )}
       {platformEditor.modal}
       {liquidationEditor.modal}
@@ -268,7 +276,7 @@ function LiquidationUpdate({ record, reload }) {
 
 /* ---- Special Projects side panel: monthly roll-over update ---- */
 
-function ProjectPanel({ record, reload, onClose, onEdit }) {
+function ProjectPanel({ record, reload, onClose }) {
   const cycle = useCycle();
   const f = record.fields;
   const status = cycleStatus(f[LAST_UPDATED], cycle);
@@ -318,8 +326,7 @@ function ProjectPanel({ record, reload, onClose, onEdit }) {
   }
 
   return (
-    <SidePanel title={f['Project Name'] || 'Untitled'} subtitle={null} onClose={onClose}
-      footer={<button className="fin-btn" onClick={onEdit}>Edit all fields</button>}>
+    <SidePanel title={f['Project Name'] || 'Untitled'} subtitle={null} onClose={onClose}>
       {f.Status && (
         <PanelSection><div className="fin-card-chips"><Chip color={f.Status === 'Active' ? '#00E676' : undefined}>{f.Status}</Chip></div></PanelSection>
       )}
@@ -331,7 +338,7 @@ function ProjectPanel({ record, reload, onClose, onEdit }) {
         <PanelRow label="Total Earned">{f['Total Earned'] != null ? formatCurrency(f['Total Earned']) : '—'}</PanelRow>
         <PanelRow label="Total Spent">{f['Total Spent'] != null ? formatCurrency(f['Total Spent']) : '—'}</PanelRow>
         <PanelRow label="Available Balance"><strong style={{ color: 'var(--accent)' }}>{formatCurrency(projectAvailable(f))}</strong></PanelRow>
-        {!hasTotals(f) && <span className="fin-hint">Total Earned / Total Spent aren’t set yet, so this shows the stored Available Balance. Set the totals via Edit all fields to include past months.</span>}
+        {!hasTotals(f) && <span className="fin-hint">Total Earned / Total Spent aren’t set yet, so this shows the stored Available Balance. Set the totals in Edit Details below to include past months.</span>}
         <PanelRow label="Last Updated">{f[LAST_UPDATED] ? formatDate(f[LAST_UPDATED]) : 'Never'}</PanelRow>
         <div className="fin-panel-row" style={{ alignItems: 'center' }}>
           <span className="fin-muted">Status</span>
@@ -354,6 +361,9 @@ function ProjectPanel({ record, reload, onClose, onEdit }) {
           </div>
         </form>
       </PanelSection>
+      {/* Total Earned / Total Spent are here so the running totals can be seeded or corrected. */}
+      <EditDetailsSection table={T.SPECIAL_PROJECTS} record={record} reload={reload} onDeleted={onClose}
+        fields={['Project Name', 'Status', 'Notes', 'Total Earned', 'Total Spent']} />
     </SidePanel>
   );
 }

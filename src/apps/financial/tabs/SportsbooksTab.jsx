@@ -8,7 +8,6 @@ export default function SportsbooksTab() {
       noun="Sportsbook"
       titleField="Book Name"
       ownerField="User"
-      chipField="Book Name"
       totalLabel="Total in Sportsbooks"
       emptyIcon="🎲"
       emptyMessage="No sportsbook balances tracked yet."

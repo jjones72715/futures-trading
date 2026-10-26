@@ -4,6 +4,9 @@ import { T, CHOICES } from '../config/airtable.js';
 import PillFilter, { ALL } from '../components/PillFilter.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
+import RecordTable from '../components/RecordTable.jsx';
+import { RecordDetailsPanel } from '../components/EditDetailsSection.jsx';
+import { FORMS } from '../config/forms.js';
 import { Chip, EmptyState, ErrorBanner, SkeletonStats, SkeletonTable, ShowInactiveToggle, Switch } from '../components/ui.jsx';
 import { formatCurrency, distinct, isActive, num } from '../utils/formatters.js';
 
@@ -13,37 +16,51 @@ const UNCATEGORIZED = 'Uncategorized';
 export const annualCost = (f) => num(f.Amount) * (PER_YEAR[f.Frequency] ?? 12);
 export const monthlyCost = (f) => annualCost(f) / 12;
 
+// Subscriptions aren't balance-based, so there's no reconciliation status here — the side panel
+// is a plain details editor.
 export default function SubscriptionsTab() {
   const { data, loading, error, reload } = useTables([T.SUBSCRIPTIONS]);
   const [owner, setOwner] = useState(ALL);
   const [showInactive, setShowInactive] = useState(false);
-  const [collapsed, setCollapsed] = useState({});
+  const [selectedId, setSelectedId] = useState(null);
 
   const subs = data[T.SUBSCRIPTIONS];
   const owners = distinct(subs, 'Owner');
+  const selected = subs.find(r => r.id === selectedId) || null;
   const editor = useRecordEditor({ table: T.SUBSCRIPTIONS, noun: 'Subscription', reload, suggestions: { Owner: owners } });
   const { toggle, pending, error: toggleError } = useFieldToggle(T.SUBSCRIPTIONS, reload);
 
   const byOwner = subs.filter(r => owner === ALL || r.fields.Owner === owner);
   const active = byOwner.filter(isActive);
   const inactiveCount = byOwner.length - active.length;
-  const visible = showInactive ? byOwner : active;
+  const visible = (showInactive ? byOwner : active)
+    .sort((a, b) => (isActive(b) - isActive(a)) || monthlyCost(b.fields) - monthlyCost(a.fields));
 
   const totalAnnual = active.reduce((s, r) => s + annualCost(r.fields), 0);
   const totalMonthly = totalAnnual / 12;
 
-  const categories = [...CHOICES.SUB_CATEGORY, ...distinct(visible, 'Category').filter(c => !CHOICES.SUB_CATEGORY.includes(c)), UNCATEGORIZED];
-  const groups = categories
-    .map(cat => ({
-      cat,
-      items: visible
-        .filter(r => (r.fields.Category || UNCATEGORIZED) === cat)
-        .sort((a, b) => (isActive(b) - isActive(a)) || monthlyCost(b.fields) - monthlyCost(a.fields)),
-    }))
-    .filter(g => g.items.length);
+  const dash = <span className="fin-faint">—</span>;
+  const columns = [
+    { key: 'name', label: 'Name', sort: r => r.fields.Name || '', className: 'cell-name',
+      render: r => <>{r.fields.Name || 'Untitled'}{r.fields['Auto Pay'] && <span className="fin-tag-muted">· auto pay</span>}</> },
+    { key: 'owner', label: 'Owner', sort: r => r.fields.Owner || '', render: r => (r.fields.Owner ? <Chip>{r.fields.Owner}</Chip> : dash) },
+    { key: 'amount', label: 'Amount', numeric: true, sort: r => monthlyCost(r.fields),
+      render: r => (
+        <>
+          <strong>{formatCurrency(r.fields.Amount)}</strong>
+          {r.fields.Frequency && r.fields.Frequency !== 'Monthly' && (
+            <span className="fin-tag-muted">{formatCurrency(monthlyCost(r.fields))}/mo</span>
+          )}
+        </>
+      ) },
+    { key: 'frequency', label: 'Frequency', sort: r => r.fields.Frequency || '', render: r => r.fields.Frequency || dash },
+    { key: 'due', label: 'Next Due', sort: r => r.fields['Due Date'] || '', render: r => r.fields['Due Date'] || dash },
+    { key: 'active', label: 'Active', interactive: true,
+      render: r => <Switch on={isActive(r)} onChange={v => toggle(r, 'Active', v)} disabled={pending === r.id} /> },
+  ];
 
   return (
-    <div>
+    <div className={selected ? 'fin-has-panel' : undefined}>
       <ErrorBanner error={error || toggleError} />
       <div className="fin-toolbar">
         <PillFilter options={owners} value={owner} onChange={setOwner} />
@@ -61,67 +78,36 @@ export default function SubscriptionsTab() {
         </div>
       )}
 
-      {loading ? <SkeletonTable rows={8} /> : groups.length === 0 ? (
+      {loading ? <SkeletonTable rows={8} /> : visible.length === 0 ? (
         <EmptyState icon="🔁" message={subs.length ? 'Nothing matches this filter.' : 'No subscriptions or recurring bills yet.'}
           actionLabel="Add subscription" onAction={() => editor.open()} />
       ) : (
-        <div className="fin-table-wrap">
-          <table className="fin-table">
-            <thead>
-              <tr>
-                <th>Name</th><th className="num">Amount</th><th>Frequency</th><th>Due Date</th><th>Category</th>
-                <th>Owner</th><th>Auto Pay</th><th>Active</th><th />
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map(g => {
-                const isCollapsed = !!collapsed[g.cat];
-                const catMonthly = g.items.filter(isActive).reduce((s, r) => s + monthlyCost(r.fields), 0);
-                return [
-                  <tr key={`h-${g.cat}`} className="group-row" onClick={() => setCollapsed(c => ({ ...c, [g.cat]: !c[g.cat] }))}>
-                    <td colSpan={9}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                        <span>
-                          <span className={`fin-sh-caret${isCollapsed ? ' closed' : ''}`} style={{ marginRight: 8 }}>▼</span>
-                          {g.cat} <span className="fin-faint" style={{ fontWeight: 400 }}>({g.items.length})</span>
-                        </span>
-                        <span>
-                          {formatCurrency(catMonthly)}<span className="fin-muted" style={{ fontWeight: 400 }}>/mo</span>
-                          <span className="fin-faint" style={{ fontWeight: 400, marginLeft: 10 }}>{formatCurrency(catMonthly * 12)}/yr</span>
-                        </span>
-                      </div>
-                    </td>
-                  </tr>,
-                  ...(isCollapsed ? [] : g.items.map(r => {
-                    const f = r.fields;
-                    const on = isActive(r);
-                    return (
-                      <tr key={r.id} className={on ? '' : 'row-muted'}>
-                        <td style={{ fontWeight: 600 }}>{f.Name}</td>
-                        <td className="num" style={{ fontWeight: 700 }}>
-                          {formatCurrency(f.Amount)}
-                          {f.Frequency && f.Frequency !== 'Monthly' && (
-                            <div className="fin-faint" style={{ fontSize: '0.7rem', fontWeight: 400 }}>{formatCurrency(monthlyCost(f))}/mo</div>
-                          )}
-                        </td>
-                        <td>{f.Frequency || '—'}</td>
-                        <td>{f['Due Date'] || '—'}</td>
-                        <td>{f.Category ? <Chip color="#00D4FF">{f.Category}</Chip> : '—'}</td>
-                        <td>{f.Owner ? <Chip>{f.Owner}</Chip> : '—'}</td>
-                        <td>
-                          <input type="checkbox" className="fin-inline-check" checked={f['Auto Pay'] === true}
-                            disabled={pending === r.id} onChange={e => toggle(r, 'Auto Pay', e.target.checked)} />
-                        </td>
-                        <td><Switch on={on} disabled={pending === r.id} onChange={v => toggle(r, 'Active', v)} /></td>
-                        <td><button className="fin-btn sm" onClick={() => editor.open(r)}>Edit</button></td>
-                      </tr>
-                    );
-                  })),
-                ];
-              })}
-            </tbody>
-          </table>
-        </div>
+        <RecordTable
+          columns={columns}
+          rows={visible}
+          selectedId={selectedId}
+          onRowClick={r => setSelectedId(r.id)}
+          rowClassName={r => (isActive(r) ? '' : 'inactive')}
+          group={{
+            by: r => r.fields.Category || UNCATEGORIZED,
+            order: [...CHOICES.SUB_CATEGORY, UNCATEGORIZED],
+            totalKey: 'amount',
+            total: items => <>{formatCurrency(items.filter(isActive).reduce((s, r) => s + monthlyCost(r.fields), 0))}<span className="fin-muted" style={{ fontWeight: 400 }}>/mo</span></>,
+          }}
+        />
+      )}
+
+      {selected && (
+        <RecordDetailsPanel
+          table={T.SUBSCRIPTIONS}
+          record={selected}
+          reload={reload}
+          onClose={() => setSelectedId(null)}
+          title={selected.fields.Name || 'Untitled'}
+          subtitle={[selected.fields.Category, selected.fields.Owner].filter(Boolean).join(' · ') || null}
+          fields={FORMS[T.SUBSCRIPTIONS].map(s => s.name)}
+          suggestions={{ Owner: owners }}
+        />
       )}
       {editor.modal}
     </div>

@@ -23,7 +23,7 @@ export default function Modal({ title, onClose, children, footer }) {
   );
 }
 
-function toFormValue(spec, raw) {
+export function toFormValue(spec, raw) {
   if (spec.type === 'checkbox') return raw === true;
   if (raw == null) return '';
   if (spec.type === 'percent') return String(Math.round(raw * 10000) / 100);
@@ -37,7 +37,7 @@ function parseNumber(str) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-function toAirtableValue(spec, value) {
+export function toAirtableValue(spec, value) {
   switch (spec.type) {
     case 'checkbox': return !!value;
     case 'currency':
@@ -53,7 +53,7 @@ function toAirtableValue(spec, value) {
   }
 }
 
-function Field({ spec, value, onChange, listId }) {
+export function Field({ spec, value, onChange, listId }) {
   const set = (e) => onChange(spec.type === 'checkbox' ? e.target.checked : e.target.value);
   if (spec.type === 'checkbox') {
     return (

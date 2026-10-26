@@ -3,6 +3,7 @@ import SidePanel, { PanelSection, PanelRow } from './SidePanel.jsx';
 import CurrencyInput from './CurrencyInput.jsx';
 import { StatusPill } from './Status.jsx';
 import { Switch } from './ui.jsx';
+import EditDetailsSection from './EditDetailsSection.jsx';
 import { updateRecord } from '../services/financialService.js';
 import { useCycle, cycleStatus, LAST_UPDATED } from '../hooks/useCycle.jsx';
 import { formatCurrency, formatDate, localIsoDate, num, parseAmount } from '../utils/formatters.js';
@@ -16,9 +17,10 @@ const toInput = (v) => (v == null ? '' : String(v));
  * Saving writes Previous = the "Previous" input, Current = the "Current" input, Last Updated = today,
  * plus any `extraInputs` ({ field, label }), then reloads so the row's status dot updates immediately.
  * `invert` colors the change for debts (a rising balance is bad).
+ * `detailFields` adds a collapsible Edit Details section (non-balance fields, Save + Delete).
  */
 export default function BalanceUpdatePanel({
-  table, record, reload, onClose, onEdit,
+  table, record, reload, onClose, detailFields, suggestions,
   title, subtitle, chips,
   currentField = 'Current Balance', previousField = 'Previous Balance',
   currentLabel = 'Current Balance', previousLabel = 'Previous Balance',
@@ -75,8 +77,7 @@ export default function BalanceUpdatePanel({
   }
 
   return (
-    <SidePanel title={title} subtitle={subtitle} onClose={onClose}
-      footer={onEdit && <button className="fin-btn" onClick={onEdit}>Edit all fields</button>}>
+    <SidePanel title={title} subtitle={subtitle} onClose={onClose}>
       {chips && <PanelSection><div className="fin-card-chips">{chips}</div></PanelSection>}
 
       <PanelSection label="Balance History">
@@ -110,6 +111,11 @@ export default function BalanceUpdatePanel({
       </PanelSection>
 
       {children}
+
+      {detailFields && (
+        <EditDetailsSection table={table} record={record} fields={detailFields} reload={reload}
+          onDeleted={onClose} suggestions={suggestions} />
+      )}
     </SidePanel>
   );
 }

@@ -3,13 +3,13 @@ import { useTables, useFieldToggle } from '../hooks/useTables.js';
 import { T, CHOICES } from '../config/airtable.js';
 import PillFilter, { ALL } from '../components/PillFilter.jsx';
 import SectionHeader from '../components/SectionHeader.jsx';
-import BalanceCard from '../components/BalanceCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { useRecordEditor } from '../components/Modal.jsx';
-import BalanceUpdatePanel, { PanelNotes, PanelActive } from '../components/BalanceUpdatePanel.jsx';
+import RecordTable, { ChangeCell } from '../components/RecordTable.jsx';
+import BalanceUpdatePanel from '../components/BalanceUpdatePanel.jsx';
 import { PanelRow } from '../components/SidePanel.jsx';
-import { useRecordStatus, staleFirst } from '../hooks/useCycle.jsx';
-import { Chip, EmptyState, ErrorBanner, SkeletonGrid, SkeletonStats, ShowInactiveToggle } from '../components/ui.jsx';
+import { useRecordStatus } from '../hooks/useCycle.jsx';
+import { Chip, EmptyState, ErrorBanner, SkeletonStats, SkeletonTable, ShowInactiveToggle, Switch } from '../components/ui.jsx';
 import { formatCurrency, distinct, isActive, sumField, num } from '../utils/formatters.js';
 
 const KEYS = [T.ASSETS, T.LIABILITIES];
@@ -20,16 +20,16 @@ function formatRate(rate) {
 }
 
 /**
- * One pill-filtered section (Assets or Liabilities), with cards grouped into
- * collapsible category headers. `invert` flips delta colors for debts.
+ * One section (Assets or Liabilities): owner pills, then a compact table grouped by
+ * category with a subtotal per category and a section total. Clicking a row opens the
+ * side panel, where all editing happens. `invert` flips change colors for debts.
  */
 function CategorySection({
   title, table, noun, records, reload, categories, valueField, prevField, valueLabel, prevLabel, invert,
-  emptyIcon, emptyMessage, renderExtra, panelRows,
+  emptyIcon, emptyMessage, panelRows, detailFields,
 }) {
   const [owner, setOwner] = useState(ALL);
   const [showInactive, setShowInactive] = useState(false);
-  const [collapsed, setCollapsed] = useState({});
   const [open, setOpen] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const statusOf = useRecordStatus();
@@ -41,17 +41,26 @@ function CategorySection({
 
   const byOwner = records.filter(r => owner === ALL || r.fields.Owner === owner);
   const inactiveCount = byOwner.filter(r => !isActive(r)).length;
-  const visible = byOwner.filter(r => showInactive || isActive(r));
+  const visible = byOwner
+    .filter(r => showInactive || isActive(r))
+    .sort((a, b) => (isActive(b) - isActive(a)) || num(b.fields[valueField]) - num(a.fields[valueField]));
+  const activeVisible = visible.filter(isActive);
+  const debt = invert ? { color: 'var(--negative)' } : undefined;
 
-  const allCategories = [...categories, ...distinct(visible, 'Category').filter(c => !categories.includes(c)), UNCATEGORIZED];
-  const groups = allCategories
-    .map(cat => ({
-      cat,
-      items: staleFirst(visible
-        .filter(r => (r.fields.Category || UNCATEGORIZED) === cat)
-        .sort((a, b) => (isActive(b) - isActive(a)) || num(b.fields[valueField]) - num(a.fields[valueField])), statusOf),
-    }))
-    .filter(g => g.items.length);
+  const columns = [
+    { key: 'name', label: 'Name', sort: r => r.fields.Name || '', className: 'cell-name', render: r => r.fields.Name || 'Untitled' },
+    { key: 'category', label: 'Category', sort: r => r.fields.Category || '',
+      render: r => (r.fields.Category ? <Chip color="#00D4FF">{r.fields.Category}</Chip> : <span className="fin-faint">—</span>) },
+    { key: 'owner', label: 'Owner', sort: r => r.fields.Owner || '', render: r => r.fields.Owner || <span className="fin-faint">—</span> },
+    { key: 'current', label: valueLabel, numeric: true, sort: r => num(r.fields[valueField]),
+      render: r => <strong style={debt}>{formatCurrency(r.fields[valueField])}</strong> },
+    { key: 'previous', label: prevLabel, numeric: true, sort: r => num(r.fields[prevField]),
+      render: r => <span className="fin-muted">{formatCurrency(r.fields[prevField])}</span> },
+    { key: 'change', label: 'Change', numeric: true, sort: r => num(r.fields[valueField]) - num(r.fields[prevField]),
+      render: r => <ChangeCell current={r.fields[valueField]} previous={r.fields[prevField]} invert={invert} /> },
+    { key: 'active', label: 'Active', interactive: true,
+      render: r => <Switch on={isActive(r)} onChange={v => toggle(r, 'Active', v)} disabled={pending === r.id} /> },
+  ];
 
   return (
     <div className={`fin-section${selected ? ' fin-has-panel' : ''}`}>
@@ -71,62 +80,42 @@ function CategorySection({
               <PillFilter options={owners} value={owner} onChange={setOwner} />
             </div>
           )}
-          {groups.length === 0 ? (
+          {visible.length === 0 ? (
             <EmptyState icon={emptyIcon} message={records.length ? 'Nothing matches this filter.' : emptyMessage}
               actionLabel={`Add ${noun.toLowerCase()}`} onAction={() => editor.open()} />
-          ) : groups.map(g => {
-            const isCollapsed = !!collapsed[g.cat];
-            const groupTotal = sumField(g.items.filter(isActive), valueField);
-            return (
-              <div key={g.cat} className="fin-group">
-                <button type="button" className="fin-group-head" onClick={() => setCollapsed(c => ({ ...c, [g.cat]: !c[g.cat] }))}>
-                  <span>
-                    <span className={`fin-sh-caret${isCollapsed ? ' closed' : ''}`} style={{ marginRight: 8 }}>▼</span>
-                    {g.cat} <span className="fin-faint" style={{ fontWeight: 400 }}>({g.items.length})</span>
-                  </span>
-                  <span>{formatCurrency(groupTotal)}</span>
-                </button>
-                {!isCollapsed && (
-                  <div className="fin-grid">
-                    {g.items.map(r => {
-                      const f = r.fields;
-                      return (
-                        <BalanceCard
-                          key={r.id}
-                          title={f.Name || 'Untitled'}
-                          chips={<>
-                            {f.Category && <Chip color="#00D4FF">{f.Category}</Chip>}
-                            {f.Owner && <Chip>{f.Owner}</Chip>}
-                          </>}
-                          current={f[valueField]}
-                          previous={f[prevField]}
-                          invert={invert}
-                          extra={renderExtra?.(f)}
-                          notes={f.Notes}
-                          active={isActive(r)}
-                          toggling={pending === r.id}
-                          onToggleActive={v => toggle(r, 'Active', v)}
-                          onEdit={() => editor.open(r)}
-                          status={statusOf(r)}
-                          selected={r.id === selectedId}
-                          onClick={() => setSelectedId(r.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          ) : (
+            <RecordTable
+              columns={columns}
+              rows={visible}
+              statusOf={statusOf}
+              selectedId={selectedId}
+              onRowClick={r => setSelectedId(r.id)}
+              rowClassName={r => (isActive(r) ? '' : 'inactive')}
+              group={{
+                by: r => r.fields.Category || UNCATEGORIZED,
+                order: [...categories, UNCATEGORIZED],
+                totalKey: 'current',
+                total: items => <span style={debt}>{formatCurrency(sumField(items.filter(isActive), valueField))}</span>,
+              }}
+              footer={{
+                label: `Total ${title}`,
+                cells: {
+                  current: <span style={debt}>{formatCurrency(sumField(activeVisible, valueField))}</span>,
+                  previous: <span className="fin-muted">{formatCurrency(sumField(activeVisible, prevField))}</span>,
+                  change: <ChangeCell current={sumField(activeVisible, valueField)} previous={sumField(activeVisible, prevField)} invert={invert} />,
+                },
+              }}
+            />
+          )}
         </>
       )}
+
       {selected && (
         <BalanceUpdatePanel
           table={table}
           record={selected}
           reload={reload}
           onClose={() => setSelectedId(null)}
-          onEdit={() => editor.open(selected)}
           title={selected.fields.Name || 'Untitled'}
           subtitle={[selected.fields.Category, selected.fields.Owner].filter(Boolean).join(' · ') || null}
           chips={<>
@@ -139,10 +128,9 @@ function CategorySection({
           previousLabel={prevLabel}
           invert={invert}
           historyRows={panelRows?.(selected.fields)}
-        >
-          <PanelNotes notes={selected.fields.Notes} />
-          <PanelActive active={isActive(selected)} onToggle={v => toggle(selected, 'Active', v)} toggling={pending === selected.id} />
-        </BalanceUpdatePanel>
+          detailFields={detailFields}
+          suggestions={{ Owner: owners }}
+        />
       )}
       {editor.modal}
     </div>
@@ -172,8 +160,8 @@ export default function AssetsLiabilitiesTab() {
 
       {loading ? (
         <>
-          <div className="fin-section"><SectionHeader title="Assets" /><SkeletonGrid count={3} /></div>
-          <div className="fin-section"><SectionHeader title="Liabilities" /><SkeletonGrid count={3} /></div>
+          <div className="fin-section"><SectionHeader title="Assets" /><SkeletonTable rows={4} /></div>
+          <div className="fin-section"><SectionHeader title="Liabilities" /><SkeletonTable rows={4} /></div>
         </>
       ) : (
         <>
@@ -190,6 +178,7 @@ export default function AssetsLiabilitiesTab() {
             prevLabel="Previous Value"
             emptyIcon="🏠"
             emptyMessage="No assets yet — add your home, vehicles and other property."
+            detailFields={['Name', 'Category', 'Owner', 'Notes', 'Active']}
           />
           <CategorySection
             title="Liabilities"
@@ -209,12 +198,7 @@ export default function AssetsLiabilitiesTab() {
               {f['Interest Rate'] != null && <PanelRow label="Interest Rate">{formatRate(f['Interest Rate'])}</PanelRow>}
               {f['Original Amount'] != null && <PanelRow label="Original Amount">{formatCurrency(f['Original Amount'])}</PanelRow>}
             </>}
-            renderExtra={f => (f['Interest Rate'] != null || f['Original Amount'] != null) && (
-              <div style={{ fontSize: '0.78rem', display: 'flex', gap: 10, flexWrap: 'wrap' }} className="fin-muted">
-                {f['Interest Rate'] != null && <span style={{ color: 'var(--text)', fontWeight: 600 }}>{formatRate(f['Interest Rate'])}</span>}
-                {f['Original Amount'] != null && <span>Original {formatCurrency(f['Original Amount'])}</span>}
-              </div>
-            )}
+            detailFields={['Name', 'Category', 'Owner', 'Original Amount', 'Interest Rate', 'Notes', 'Active']}
           />
         </>
       )}
