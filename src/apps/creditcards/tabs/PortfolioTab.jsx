@@ -10,6 +10,7 @@ import { TotalPerkValueCell, DifferenceCell } from '../components/NetValueGroup.
 import { sumPerkValue } from '../utils/perks.js';
 import { AddCardPanel } from '../components/AddCardPanel.jsx';
 import { AddAuthorizedUserPanel } from '../components/AddAuthorizedUserPanel.jsx';
+import { EditCardPanel } from '../components/EditCardPanel.jsx';
 
 const BANK_NAMES = {
   'recmOSLhOAYVqi09z': 'American Express',
@@ -45,6 +46,7 @@ const FIELDS = [
   'Personal/Business',
   'Annual Fee Amount',
   'Days Until Annual Fee',
+  'Open Date',
   'Decision',
   'Status',
   'Owner',
@@ -55,7 +57,7 @@ const FIELDS = [
 const PERK_INSTANCE_FIELDS = ['Card', 'Value'];
 const SPEND_BONUS_FIELDS = ['Card', 'Value'];
 
-const ROW_COLUMNS = '1.7fr 65px 80px 0.8fr 80px 100px 90px 65px 95px 120px 60px';
+const ROW_COLUMNS = '1.7fr 65px 80px 0.8fr 80px 100px 90px 65px 95px 95px 70px 120px 60px';
 
 function resolveIssuer(raw) {
   if (!raw) return 'Unknown';
@@ -83,6 +85,21 @@ function addDays(date, n) {
 function fmtDate(d) {
   if (!d) return '—';
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
+function fmtOpenDate(dateStr) {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-');
+  return `${parseInt(m)}/${parseInt(d)}/${y}`;
+}
+
+function yearsOpenStr(dateStr) {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const opened = new Date(y, m - 1, d);
+  const years = (Date.now() - opened.getTime()) / (365.25 * 24 * 3600 * 1000);
+  if (years < 0) return '—';
+  return `${years.toFixed(1)}y`;
 }
 
 function PillBtn({ active, onClick, children }) {
@@ -141,6 +158,7 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
   const { netValue, hasAnyValue } = sumPerkValue(instances);
   const cardName = stripOwnerPrefix(f['Card Name'], ownerIds.length ? PEOPLE[ownerIds[0]] : null) || '—';
   const last4 = f['Last 4/Last 5 (AMEX)'] || null;
+  const openDate = f['Open Date'] || null;
 
   return (
     <div
@@ -215,6 +233,14 @@ function PortfolioRow({ card, personNameById, instances, onOpen }) {
         {feeDate ? fmtDate(feeDate) : ''}
       </div>
 
+      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
+        {fmtOpenDate(openDate)}
+      </div>
+
+      <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
+        {yearsOpenStr(openDate)}
+      </div>
+
       <div>
         <DecisionBadge decision={f['Decision']} />
       </div>
@@ -280,6 +306,12 @@ export function PortfolioTab() {
     clearCardSummaryCache();
     setPanel(null);
     load();
+  }
+
+  function handleCardEdited(id) {
+    clearCardSummaryCache();
+    load();
+    setPanel({ type: 'card', id });
   }
 
   const issuerOptions = ['All', ...new Set(cards.map(c => resolveIssuer(c.fields['Issuer'])))].sort((a, b) => {
@@ -374,7 +406,7 @@ export function PortfolioTab() {
           display: 'grid', gridTemplateColumns: ROW_COLUMNS, gap: '0.75rem',
           padding: '0.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}>
-          {['Card', 'Last 4/5', 'Type', 'Person', 'Annual Fee', 'Total Perk Value', 'Difference', 'Days', 'Fee Date', 'Decision', 'AUs'].map((h, i) => (
+          {['Card', 'Last 4/5', 'Type', 'Person', 'Annual Fee', 'Total Perk Value', 'Difference', 'Days', 'Fee Date', 'Opened', 'Years Open', 'Decision', 'AUs'].map((h, i) => (
             <span key={i} style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {h}
             </span>
@@ -407,7 +439,18 @@ export function PortfolioTab() {
       </div>
 
       {panel?.type === 'card' && (
-        <CardSummaryPanel cardId={panel.id} onClose={() => setPanel(null)} />
+        <CardSummaryPanel
+          cardId={panel.id}
+          onClose={() => setPanel(null)}
+          onEdit={id => setPanel({ type: 'edit-card', id })}
+        />
+      )}
+      {panel?.type === 'edit-card' && (
+        <EditCardPanel
+          cardId={panel.id}
+          onClose={() => setPanel({ type: 'card', id: panel.id })}
+          onSaved={() => handleCardEdited(panel.id)}
+        />
       )}
       {panel?.type === 'add-card' && (
         <AddCardPanel onClose={() => setPanel(null)} onCreated={handleCardCreated} />

@@ -181,7 +181,7 @@ function Skeleton() {
   );
 }
 
-export function CardSummaryPanel({ cardId, onClose }) {
+export function CardSummaryPanel({ cardId, onClose, onEdit }) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -686,6 +686,22 @@ export function CardSummaryPanel({ cardId, onClose }) {
                   </>
                 )}
               </div>
+
+              <Divider />
+
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(cardId)}
+                  style={{
+                    padding: '0.75rem 1.5rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                    background: 'rgba(255,255,255,0.06)', color: '#fff', fontWeight: 600, fontSize: '0.88rem',
+                    cursor: 'pointer', alignSelf: 'flex-start',
+                  }}
+                >
+                  ✎ Edit Card Details
+                </button>
+              )}
             </>
           )}
         </div>
