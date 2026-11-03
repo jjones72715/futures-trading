@@ -11,6 +11,7 @@ import { FirmUsageTab } from "./components/FirmUsageTab.jsx";
 import { TradeLogTab } from "./components/TradeLogTab.jsx";
 import { AdvanceDayModal } from "./components/AdvanceDayModal.jsx";
 import { ValueRankingsTab } from "./tabs/ValueRankingsTab.jsx";
+import { DiscordBotTab } from "./tabs/DiscordBotTab.jsx";
 
 export default function App() {
   const [perfAccounts, setPerfAccounts] = useState([]);
@@ -445,6 +446,7 @@ export default function App() {
             ["traderpl", "💹 Trader P&L"],
             ["tradelog", "📓 Trade Log"],
             ["valuerankings", "🏆 Value Rankings"],
+            ["discordbot", "🤖 Discord Bot"],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               style={{ background: tab === key ? "#ffd700" : "#e5e5e5", color: "#000", border: `1px solid ${tab === key ? "#d4a800" : "#c8c8c8"}`, borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: tab === key ? 800 : 600, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -462,6 +464,7 @@ export default function App() {
               {tab === "firms" && <FirmUsageTab evalAccounts={evalAccounts} perfAccounts={perfAccounts} />}
               {tab === "tradelog" && <TradeLogTab />}
               {tab === "valuerankings" && <ValueRankingsTab />}
+              {tab === "discordbot" && <DiscordBotTab />}
             </div>
             </div>
         );
