@@ -10,3 +10,4 @@ export const PAYOUT_STRATEGIES_TABLE = "tbljLby6v0o6fydOw";
 export const FIRMS_TABLE = "tblR0iLSQZI1xXYa6";
 export const TRADE_ANALYTICS_TABLE = "tbl6HGXopi8uzdl4V";
 export const DISCORD_SOURCES_TABLE = "tblNtTr4yT4cXBVQZ";
+export const BOT_CONFIG_TABLE = "tblOk0hdWYcnwkgKr";
