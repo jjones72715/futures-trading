@@ -22,10 +22,9 @@ export function FirmUsageTab() {
         const fMap = {};
         firmRecords.forEach(r => { fMap[r.id] = r; });
 
-        // ROI Ratio per firm — computed client-side from linked Performance
-        // Account Types (the Firms table's "Best Value Score" rollup is broken
-        // and unused here), same logic the pullout panel's Best Account section uses.
-        const perfTypeRecords = await fetchTable(PERF_TYPES_TABLE, ["Name", "ROI Ratio (Unlimited)", "Firm"]);
+        // Best ROI per firm — computed client-side from linked Performance
+        // Account Types, same logic the pullout panel's Best Account section uses.
+        const perfTypeRecords = await fetchTable(PERF_TYPES_TABLE, ["Name", "ROI", "Firm"]);
         const perfTypesByFirm = {};
         perfTypeRecords.forEach(r => {
           (r.fields["Firm"] || []).forEach(firmId => {
@@ -189,7 +188,7 @@ export function FirmUsageTab() {
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Rank</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Firm</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Reputation Score</div>
-                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>ROI Ratio</div>
+                <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>ROI</div>
                 <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700, textAlign: "center" }}>Max Accounts</div>
                 {traderLabels.map(t => (
                   <div key={t} style={{ fontSize: 11, color: pc.text, fontWeight: 700, textAlign: "center" }}>{t}</div>

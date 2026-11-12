@@ -292,7 +292,7 @@ export function FirmDetailPanel({ firmId, firmName, onClose }) {
 
               {bestAccount && (
                 <StatCard label="Best Account">
-                  {bestAccount.name} — ROI Ratio: {typeof bestAccount.roiRatio === "number" ? bestAccount.roiRatio.toFixed(2) : bestAccount.roiRatio}
+                  {bestAccount.name} — ROI: {typeof bestAccount.roiRatio === "number" ? bestAccount.roiRatio.toFixed(2) : bestAccount.roiRatio}
                 </StatCard>
               )}
 

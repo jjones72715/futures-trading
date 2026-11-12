@@ -4,9 +4,8 @@ import { loadValueRankingsData } from "../services/valueRankingsService.js";
 const PROVIDER_ORDER = ["DX Feed", "Rithmic", "Tradovate", "Project X"];
 
 const METRICS = [
-  { key: "roiUnlimited",    label: "ROI Unlimited" },
-  { key: "roiSinglePayout", label: "ROI Single Payout" },
-  { key: "roiReset",        label: "ROI Reset" },
+  { key: "roi",      label: "ROI" },
+  { key: "roiReset", label: "Reset ROI" },
 ];
 
 function roiColor(v) {
@@ -55,7 +54,7 @@ export function ValueRankingsTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [metric, setMetric] = useState("roiUnlimited");
+  const [metric, setMetric] = useState("roi");
   const [selectedTrader, setSelectedTrader] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null); // "dp::firmKey" — only one at a time
 
