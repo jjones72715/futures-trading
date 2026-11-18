@@ -4,6 +4,7 @@ import {
   CARD_PRODUCTS_TABLE, PERK_DEFINITIONS_TABLE, CARD_POTENTIAL_VALUES_TABLE, BANKS_TABLE,
 } from '../config/tables.js';
 import { StatCard } from '../components/StatCard.jsx';
+import { InfoIcon } from '../components/InfoIcon.jsx';
 import { $$ } from '../utils/format.js';
 
 const PERSONS = ['Jonathan', 'Sherry', 'Judy', 'Wade', 'Amanda'];
@@ -231,7 +232,10 @@ function PerkRow({ perk, cpvRow, onSave }) {
       padding: '0.6rem 0.75rem', borderRadius: 8, background: '#172033',
       border: hasRow ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.15)',
     }}>
-      <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>{perk.fields['Perk Name'] || '—'}</span>
+      <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+        {perk.fields['Perk Name'] || '—'}
+        <InfoIcon note={perk.fields['Notes']} />
+      </span>
       <div>
         <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', fontWeight: 600 }}>FM Face</div>
         <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.4)' }}>{faceValue != null ? $$(faceValue) : '—'}</div>
