@@ -6,8 +6,10 @@ import {
 import { StatCard } from '../components/StatCard.jsx';
 import { $$ } from '../utils/format.js';
 
-const PERSONS = ['Jonathan', 'Cherelyn', 'Business'];
-const PERSON_COLORS = { Jonathan: '#00D4FF', Cherelyn: '#B388FF', Business: '#FFD60A' };
+const PERSONS = ['Jonathan', 'Sherry', 'Judy', 'Wade', 'Amanda'];
+const PERSON_COLORS = {
+  Jonathan: '#00D4FF', Sherry: '#B388FF', Judy: '#FFD60A', Wade: '#FF6D45', Amanda: '#22c55e',
+};
 const TYPE_OPTIONS = ['All', 'Personal', 'Business'];
 
 const CARD_PRODUCT_FIELDS = ['Product Name', 'Issuer', 'Personal/Business', 'Annual Fee'];
@@ -434,7 +436,10 @@ export function CardPotentialValuesTab() {
   }
 
   const enriched = useMemo(() => {
-    return products.map(p => {
+    // Only cards that exist in the FM spreadsheet — identified by having at least
+    // one Perk Definition linked from the bulk import. Every other Card Product
+    // (the other 190+ rows in the full Card Products table) is out of scope here.
+    return products.filter(p => (perkDefsByProduct[p.id] || []).length > 0).map(p => {
       const issuerId = (p.fields['Issuer'] || [])[0];
       const issuerName = banksById[issuerId] || 'Unknown';
       const annualFee = p.fields['Annual Fee'] ?? 0;
