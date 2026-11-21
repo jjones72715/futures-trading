@@ -4,7 +4,9 @@ import { T } from '../config/airtable.js';
 
 // Monthly reconciliation cycle. The cutoff is the Date of the most recent Monthly Net Worth
 // snapshot, fetched once per page load. A record is "Up to Date" when its Last Updated date
-// is on or after the cutoff (or, before any snapshot exists, when it has been updated at all).
+// is strictly after the cutoff — an update dated the same day as the snapshot belongs to that
+// snapshot's cycle, so it still Needs Update. Before any snapshot exists, a record is Up to Date
+// once it has been updated at all.
 
 export const LAST_UPDATED = 'Last Updated';
 
@@ -35,7 +37,7 @@ export function cycleStatus(lastUpdated, { cutoff, loading }) {
   if (loading) return null;
   if (!lastUpdated) return 'stale';
   if (!cutoff) return 'current';
-  return String(lastUpdated).slice(0, 10) >= cutoff ? 'current' : 'stale';
+  return String(lastUpdated).slice(0, 10) > cutoff ? 'current' : 'stale';
 }
 
 // Hook form: returns (record) => status, using the record's Last Updated field.
